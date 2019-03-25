@@ -73,12 +73,13 @@ int main(int argc, char *argv[])
     char buffer[BUF_SIZE];
     int buf_avail, buf_written;
     int my_fd = -1;
+    FILE *template_file;
 
     /* argc is always one more than the number of arguments passed, because the first one
      * is the name of the executable. */
-    if (argc != 2)
+    if (argc != 3)
     {
-        fprintf(stderr, "%s\n", "Usage:\n\tserver <listen-port>");
+        fprintf(stderr, "%s\n", "Usage:\n\tserver <listen-port> <html-template-file>");
         exit(EXIT_FAILURE);
     }
 
@@ -87,7 +88,14 @@ int main(int argc, char *argv[])
     server_socket_fd = listen_on_socket(listening_port);
     if (server_socket_fd == -1)
     {
-        fprintf(stderr, "%s %d\n", "Unable to create socket on port ", listening_port);
+        fprintf(stderr, "Unable to create socket on port %d\n", listening_port);
+        exit(EXIT_FAILURE);
+    }
+
+    template_file = fopen(argv[2], "r");
+    if (template_file == NULL)
+    {
+        fprintf(stderr, "Unable to open HTML template file %s\n", argv[2]);
         exit(EXIT_FAILURE);
     }
 

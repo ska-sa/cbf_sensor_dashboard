@@ -18,6 +18,7 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <string.h>
+#include <unistd.h> /* Needed for read() and write() */
 
 /* This is handy for keeping track of the number of file descriptors. */
 #undef max
@@ -72,7 +73,7 @@ int main(int argc, char *argv[])
     int server_socket_fd;
     char buffer[BUF_SIZE];
     int buf_avail, buf_written;
-    int my_fd = -1;
+    int file_descriptors[FD_SETSIZE]; /* We can handle this many connections at once. */
     FILE *template_file;
 
     /* argc is always one more than the number of arguments passed, because the first one
@@ -99,6 +100,13 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
+    /* Clear out the array of file descriptors. */
+    int i;
+    for (i = 0; i < FD_SETSIZE; i++)
+    {
+        file_descriptors[i] = -1; /* -1 indicates that it should be ignored. */
+    }
+
     for(;;) /* for EVAR - exit using ctrl+c */
     {
         int r; /* dump variable for results of functions */
@@ -116,25 +124,25 @@ int main(int argc, char *argv[])
         nfds = max(nfds, server_socket_fd);
 
         /* This sets up which file descriptors we'd like to read from on this round. */
-        if (my_fd > 0 && buf_avail < BUF_SIZE)
+        for (i = 0; i < FD_SETSIZE; i++)
         {
-            FD_SET(my_fd, &rd);
-            nfds = max(nfds, my_fd);
+            if (file_descriptors[i] > 0)
+            {
+                FD_SET(file_descriptors[i], &rd);
+                FD_SET(file_descriptors[i], &er); /* For completeness... */
+                nfds = max(nfds, file_descriptors[i]);
+            }
         }
+
         /*  for the time being I'm not going to be writing to that socket, just reading.
         if (my_fd > 0 && buf_avail - buf_written > 0)
         {
             FD_SET(my_fd, &wr);
             nfds = max(nfds, my_fd);
         }*/
-        if (my_fd > 0)
-        {
-            FD_SET(my_fd, &er);
-            nfds = max(nfds, my_fd);
-        }
 
         /* Passing select() a NULL as the last parameter blocks here, and can even be swapped,
-         * until such time as the */
+         * until such time as there's something to be done on one of the file-descriptors*/
         r = select(nfds + 1, &rd, &wr, &er, NULL);
 
         /* EINTR just means it was interrupted by a signal or something.
@@ -164,52 +172,64 @@ int main(int argc, char *argv[])
             }
             else
             {
-                if (my_fd >= 0)
+                for (i = 0; i < FD_SETSIZE; i++)
                 {
-                    shutdown(my_fd, SHUT_RDWR);
-                    close(my_fd);
-                    my_fd = -1;
-                }
-                buf_avail = buf_written = 0; /* Don't actually use this functionality. TODO edit it out, or actually figure out how to make use of it. */
-                my_fd = r;
-                printf("Connection from %s\n", inet_ntoa(client_address.sin_addr));
+                    if (file_descriptors[i] < 0)
+                    {
+                        file_descriptors[i] = r;
+                        break;
+                    }
+                } 
+                if (i == FD_SETSIZE)
+                    perror("Unable to open additional connections."); /* I have a suspicion that we wont' actually get here because accept() will likely return an error if there are too many file descriptors already open? */
+                else
+                    printf("Connection from %s\n", inet_ntoa(client_address.sin_addr));
             }
         }
 
         /* Handle the OOB stuff first. For completeness' sake. */
-        if (my_fd > 0)
+        for (i = 0; i < FD_SETSIZE; i++)
         {
-            if (FD_ISSET(my_fd, &er))
+            if (file_descriptors[i] > 0)
             {
-                char c;
-                r = recv(my_fd, &c, 1, MSG_OOB);
-                if (r < 1)
+                if (FD_ISSET(file_descriptors[i], &er))
                 {
-                    shutdown(my_fd, SHUT_RDWR);
-                    close(my_fd);
-                    my_fd = -1;
+                    char c;
+                    r = recv(file_descriptors[i], &c, 1, MSG_OOB);
+                    if (r < 1)
+                    {
+                        shutdown(file_descriptors[i], SHUT_RDWR);
+                        close(file_descriptors[i]);
+                        file_descriptors[i] = -1;
+                    }
+                    else
+                        printf("OOB: %c\n", c);
                 }
-                else
-                    printf("OOB: %c\n", c);
             }
         }
 
         /* Now handle the actual reading from the socket. */
-        if (my_fd > 0)
-            if (FD_ISSET(my_fd, &rd))
+        for (i = 0; i < FD_SETSIZE; i++)
+        {
+            if (file_descriptors[i] > 0)
             {
-                r = read(my_fd, buffer, BUF_SIZE - 1); /* -1 to prevent overrunning the buffer. */
-                if (r < 1)
+                if (FD_ISSET(file_descriptors[i], &rd))
                 {
-                    shutdown(my_fd, SHUT_RDWR);
-                    close(my_fd);
-                    my_fd = -1;
-                }
-                else
-                {
-                    buffer[r] = '\0'; /* To make it a well-formed string, so that printf doesn't print too much stuff. */
-                    printf("Received: %s\n", buffer);
+                    r = read(file_descriptors[i], buffer, BUF_SIZE - 1); /* -1 to prevent overrunning the buffer. */
+                    if (r < 1)
+                    {
+                        shutdown(file_descriptors[i], SHUT_RDWR);
+                        close(file_descriptors[i]);
+                        file_descriptors[i] = -1;
+                    }
+                    else
+                    {
+                        buffer[r] = '\0'; /* To make it a well-formed string. */
+                        printf("Received: %s\n", buffer);
+                    }
                 }
             }
+        }
     }
 }
+

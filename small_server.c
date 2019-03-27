@@ -74,7 +74,9 @@ int main(int argc, char *argv[])
     char buffer[BUF_SIZE];
     int buf_avail, buf_written;
     int file_descriptors[FD_SETSIZE]; /* We can handle this many connections at once. */
+    char file_descriptors_want_data[FD_SETSIZE]; /* Keep track of the fds that actually want something. */
     FILE *template_file;
+    int i; /* for use as a loop index */
 
     /* argc is always one more than the number of arguments passed, because the first one
      * is the name of the executable. */
@@ -99,12 +101,13 @@ int main(int argc, char *argv[])
         fprintf(stderr, "Unable to open HTML template file %s\n", argv[2]);
         exit(EXIT_FAILURE);
     }
+    fclose(template_file); /* Will open it again later. */
 
     /* Clear out the array of file descriptors. */
-    int i;
     for (i = 0; i < FD_SETSIZE; i++)
     {
         file_descriptors[i] = -1; /* -1 indicates that it should be ignored. */
+        file_descriptors_want_data[i] = 0;
     }
 
     for(;;) /* for EVAR - exit using ctrl+c */
@@ -130,6 +133,8 @@ int main(int argc, char *argv[])
             {
                 FD_SET(file_descriptors[i], &rd);
                 FD_SET(file_descriptors[i], &er); /* For completeness... */
+                if (file_descriptors_want_data[i])
+                    FD_SET(file_descriptors[i], &wr);
                 nfds = max(nfds, file_descriptors[i]);
             }
         }
@@ -225,8 +230,58 @@ int main(int argc, char *argv[])
                     else
                     {
                         buffer[r] = '\0'; /* To make it a well-formed string. */
-                        printf("Received: %s\n", buffer);
+                        if (strncmp(buffer, "GET", 3) == 0)
+                            file_descriptors_want_data[i] = 1;
+                        else
+                            printf("Got a request that wasn't just GET: %s\n", buffer);
                     }
+                }
+            }
+        }
+
+        /* Handle the sockets that want to be written to. */
+        for (i = 0; i < FD_SETSIZE; i++)
+        {
+            if (file_descriptors[i] > 0)
+            {
+                if (FD_ISSET(file_descriptors[i], &wr))
+                {  
+                    template_file = fopen(argv[2], "r");
+                    if (template_file == NULL)
+                    {
+                        char error_message[] = "HTTP/1.1 404 Not Found";
+                        r = write(file_descriptors[i], error_message, sizeof(error_message));
+                        shutdown(file_descriptors[i], SHUT_RDWR);
+                        close(file_descriptors[i]);
+                        file_descriptors[i] = -1;
+                        file_descriptors_want_data[i] = 0;
+                        fprintf(stderr, "Unable to open HTML template file %s\n", argv[2]);
+                    }
+
+                    char buffer[BUF_SIZE];
+                    char *res;
+                    do {
+                        res = fgets(buffer, BUF_SIZE, template_file);
+                        if (res != NULL)
+                        {
+                            r = write(file_descriptors[i], buffer, strlen(buffer));
+                            if (r < 1)
+                            {
+                                shutdown(file_descriptors[i], SHUT_RDWR);
+                                close(file_descriptors[i]);
+                                file_descriptors[i] = -1;
+                                file_descriptors_want_data[i] = 0;
+                            }
+                        }
+                    } while (res != NULL);
+
+                    fclose(template_file);
+
+                    /* Finished sending the HTML template down the pipe. */
+                    shutdown(file_descriptors[i], SHUT_RDWR);
+                    close(file_descriptors[i]);
+                    file_descriptors[i] = -1;
+                    file_descriptors_want_data[i] = 0;
                 }
             }
         }

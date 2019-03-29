@@ -19,6 +19,8 @@
 #include <errno.h>
 #include <string.h>
 #include <unistd.h> /* Needed for read() and write() */
+#include <katcp.h>
+#include <katcl.h>
 
 /* This is handy for keeping track of the number of file descriptors. */
 #undef max
@@ -77,6 +79,7 @@ int main(int argc, char *argv[])
     char file_descriptors_want_data[FD_SETSIZE]; /* Keep track of the fds that actually want something. */
     FILE *template_file;
     int i; /* for use as a loop index */
+    struct katcl_line *test;
 
     /* argc is always one more than the number of arguments passed, because the first one
      * is the name of the executable. */
@@ -85,6 +88,10 @@ int main(int argc, char *argv[])
         fprintf(stderr, "%s\n", "Usage:\n\tserver <listen-port> <html-template-file>");
         exit(EXIT_FAILURE);
     }
+
+#if 1
+    test = create_katcl(STDIN_FILENO);
+#endif
 
     /* open a socket on the port specified */
     listening_port = atoi(argv[1]);

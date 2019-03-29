@@ -59,8 +59,14 @@ HTTP/1.1 200 OK
 .redbutton:hover {opacity: 1}
 
 </style>
+<script>
+function timedRefresh(timeoutPeriod) {
+    setTimeout("location.reload(true);",timeoutPeriod);
+}
+</script>
+
 </head>
- <body>
+ <body onload="JavaScript:timedRefresh(5000);">
    <section>
     <table>
     <tr>

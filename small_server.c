@@ -21,6 +21,7 @@
 #include <unistd.h> /* Needed for read() and write() */
 #include <katcp.h>
 #include <katcl.h>
+#include <netc.h>
 
 /* This is handy for keeping track of the number of file descriptors. */
 #undef max
@@ -68,30 +69,56 @@ static int listen_on_socket(int listening_port)
     return s;
 }
 
+/*
+static int connect_katcp_socket(char* address, int port)
+{
+    struct sockaddr_in addr;
+    int s;
+
+    if ((s = socket(AF_INET, SOCK_STREAM, 0)) == -1)
+    {
+        perror("outbound socket");
+        return -1;
+    }
+
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_port = htons(port);
+    addr.sin_family = AF_INET;
+    if (!inet_aton(address, (struct in_addr *) &addr.sin_addr.s_addr))
+    {
+        perror("Bad IP addres format.");
+        close(s);
+        return -1;
+    }
+
+    if (connect(s, (struct sockaddr *) &addr, sizeof(addr)) == -1)
+    {
+        perror("connect");
+        shutdown(s, SHUT_RDWR);
+        close(s);
+        return -1;
+    }
+    return s;
+}
+*/
 
 int main(int argc, char *argv[])
 {
-    int listening_port;
-    int server_socket_fd;
+    int listening_port, katcp_port;
+    int server_socket_fd, katcp_socket_fd;
     char buffer[BUF_SIZE];
-    int buf_avail, buf_written;
     int file_descriptors[FD_SETSIZE]; /* We can handle this many connections at once. */
     char file_descriptors_want_data[FD_SETSIZE]; /* Keep track of the fds that actually want something. */
     FILE *template_file;
     int i; /* for use as a loop index */
-    struct katcl_line *test;
 
     /* argc is always one more than the number of arguments passed, because the first one
      * is the name of the executable. */
-    if (argc != 3)
+    if (argc != 5)
     {
-        fprintf(stderr, "%s\n", "Usage:\n\tserver <listen-port> <html-template-file>");
+        fprintf(stderr, "%s\n", "Usage:\n\tserver <listen-port> <html-template-file> <katcp-server> <katcp-port>");
         exit(EXIT_FAILURE);
     }
-
-#if 1
-    test = create_katcl(STDIN_FILENO);
-#endif
 
     /* open a socket on the port specified */
     listening_port = atoi(argv[1]);
@@ -110,6 +137,19 @@ int main(int argc, char *argv[])
     }
     fclose(template_file); /* Will open it again later. */
 
+    katcp_port = atoi(argv[4]);
+    katcp_socket_fd = net_connect(argv[3], katcp_port, NETC_VERBOSE_ERRORS | NETC_VERBOSE_STATS);
+    if (katcp_socket_fd == -1)
+    {
+        fprintf(stderr, "Unable to connect to katcp server %s:%d\n", argv[3], katcp_port);
+        exit(EXIT_FAILURE);
+    }
+
+    /* Tell the KATCP server that we'd like to know something. */
+    {
+        //TODO put the stuff from katcp_test here.
+    }
+    
     /* Clear out the array of file descriptors. */
     for (i = 0; i < FD_SETSIZE; i++)
     {
@@ -117,7 +157,7 @@ int main(int argc, char *argv[])
         file_descriptors_want_data[i] = 0;
     }
 
-    for(;;) /* for EVAR - exit using ctrl+c */
+    for(;;) /* for-EVAR - exit using ctrl+c */
     {
         int r; /* dump variable for results of functions */
         int nfds = 0; /* number of file descriptors. */
@@ -240,7 +280,7 @@ int main(int argc, char *argv[])
                         if (strncmp(buffer, "GET", 3) == 0)
                             file_descriptors_want_data[i] = 1;
                         else
-                            printf("Got a request that wasn't just GET: %s\n", buffer);
+                            printf("Got a message not starting with GET: %s\n", buffer);
                     }
                 }
             }

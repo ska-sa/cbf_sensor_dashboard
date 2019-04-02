@@ -111,6 +111,7 @@ int main(int argc, char *argv[])
     char file_descriptors_want_data[FD_SETSIZE]; /* Keep track of the fds that actually want something. */
     FILE *template_file;
     int i; /* for use as a loop index */
+    struct katcl_line *l;
 
     /* argc is always one more than the number of arguments passed, because the first one
      * is the name of the executable. */
@@ -144,10 +145,14 @@ int main(int argc, char *argv[])
         fprintf(stderr, "Unable to connect to katcp server %s:%d\n", argv[3], katcp_port);
         exit(EXIT_FAILURE);
     }
-
-    /* Tell the KATCP server that we'd like to know something. */
+    else
+    /* Tell the cmc that we'd like to know something. */
     {
-        //TODO put the stuff from katcp_test here.
+        l = create_katcl(katcp_socket_fd);
+
+        if (append_string_katcl(l, KATCP_FLAG_FIRST | KATCP_FLAG_LAST, "?array-list") < 0) return -1;
+
+        r = write_katcl(l);
     }
     
     /* Clear out the array of file descriptors. */
@@ -333,5 +338,10 @@ int main(int argc, char *argv[])
             }
         }
     }
+
+    /* cleanup */
+    destroy_katcl(l, 1);
+
+    return 0;
 }
 

@@ -13,25 +13,39 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
+#include <sys/time.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <errno.h>
 #include <string.h>
 #include <unistd.h> /* Needed for read() and write() */
+#include <signal.h>
 #include <katcp.h>
 #include <katcl.h>
 #include <netc.h>
+
+#include "array_handling.h"
 
 /* This is handy for keeping track of the number of file descriptors. */
 #undef max
 #define max(x,y) ((x) > (y) ? (x) : (y))
 
 #define BUF_SIZE 1024
+#define NAME_LENGTH 1024
+
+volatile sig_atomic_t stop = 0;
+void sigint(int signo)
+{
+    if (signo == SIGINT)
+    {
+        printf("Caught Ctrl+C, exiting...\n");
+        stop = 1;
+    }
+}
 
 /* Function takes a port number as an argument and returns a file descriptor
  * to the resulting socket. Opens socket on 0.0.0.0. */
-
 static int listen_on_socket(int listening_port)
 {
     struct sockaddr_in a;
@@ -69,41 +83,11 @@ static int listen_on_socket(int listening_port)
     return s;
 }
 
-/*
-static int connect_katcp_socket(char* address, int port)
-{
-    struct sockaddr_in addr;
-    int s;
-
-    if ((s = socket(AF_INET, SOCK_STREAM, 0)) == -1)
-    {
-        perror("outbound socket");
-        return -1;
-    }
-
-    memset(&addr, 0, sizeof(addr));
-    addr.sin_port = htons(port);
-    addr.sin_family = AF_INET;
-    if (!inet_aton(address, (struct in_addr *) &addr.sin_addr.s_addr))
-    {
-        perror("Bad IP addres format.");
-        close(s);
-        return -1;
-    }
-
-    if (connect(s, (struct sockaddr *) &addr, sizeof(addr)) == -1)
-    {
-        perror("connect");
-        shutdown(s, SHUT_RDWR);
-        close(s);
-        return -1;
-    }
-    return s;
-}
-*/
-
 int main(int argc, char *argv[])
 {
+
+    signal(SIGINT, &sigint);
+
     int listening_port, katcp_port;
     int server_socket_fd, katcp_socket_fd;
     char buffer[BUF_SIZE];
@@ -112,6 +96,11 @@ int main(int argc, char *argv[])
     FILE *template_file;
     int i; /* for use as a loop index */
     struct katcl_line *l;
+    int r; /* dump variable for results of functions */
+
+    struct cmc_array **array_list = NULL;
+    int array_list_size = 0;
+//    int make_new_array_list = 0;
 
     /* argc is always one more than the number of arguments passed, because the first one
      * is the name of the executable. */
@@ -146,12 +135,10 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
     else
-    /* Tell the cmc that we'd like to know something. */
+    /* Tell the cmc that we'd like to know something about the arrays that are here. */
     {
         l = create_katcl(katcp_socket_fd);
-
         if (append_string_katcl(l, KATCP_FLAG_FIRST | KATCP_FLAG_LAST, "?array-list") < 0) return -1;
-
         r = write_katcl(l);
     }
     
@@ -162,9 +149,8 @@ int main(int argc, char *argv[])
         file_descriptors_want_data[i] = 0;
     }
 
-    for(;;) /* for-EVAR - exit using ctrl+c */
+    while(!stop) /* to allow for graceful exiting, otherwise we get potential leaks. */
     {
-        int r; /* dump variable for results of functions */
         int nfds = 0; /* number of file descriptors. */
         fd_set rd, wr, er; /* sets of file descriptors to monitor things. er will likely not be used but
                               marc says it's good practice to keep it around. */
@@ -177,6 +163,10 @@ int main(int argc, char *argv[])
         /* Indicate that we're happy to read from the socket that we've just opened. */
         FD_SET(server_socket_fd, &rd);
         nfds = max(nfds, server_socket_fd);
+        
+        /* we're also happy to read from the katcp socket. */
+        FD_SET(katcp_socket_fd, &rd);
+        nfds = max(nfds, katcp_socket_fd);
 
         /* This sets up which file descriptors we'd like to read from on this round. */
         for (i = 0; i < FD_SETSIZE; i++)
@@ -190,13 +180,6 @@ int main(int argc, char *argv[])
                 nfds = max(nfds, file_descriptors[i]);
             }
         }
-
-        /*  for the time being I'm not going to be writing to that socket, just reading.
-        if (my_fd > 0 && buf_avail - buf_written > 0)
-        {
-            FD_SET(my_fd, &wr);
-            nfds = max(nfds, my_fd);
-        }*/
 
         /* Passing select() a NULL as the last parameter blocks here, and can even be swapped,
          * until such time as there's something to be done on one of the file-descriptors*/
@@ -242,6 +225,50 @@ int main(int argc, char *argv[])
                 else
                     printf("Connection from %s\n", inet_ntoa(client_address.sin_addr));
             }
+        }
+
+        if (FD_ISSET(katcp_socket_fd, &wr))
+        {
+            if (l == NULL)
+                l = create_katcl(katcp_socket_fd);
+            /* Need to determine which message to send. It'll be an array-list first, sensor-list and sensor-sampling later. */
+            if (append_string_katcl(l, KATCP_FLAG_FIRST | KATCP_FLAG_LAST, "?array-list") < 0) perror("append_string_katcl");
+            r = write_katcl(l);
+            if (r < 0)
+            {
+                fprintf(stderr, "failed to send katcp message\n");
+                perror("write_katcl");
+                destroy_katcl(l, 1);
+            }
+        }
+
+        if (FD_ISSET(katcp_socket_fd, &rd))
+        {
+           r = read_katcl(l);
+           if (r)
+           {
+               fprintf(stderr, "read failed: %s\n", (r < 0) ? strerror(error_katcl(l)) : "connection terminated");
+               perror("read_katcl");
+           }
+
+           while (have_katcl(l) > 0)
+           {
+               if (strncmp(arg_string_katcl(l, 0), "#log", 4) != 0) /* i.e. if it's not a log */
+               {
+                   /* This is where the tricky bit comes in. */
+                   //printf("Received something that's not a log.\n");
+                   char *buffer = read_full_katcp_line(l);
+                   printf("%s\n", buffer);
+                   free(buffer);
+               }
+           }
+           //printf("Current array_list_size: %d\n", array_list_size);
+           for (i = 0; i < array_list_size; i++)
+           {
+               char* buffer = get_array_name(array_list[i]);
+               printf("line %d: %s\n", i, buffer);
+               free(buffer);
+           }
         }
 
         /* Handle the OOB stuff first. For completeness' sake. */
@@ -298,6 +325,7 @@ int main(int argc, char *argv[])
             {
                 if (FD_ISSET(file_descriptors[i], &wr))
                 {  
+                    /* commenting this out for the time being.
                     template_file = fopen(argv[2], "r");
                     if (template_file == NULL)
                     {
@@ -328,8 +356,27 @@ int main(int argc, char *argv[])
                     } while (res != NULL);
 
                     fclose(template_file);
-
-                    /* Finished sending the HTML template down the pipe. */
+                    */
+                    
+                    if (array_list)
+                    {
+                        /*int j;
+                        for (j = 0; j < array_list_size; j++)
+                        {
+                           char *line_to_write;
+                            size_t needed = snprintf(NULL, 0, "%s %d\n", array_list[j]->name, array_list[j]->monitor_port) + 1;
+                            line_to_write = malloc(needed);
+                            sprintf(line_to_write, "%s %d\n", array_list[j]->name, array_list[j]->monitor_port);
+                            r = write(file_descriptors[i], line_to_write, strlen(array_list[j]));
+                            free(line_to_write);
+                        }*/
+                    }
+                    else
+                    {
+                        char message[] = "No arrays currently running, or cmc not yet polled. Please try again later...\n";
+                        /* TODO make this auto-refreshing as well.*/
+                        r = write(file_descriptors[i], message, sizeof(message));
+                    }
                     shutdown(file_descriptors[i], SHUT_RDWR);
                     close(file_descriptors[i]);
                     file_descriptors[i] = -1;

@@ -4,7 +4,10 @@
 #include <katcp.h>
 #include <katcl.h>
 
-struct cmc_array;
+struct cmc_array {
+    char *name;
+    int monitor_port;
+};
 
 char *read_full_katcp_line(struct katcl_line *l);
 

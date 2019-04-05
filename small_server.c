@@ -34,6 +34,15 @@
 #define BUF_SIZE 1024
 #define NAME_LENGTH 1024
 
+
+enum program_state {
+    STARTUP_SEND,
+    STARTUP_RECV,
+    MONITOR,
+    ADD_TO_LIST_REQUEST_MONITOR_PORT,
+    ADD_TO_LIST_RECEIVE_MONITOR_PORT
+};
+
 volatile sig_atomic_t stop = 0;
 void sigint(int signo)
 {
@@ -98,8 +107,11 @@ int main(int argc, char *argv[])
     struct katcl_line *l;
     int r; /* dump variable for results of functions */
 
+    enum program_state state = STARTUP_SEND;
+
     struct cmc_array **array_list = NULL;
     int array_list_size = 0;
+    char* new_array_name = NULL;
 //    int make_new_array_list = 0;
 
     /* argc is always one more than the number of arguments passed, because the first one
@@ -135,19 +147,16 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
     else
-    /* Tell the cmc that we'd like to know something about the arrays that are here. */
-    {
         l = create_katcl(katcp_socket_fd);
-        if (append_string_katcl(l, KATCP_FLAG_FIRST | KATCP_FLAG_LAST, "?array-list") < 0) return -1;
-        r = write_katcl(l);
-    }
-    
+   
     /* Clear out the array of file descriptors. */
     for (i = 0; i < FD_SETSIZE; i++)
     {
         file_descriptors[i] = -1; /* -1 indicates that it should be ignored. */
         file_descriptors_want_data[i] = 0;
     }
+
+
 
     while(!stop) /* to allow for graceful exiting, otherwise we get potential leaks. */
     {
@@ -168,6 +177,18 @@ int main(int argc, char *argv[])
         FD_SET(katcp_socket_fd, &rd);
         nfds = max(nfds, katcp_socket_fd);
 
+        /* we only need to write to it in one of a certain number of states */
+        switch (state)
+        {
+            case STARTUP_SEND:
+            case ADD_TO_LIST_REQUEST_MONITOR_PORT:
+                FD_SET(katcp_socket_fd, &wr);
+                /* nfds already updated to include this fd, so no need to update it again here. */
+                break;
+            default:
+                ;
+        }
+            
         /* This sets up which file descriptors we'd like to read from on this round. */
         for (i = 0; i < FD_SETSIZE; i++)
         {
@@ -227,18 +248,35 @@ int main(int argc, char *argv[])
             }
         }
 
-        if (FD_ISSET(katcp_socket_fd, &wr))
+        if (FD_ISSET(katcp_socket_fd, &wr)) /* Tell the cmc that we'd like to know something about the arrays that are here. */
         {
-            if (l == NULL)
-                l = create_katcl(katcp_socket_fd);
-            /* Need to determine which message to send. It'll be an array-list first, sensor-list and sensor-sampling later. */
-            if (append_string_katcl(l, KATCP_FLAG_FIRST | KATCP_FLAG_LAST, "?array-list") < 0) perror("append_string_katcl");
-            r = write_katcl(l);
-            if (r < 0)
+            int send = 0; /* flag to skip over sending if there's nothing to send. */
+            switch (state)
             {
-                fprintf(stderr, "failed to send katcp message\n");
-                perror("write_katcl");
-                destroy_katcl(l, 1);
+                case STARTUP_SEND: 
+                    append_string_katcl(l, KATCP_FLAG_FIRST | KATCP_FLAG_LAST, "?array-list");
+                    append_string_katcl(l, KATCP_FLAG_FIRST, "?client-config");
+                    append_string_katcl(l, KATCP_FLAG_LAST, "info-all");
+                    send = 1;
+                    state = STARTUP_RECV;
+                    break;
+                case ADD_TO_LIST_REQUEST_MONITOR_PORT:
+                    append_string_katcl(l, KATCP_FLAG_FIRST | KATCP_FLAG_LAST, "?array-list");
+                    send = 1;
+                    state = ADD_TO_LIST_RECEIVE_MONITOR_PORT;
+                    break;
+                default: 
+                    send = 0; /* just in case */
+            }
+            if (send) 
+            {
+                r = write_katcl(l);
+                if (r < 0)
+                {
+                    fprintf(stderr, "failed to send katcp message\n");
+                    perror("write_katcl");
+                    destroy_katcl(l, 1);
+                }
             }
         }
 
@@ -253,22 +291,121 @@ int main(int argc, char *argv[])
 
            while (have_katcl(l) > 0)
            {
-               if (strncmp(arg_string_katcl(l, 0), "#log", 4) != 0) /* i.e. if it's not a log */
+                switch (state)
+                {
+                    case STARTUP_RECV:
+                        if (!strcmp(arg_string_katcl(l, 0), "#array-list"))
+                        {
+                            struct cmc_array **temp = realloc(array_list, sizeof(*array_list)*(++array_list_size));
+                            if (temp)
+                                array_list = temp;
+                            char* array_name = arg_string_katcl(l, 1);
+                            strtok(arg_string_katcl(l, 2), ",");
+                            int monitor_port = atoi(strtok(NULL, ","));
+                            printf("Monitoring array \"%s\" on port %d of the CMC...\n", array_name, monitor_port);
+                            array_list[array_list_size-1] = create_array(array_name, monitor_port);
+                        }
+                        else if (!strcmp(arg_string_katcl(l, 0), "!array-list"))
+                        {
+                            printf("Finished getting initial array list. Monitoring...\n");
+                            state = MONITOR;
+                        }
+                        break;
+                    case MONITOR:
+                        if (!strcmp(arg_string_katcl(l, 0), "#group-created"))
+                        {
+                            char *temp = arg_string_katcl(l, 1);
+                            new_array_name = strtok(temp, ".");
+                            printf("Noticed a new array, %s. Requesting monitor port to connect to...\n", new_array_name);
+                            state = ADD_TO_LIST_REQUEST_MONITOR_PORT;
+                            break;
+                        }
+                        else if (!strcmp(arg_string_katcl(l, 0), "#group-destroyed"))
+                        {
+                            /* remove the array from the list. */
+                            char *name_of_removed_array = strtok(arg_string_katcl(l, 1), ".");
+                            int j;
+                            for (j = 0; j < array_list_size; j++)
+                            {
+                                if (!strcmp(name_of_removed_array, array_list[j]->name))
+                                    break;
+                            }
+                            if (j == array_list_size)
+                                fprintf(stderr, "Weirdly, the CMC said that %s is being destroyed, but we didn't have it on the list in the first place...", name_of_removed_array);
+                            else
+                            {
+                                destroy_array(array_list[j]);
+                                memmove(&array_list[j], &array_list[j+1], (array_list_size - j - 1)*sizeof(*array_list));
+                                struct cmc_array **temp = realloc(array_list, sizeof(*array_list)*(--array_list_size));
+                                if (temp)
+                                    array_list = temp;
+                                printf("No longer monitoring %s - destroyed.\n", name_of_removed_array);
+                                free(name_of_removed_array);
+                            }
+                        }
+                        break;
+                    case ADD_TO_LIST_RECEIVE_MONITOR_PORT:
+                        if (!strcmp(arg_string_katcl(l, 0), "#array-list") && !(strcmp(arg_string_katcl(l, 1), new_array_name)))
+                        {
+                            struct cmc_array **temp = realloc(array_list, sizeof(*array_list)*(++array_list_size));
+                            if (temp)
+                                array_list = temp;
+                            char* temp_array_name = arg_string_katcl(l, 1);
+                            strtok(arg_string_katcl(l, 2), ",");
+                            int monitor_port = atoi(strtok(NULL, ","));
+                            printf("Monitoring array \"%s\" on port %d of the CMC...\n", new_array_name, monitor_port);
+                            array_list[array_list_size-1] = create_array(new_array_name, monitor_port);
+                            free(new_array_name);
+                            free(temp_array_name);
+                            state = MONITOR;
+                            break;
+                        }
+                        else
+                        {
+                            int j;
+                            do 
+                                printf("%s ", arg_string_katcl(l, j));
+                            while (arg_string_katcl(l, ++j) != NULL);
+                            printf("\n");
+                        }
+                    default:
+                        ;
+                }
+
+               /*
+               
+               else if (!strcmp(arg_string_katcl(l, 0), "!array-list"))
                {
-                   /* This is where the tricky bit comes in. */
+                   printf("Got !array-list\n");
+               }
+               else if (!strcmp(arg_string_katcl(l, 0), "#group-created"))
+               {
+                   printf("Got #group-created\n");
+               }
+               else if (!strcmp(arg_string_katcl(l, 0), "#group-destroyed"))
+               {
+                   printf("Got #group-destroyed\n");
+               }
+               else
+               {
+                   //printf("Got something else.\n");
+               }*/
+               /*if (strncmp(arg_string_katcl(l, 0), "#log", 4) != 0)
+               {
+               //this code just here for reference for the time being. Remove this comment once things are more sorted.
                    //printf("Received something that's not a log.\n");
                    char *buffer = read_full_katcp_line(l);
                    printf("%s\n", buffer);
                    free(buffer);
-               }
+               }*/
            }
            //printf("Current array_list_size: %d\n", array_list_size);
-           for (i = 0; i < array_list_size; i++)
-           {
-               char* buffer = get_array_name(array_list[i]);
-               printf("line %d: %s\n", i, buffer);
-               free(buffer);
-           }
+           //for (i = 0; i < array_list_size; i++)
+           //{
+           //    char* buffer = get_array_name(array_list[i]);
+           //    printf("line %d: %s\n", i, buffer);
+           //    free(buffer);
+           //}
         }
 
         /* Handle the OOB stuff first. For completeness' sake. */
@@ -360,16 +497,16 @@ int main(int argc, char *argv[])
                     
                     if (array_list)
                     {
-                        /*int j;
+                        int j;
                         for (j = 0; j < array_list_size; j++)
                         {
-                           char *line_to_write;
+                            char *line_to_write;
                             size_t needed = snprintf(NULL, 0, "%s %d\n", array_list[j]->name, array_list[j]->monitor_port) + 1;
                             line_to_write = malloc(needed);
                             sprintf(line_to_write, "%s %d\n", array_list[j]->name, array_list[j]->monitor_port);
-                            r = write(file_descriptors[i], line_to_write, strlen(array_list[j]));
+                            r = write(file_descriptors[i], line_to_write, strlen(line_to_write));
                             free(line_to_write);
-                        }*/
+                        }
                     }
                     else
                     {
@@ -388,6 +525,9 @@ int main(int argc, char *argv[])
 
     /* cleanup */
     destroy_katcl(l, 1);
+    for (i = 0; i < array_list_size; i++)
+        destroy_array(array_list[i]);
+    free(array_list);
 
     return 0;
 }

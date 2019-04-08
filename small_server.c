@@ -322,10 +322,25 @@ int main(int argc, char *argv[])
                             if (temp)
                                 array_list = temp;
                             char* array_name = arg_string_katcl(l, 1);
-                            strtok(arg_string_katcl(l, 2), ",");
+                            strtok(arg_string_katcl(l, 2), ","); /* don't need the first bit, that's the control port */
                             int monitor_port = atoi(strtok(NULL, ","));
                             printf("Monitoring array \"%s\" on port %d of the CMC...\n", array_name, monitor_port);
-                            array_list[array_list_size-1] = create_array(array_name, monitor_port);
+                            int j = 3;
+                            char *multicast_groups = malloc(1);
+                            multicast_groups[0] = '\0';
+                            char *buffer;
+                            do {
+                                buffer = arg_string_katcl(l, j);
+                                if (buffer)
+                                {
+                                    multicast_groups = realloc(multicast_groups, strlen(multicast_groups) + strlen(buffer) + 2);
+                                    strcat(multicast_groups, " ");
+                                    strcat(multicast_groups, buffer);
+                                }
+                                j++;
+                            } while (buffer);
+                            array_list[array_list_size-1] = create_array(array_name, monitor_port, multicast_groups);
+                            free(multicast_groups);
                         }
                         else if (!strcmp(arg_string_katcl(l, 0), "!array-list"))
                         {
@@ -383,9 +398,26 @@ int main(int argc, char *argv[])
                             strtok(arg_string_katcl(l, 2), ",");
                             int monitor_port = atoi(strtok(NULL, ","));
                             printf("Monitoring array \"%s\" on port %d of the CMC...\n", new_array_name, monitor_port);
-                            array_list[array_list_size-1] = create_array(new_array_name, monitor_port);
+
+                            int j = 3;
+                            char *multicast_groups = malloc(1);
+                            multicast_groups[0] = '\0';
+                            char *buffer;
+                            do {
+                                buffer = arg_string_katcl(l, j);
+                                if (buffer)
+                                {
+                                    multicast_groups = realloc(multicast_groups, strlen(multicast_groups) + strlen(buffer) + 2);
+                                    strcat(multicast_groups, " ");
+                                    strcat(multicast_groups, buffer);
+                                }
+                                j++;
+                            } while (buffer);
+                            array_list[array_list_size-1] = create_array(new_array_name, monitor_port, multicast_groups);
+                            free(multicast_groups);
+
                             free(new_array_name);
-                            //free(temp_array_name);
+                            free(multicast_groups);
                             state = MONITOR;
                             break;
                         }
@@ -532,7 +564,7 @@ int main(int argc, char *argv[])
                             char *line_to_write;
                             size_t needed = snprintf(NULL, 0, "%s %d\n", array_list[j]->name, array_list[j]->monitor_port) + 1;
                             line_to_write = malloc(needed);
-                            sprintf(line_to_write, "%s %d\n", array_list[j]->name, array_list[j]->monitor_port);
+                            sprintf(line_to_write, "%s %d %s\n", array_list[j]->name, array_list[j]->monitor_port, array_list[j]->multicast_groups);
                             r = write(file_descriptors[i], line_to_write, strlen(line_to_write));
                             free(line_to_write);
                         }

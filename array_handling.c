@@ -28,12 +28,14 @@ char *read_full_katcp_line(struct katcl_line *l)
     return line_to_return;
 }
 
-struct cmc_array *create_array(char *array_name, int monitor_port)
+struct cmc_array *create_array(char *array_name, int monitor_port, char *multicast_groups)
 {
     struct cmc_array *new_array = malloc(sizeof(*new_array));
     new_array->name = malloc(strlen(array_name) + 1);
     sprintf(new_array->name, "%s", array_name);
     new_array->monitor_port = monitor_port;
+    new_array->multicast_groups = malloc(strlen(multicast_groups) + 1);
+    sprintf(new_array->multicast_groups, "%s", multicast_groups);
     return new_array;
 }
 
@@ -47,6 +49,7 @@ char *get_array_name(struct cmc_array *array)
 void destroy_array(struct cmc_array *array)
 {
     free(array->name);
+    free(array->multicast_groups);
     free(array);
 }
 

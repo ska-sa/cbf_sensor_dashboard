@@ -484,39 +484,6 @@ int main(int argc, char *argv[])
             {
                 if (FD_ISSET(file_descriptors[i], &wr))
                 {  
-                    /* commenting this out for the time being.
-                    template_file = fopen(argv[2], "r");
-                    if (template_file == NULL)
-                    {
-                        char error_message[] = "HTTP/1.1 404 Not Found";
-                        r = write(file_descriptors[i], error_message, sizeof(error_message));
-                        shutdown(file_descriptors[i], SHUT_RDWR);
-                        close(file_descriptors[i]);
-                        file_descriptors[i] = -1;
-                        file_descriptors_want_data[i] = 0;
-                        fprintf(stderr, "Unable to open HTML template file %s\n", argv[2]);
-                    }
-
-                    char buffer[BUF_SIZE];
-                    char *res;
-                    do {
-                        res = fgets(buffer, BUF_SIZE, template_file);
-                        if (res != NULL)
-                        {
-                            r = write(file_descriptors[i], buffer, strlen(buffer));
-                            if (r < 1)
-                            {
-                                shutdown(file_descriptors[i], SHUT_RDWR);
-                                close(file_descriptors[i]);
-                                file_descriptors[i] = -1;
-                                file_descriptors_want_data[i] = 0;
-                            }
-                        }
-                    } while (res != NULL);
-
-                    fclose(template_file);
-                    */
-                    
                     r = send_http_ok(file_descriptors[i]);
                     r = send_html_header(file_descriptors[i]);
                     r = send_html_body_open(file_descriptors[i]);

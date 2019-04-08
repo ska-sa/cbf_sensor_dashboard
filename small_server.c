@@ -562,7 +562,7 @@ int main(int argc, char *argv[])
                         for (j = 0; j < array_list_size; j++)
                         {
                             char *line_to_write;
-                            size_t needed = snprintf(NULL, 0, "%s %d\n", array_list[j]->name, array_list[j]->monitor_port) + 1;
+                            size_t needed = snprintf(NULL, 0, "%s %d %s\n", array_list[j]->name, array_list[j]->monitor_port, array_list[j]->multicast_groups) + 4;
                             line_to_write = malloc(needed);
                             sprintf(line_to_write, "%s %d %s\n", array_list[j]->name, array_list[j]->monitor_port, array_list[j]->multicast_groups);
                             r = write(file_descriptors[i], line_to_write, strlen(line_to_write));

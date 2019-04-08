@@ -38,8 +38,6 @@ int send_html_header(int socket_fd)
         }
     } while (res != NULL);
 
-    printf("%d\n", html_header_file);
-
     fclose(html_header_file);
 
     return 1;
@@ -107,7 +105,7 @@ int send_html_table_arraylist_row(int socket_fd, struct cmc_array *array)
 {
     int r;
     char *html_table_row;
-    size_t needed = snprintf(NULL, 0, "<tr><td>%s</td><td>%d</td><td>%s</td>\n</tr>\n", array->name, array->monitor_port, array->multicast_groups) + 1;
+    size_t needed = snprintf(NULL, 0, "<tr><td>%s</td><td><a href=\"%d\">%d</a></td><td>%s</td>\n</tr>\n", array->name, array->monitor_port, array->monitor_port, array->multicast_groups) + 1;
     html_table_row = malloc(needed);
     sprintf(html_table_row, "<tr><td>%s</td><td><a href=\"%d\">%d</a></td><td>%s</td>\n</tr>\n", array->name, array->monitor_port, array->monitor_port, array->multicast_groups);
     r = write(socket_fd, html_table_row, strlen(html_table_row));

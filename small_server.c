@@ -36,8 +36,10 @@
 
 
 enum program_state {
-    STARTUP_SEND,
-    STARTUP_RECV,
+    STARTUP_SEND_CLIENT_CONFIG,
+    STARTUP_WAIT_CLIENT_CONFIG_OKAY,
+    STARTUP_REQUEST_ARRAY_LIST,
+    STARTUP_RECV_ARRAY_LIST,
     MONITOR,
     ADD_TO_LIST_REQUEST_MONITOR_PORT,
     ADD_TO_LIST_RECEIVE_MONITOR_PORT
@@ -107,7 +109,7 @@ int main(int argc, char *argv[])
     struct katcl_line *l;
     int r; /* dump variable for results of functions */
 
-    enum program_state state = STARTUP_SEND;
+    enum program_state state = STARTUP_SEND_CLIENT_CONFIG;
 
     struct cmc_array **array_list = NULL;
     int array_list_size = 0;
@@ -180,7 +182,8 @@ int main(int argc, char *argv[])
         /* we only need to write to it in one of a certain number of states */
         switch (state)
         {
-            case STARTUP_SEND:
+            case STARTUP_SEND_CLIENT_CONFIG:
+            case STARTUP_REQUEST_ARRAY_LIST:
             case ADD_TO_LIST_REQUEST_MONITOR_PORT:
                 FD_SET(katcp_socket_fd, &wr);
                 /* nfds already updated to include this fd, so no need to update it again here. */
@@ -204,7 +207,10 @@ int main(int argc, char *argv[])
 
         /* Passing select() a NULL as the last parameter blocks here, and can even be swapped,
          * until such time as there's something to be done on one of the file-descriptors*/
+        printf("Heading into select with state  %d\n", state);
         r = select(nfds + 1, &rd, &wr, &er, NULL);
+        printf("Selected %d, currently in state %d\n", r, state);
+
 
         /* EINTR just means it was interrupted by a signal or something.
          * Ignore and try again on the next round. */
@@ -253,12 +259,16 @@ int main(int argc, char *argv[])
             int send = 0; /* flag to skip over sending if there's nothing to send. */
             switch (state)
             {
-                case STARTUP_SEND: 
-                    append_string_katcl(l, KATCP_FLAG_FIRST | KATCP_FLAG_LAST, "?array-list");
+                case STARTUP_SEND_CLIENT_CONFIG:
                     append_string_katcl(l, KATCP_FLAG_FIRST, "?client-config");
                     append_string_katcl(l, KATCP_FLAG_LAST, "info-all");
                     send = 1;
-                    state = STARTUP_RECV;
+                    state = STARTUP_WAIT_CLIENT_CONFIG_OKAY;
+                    break;
+                case STARTUP_REQUEST_ARRAY_LIST:
+                    append_string_katcl(l, KATCP_FLAG_FIRST | KATCP_FLAG_LAST, "?array-list");
+                    send = 1;
+                    state = STARTUP_RECV_ARRAY_LIST;
                     break;
                 case ADD_TO_LIST_REQUEST_MONITOR_PORT:
                     append_string_katcl(l, KATCP_FLAG_FIRST | KATCP_FLAG_LAST, "?array-list");
@@ -293,7 +303,19 @@ int main(int argc, char *argv[])
            {
                 switch (state)
                 {
-                    case STARTUP_RECV:
+                    case STARTUP_WAIT_CLIENT_CONFIG_OKAY:
+                        if (!strcmp(arg_string_katcl(l, 0), "!client-config"))
+                        {
+                            if (!strcmp(arg_string_katcl(l, 1), "ok"))
+                                state = STARTUP_REQUEST_ARRAY_LIST;
+                            else
+                            {
+                                fprintf(stderr, "!client-config received %s, expected ok\nretrying...\n", arg_string_katcl(l, 1));
+                                state = STARTUP_SEND_CLIENT_CONFIG;
+                            }
+                        }
+                        break;
+                    case STARTUP_RECV_ARRAY_LIST:
                         if (!strcmp(arg_string_katcl(l, 0), "#array-list"))
                         {
                             struct cmc_array **temp = realloc(array_list, sizeof(*array_list)*(++array_list_size));
@@ -362,7 +384,7 @@ int main(int argc, char *argv[])
                         }
                         else
                         {
-                            int j;
+                            int j = 0;
                             do 
                                 printf("%s ", arg_string_katcl(l, j));
                             while (arg_string_katcl(l, ++j) != NULL);

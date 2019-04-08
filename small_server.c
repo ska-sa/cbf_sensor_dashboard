@@ -207,9 +207,9 @@ int main(int argc, char *argv[])
 
         /* Passing select() a NULL as the last parameter blocks here, and can even be swapped,
          * until such time as there's something to be done on one of the file-descriptors*/
-        printf("Heading into select with state  %d\n", state);
+        //printf("Heading into select with state  %d\n", state);
         r = select(nfds + 1, &rd, &wr, &er, NULL);
-        printf("Selected %d, currently in state %d\n", r, state);
+        //printf("Selected %d, currently in state %d\n", r, state);
 
 
         /* EINTR just means it was interrupted by a signal or something.
@@ -337,7 +337,9 @@ int main(int argc, char *argv[])
                         if (!strcmp(arg_string_katcl(l, 0), "#group-created"))
                         {
                             char *temp = arg_string_katcl(l, 1);
-                            new_array_name = strtok(temp, ".");
+                            new_array_name = malloc(strlen(temp));
+                            sprintf(new_array_name, "%s",  strtok(temp, ".")); /* array name will be format steven.control or steven.monitor, so we only need the steven part */
+                            /* this needs to be sprintf to ensure that the name persists once this katcl line is moved on to the next thing. */
                             printf("Noticed a new array, %s. Requesting monitor port to connect to...\n", new_array_name);
                             state = ADD_TO_LIST_REQUEST_MONITOR_PORT;
                             break;
@@ -346,50 +348,55 @@ int main(int argc, char *argv[])
                         {
                             /* remove the array from the list. */
                             char *name_of_removed_array = strtok(arg_string_katcl(l, 1), ".");
-                            int j;
-                            for (j = 0; j < array_list_size; j++)
-                            {
-                                if (!strcmp(name_of_removed_array, array_list[j]->name))
-                                    break;
-                            }
-                            if (j == array_list_size)
-                                fprintf(stderr, "Weirdly, the CMC said that %s is being destroyed, but we didn't have it on the list in the first place...", name_of_removed_array);
-                            else
-                            {
-                                destroy_array(array_list[j]);
-                                memmove(&array_list[j], &array_list[j+1], (array_list_size - j - 1)*sizeof(*array_list));
-                                struct cmc_array **temp = realloc(array_list, sizeof(*array_list)*(--array_list_size));
-                                if (temp)
-                                    array_list = temp;
-                                printf("No longer monitoring %s - destroyed.\n", name_of_removed_array);
-                                free(name_of_removed_array);
+                            char *temp = strtok(NULL, ".");
+                            if (!strcmp(temp, "monitor")) /* ignore the "control" one, otherwise we remove it first time round and get an unexpected message when the other group is destroyed. */
+                            { 
+                                int j;
+                                for (j = 0; j < array_list_size; j++)
+                                {
+                                    if (!strcmp(name_of_removed_array, array_list[j]->name))
+                                        break;
+                                }
+                                if (j == array_list_size)
+                                    fprintf(stderr, "Weirdly, the CMC said that %s is being destroyed, but we didn't have it on the list in the first place...", name_of_removed_array);
+                                else
+                                {
+                                    destroy_array(array_list[j]);
+                                    memmove(&array_list[j], &array_list[j+1], (array_list_size - j - 1)*sizeof(*array_list));
+                                    struct cmc_array **temp = realloc(array_list, sizeof(*array_list)*(--array_list_size));
+                                    if (temp)
+                                        array_list = temp;
+                                    printf("No longer monitoring %s - destroyed.\n", name_of_removed_array);
+                                    //free(name_of_removed_array);
+                                }
                             }
                         }
                         break;
                     case ADD_TO_LIST_RECEIVE_MONITOR_PORT:
                         if (!strcmp(arg_string_katcl(l, 0), "#array-list") && !(strcmp(arg_string_katcl(l, 1), new_array_name)))
                         {
+                            printf("Caught the list entry with our new array, %s\n", new_array_name);
                             struct cmc_array **temp = realloc(array_list, sizeof(*array_list)*(++array_list_size));
                             if (temp)
                                 array_list = temp;
-                            char* temp_array_name = arg_string_katcl(l, 1);
+                            //char* temp_array_name = arg_string_katcl(l, 1);
                             strtok(arg_string_katcl(l, 2), ",");
                             int monitor_port = atoi(strtok(NULL, ","));
                             printf("Monitoring array \"%s\" on port %d of the CMC...\n", new_array_name, monitor_port);
                             array_list[array_list_size-1] = create_array(new_array_name, monitor_port);
                             free(new_array_name);
-                            free(temp_array_name);
+                            //free(temp_array_name);
                             state = MONITOR;
                             break;
                         }
-                        else
+                        /*else
                         {
                             int j = 0;
                             do 
                                 printf("%s ", arg_string_katcl(l, j));
                             while (arg_string_katcl(l, ++j) != NULL);
                             printf("\n");
-                        }
+                        }*/
                     default:
                         ;
                 }

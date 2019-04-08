@@ -26,6 +26,7 @@
 #include <netc.h>
 
 #include "array_handling.h"
+#include "html_handling.h"
 
 /* This is handy for keeping track of the number of file descriptors. */
 #undef max
@@ -375,7 +376,6 @@ int main(int argc, char *argv[])
                                 j++;
                             } while (buffer);
                             array_list[array_list_size-1] = create_array(new_array_name, monitor_port, multicast_groups);
-                            free(multicast_groups);
 
                             free(new_array_name);
                             free(multicast_groups);
@@ -517,18 +517,20 @@ int main(int argc, char *argv[])
                     fclose(template_file);
                     */
                     
+                    r = send_http_ok(file_descriptors[i]);
+                    r = send_html_header(file_descriptors[i]);
+                    r = send_html_body_open(file_descriptors[i]);
+
                     if (array_list)
                     {
+                        send_html_table_start(file_descriptors[i]);
+                        send_html_table_arraylist_header(file_descriptors[i]);
                         int j;
                         for (j = 0; j < array_list_size; j++)
                         {
-                            char *line_to_write;
-                            size_t needed = snprintf(NULL, 0, "%s %d %s\n", array_list[j]->name, array_list[j]->monitor_port, array_list[j]->multicast_groups) + 4;
-                            line_to_write = malloc(needed);
-                            sprintf(line_to_write, "%s %d %s\n", array_list[j]->name, array_list[j]->monitor_port, array_list[j]->multicast_groups);
-                            r = write(file_descriptors[i], line_to_write, strlen(line_to_write));
-                            free(line_to_write);
+                            send_html_table_arraylist_row(file_descriptors[i], array_list[j]);
                         }
+                        send_html_table_end(file_descriptors[i]);
                     }
                     else
                     {
@@ -536,6 +538,9 @@ int main(int argc, char *argv[])
                         /* TODO make this auto-refreshing as well.*/
                         r = write(file_descriptors[i], message, sizeof(message));
                     }
+
+                    r = send_html_body_close(file_descriptors[i]);
+
                     shutdown(file_descriptors[i], SHUT_RDWR);
                     close(file_descriptors[i]);
                     file_descriptors[i] = -1;

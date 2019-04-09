@@ -5,7 +5,9 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h> /* Needed for read() and write() */
-
+#include <katcp.h>
+#include <katcl.h>
+#include <netc.h>
 #include "array_handling.h"
 
 char *read_full_katcp_line(struct katcl_line *l)
@@ -32,14 +34,26 @@ char *read_full_katcp_line(struct katcl_line *l)
     return line_to_return;
 }
 
-struct cmc_array *create_array(char *array_name, int monitor_port, char *multicast_groups)
+struct cmc_array *create_array(char *array_name, int monitor_port, char *multicast_groups, char* cmc_address)
 {
     struct cmc_array *new_array = malloc(sizeof(*new_array));
+
     new_array->name = malloc(strlen(array_name) + 1);
     sprintf(new_array->name, "%s", array_name);
-    new_array->monitor_port = monitor_port;
+
     new_array->multicast_groups = malloc(strlen(multicast_groups) + 1);
     sprintf(new_array->multicast_groups, "%s", multicast_groups);
+
+    new_array->monitor_port = monitor_port;
+    new_array->monitor_socket_fd = net_connect(cmc_address, new_array->monitor_port, NETC_VERBOSE_ERRORS | NETC_VERBOSE_STATS);
+    if (new_array->monitor_socket_fd == -1)
+    {
+        fprintf(stderr, "unable to connect to array %s monitor port %d...\n", array_name, monitor_port);
+        free(new_array->multicast_groups);
+        free(new_array->name);
+        free(new_array);
+        return NULL;
+    }
     return new_array;
 }
 
@@ -54,6 +68,8 @@ void destroy_array(struct cmc_array *array)
 {
     free(array->name);
     free(array->multicast_groups);
+    shutdown(array->monitor_socket_fd, SHUT_RDWR);
+    close(array->monitor_socket_fd);
     free(array);
 }
 

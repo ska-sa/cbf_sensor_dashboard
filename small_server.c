@@ -41,6 +41,7 @@ enum program_state {
     STARTUP_WAIT_CLIENT_CONFIG_OKAY,
     STARTUP_REQUEST_ARRAY_LIST,
     STARTUP_RECV_ARRAY_LIST,
+    REQUEST_SENSOR_LISTS,
     MONITOR,
     ADD_TO_LIST_REQUEST_MONITOR_PORT,
     ADD_TO_LIST_RECEIVE_MONITOR_PORT
@@ -62,10 +63,11 @@ int main(int argc, char *argv[])
     signal(SIGINT, &sigint);
 
     int listening_port, katcp_port;
+    char *cmc_address;
     int server_socket_fd, katcp_socket_fd;
     char buffer[BUF_SIZE];
     int file_descriptors[FD_SETSIZE]; /* We can handle this many connections at once. */
-    char file_descriptors_want_data[FD_SETSIZE]; /* Keep track of the fds that actually want something. */
+    int file_descriptors_want_data[FD_SETSIZE]; /* Keep track of the fds that actually want something. */
     FILE *template_file;
     int i; /* for use as a loop index */
     struct katcl_line *l;
@@ -104,7 +106,9 @@ int main(int argc, char *argv[])
     fclose(template_file); /* Will open it again later. */
 
     katcp_port = atoi(argv[4]);
-    katcp_socket_fd = net_connect(argv[3], katcp_port, NETC_VERBOSE_ERRORS | NETC_VERBOSE_STATS);
+    cmc_address = malloc(strlen(argv[3]) + 1);
+    sprintf(cmc_address, "%s", argv[3]);
+    katcp_socket_fd = net_connect(cmc_address, katcp_port, NETC_VERBOSE_ERRORS | NETC_VERBOSE_STATS);
     if (katcp_socket_fd == -1)
     {
         fprintf(stderr, "Unable to connect to katcp server %s:%d\n", argv[3], katcp_port);
@@ -150,6 +154,13 @@ int main(int argc, char *argv[])
                 FD_SET(katcp_socket_fd, &wr);
                 /* nfds already updated to include this fd, so no need to update it again here. */
                 break;
+            case REQUEST_SENSOR_LISTS:
+                for (i = 0; i < array_list_size; i++)
+                {
+                    FD_SET(array_list[i]->monitor_socket_fd, &wr);
+                    nfds = max(nfds, array_list[i]->monitor_socket_fd);
+                }
+                break;
             default:
                 ;
         }
@@ -189,12 +200,12 @@ int main(int argc, char *argv[])
         /* If we've decided in the above section to read from the socket... */
         if (FD_ISSET(server_socket_fd, &rd))
         {
-            unsigned int l;
+            unsigned int len;
             struct sockaddr_in client_address;
     
             /* accept (i.e. open) the connection, get a new file descriptor for the open connection. */
-            memset(&client_address, 0, l = sizeof(client_address));
-            r = accept(server_socket_fd, (struct sockaddr *) &client_address, &l);
+            memset(&client_address, 0, len = sizeof(client_address));
+            r = accept(server_socket_fd, (struct sockaddr *) &client_address, &len);
             if (r == -1)
             {
                 perror("accept()");
@@ -237,6 +248,7 @@ int main(int argc, char *argv[])
                     send = 1;
                     state = ADD_TO_LIST_RECEIVE_MONITOR_PORT;
                     break;
+
                 default: 
                     send = 0; /* just in case */
             }
@@ -301,13 +313,13 @@ int main(int argc, char *argv[])
                                 }
                                 j++;
                             } while (buffer);
-                            array_list[array_list_size-1] = create_array(array_name, monitor_port, multicast_groups);
+                            array_list[array_list_size-1] = create_array(array_name, monitor_port, multicast_groups, cmc_address);
                             free(multicast_groups);
                         }
                         else if (!strcmp(arg_string_katcl(l, 0), "!array-list"))
                         {
-                            printf("Finished getting initial array list. Monitoring...\n");
-                            state = MONITOR;
+                            printf("Finished getting initial array list. Getting sensor lists...\n");
+                            state = REQUEST_SENSOR_LISTS;
                         }
                         break;
                     case MONITOR:
@@ -375,59 +387,17 @@ int main(int argc, char *argv[])
                                 }
                                 j++;
                             } while (buffer);
-                            array_list[array_list_size-1] = create_array(new_array_name, monitor_port, multicast_groups);
+                            array_list[array_list_size-1] = create_array(new_array_name, monitor_port, multicast_groups, cmc_address);
 
                             free(new_array_name);
                             free(multicast_groups);
                             state = MONITOR;
                             break;
                         }
-                        /*else
-                        {
-                            int j = 0;
-                            do 
-                                printf("%s ", arg_string_katcl(l, j));
-                            while (arg_string_katcl(l, ++j) != NULL);
-                            printf("\n");
-                        }*/
-                    default:
+                   default:
                         ;
                 }
-
-               /*
-               
-               else if (!strcmp(arg_string_katcl(l, 0), "!array-list"))
-               {
-                   printf("Got !array-list\n");
-               }
-               else if (!strcmp(arg_string_katcl(l, 0), "#group-created"))
-               {
-                   printf("Got #group-created\n");
-               }
-               else if (!strcmp(arg_string_katcl(l, 0), "#group-destroyed"))
-               {
-                   printf("Got #group-destroyed\n");
-               }
-               else
-               {
-                   //printf("Got something else.\n");
-               }*/
-               /*if (strncmp(arg_string_katcl(l, 0), "#log", 4) != 0)
-               {
-               //this code just here for reference for the time being. Remove this comment once things are more sorted.
-                   //printf("Received something that's not a log.\n");
-                   char *buffer = read_full_katcp_line(l);
-                   printf("%s\n", buffer);
-                   free(buffer);
-               }*/
-           }
-           //printf("Current array_list_size: %d\n", array_list_size);
-           //for (i = 0; i < array_list_size; i++)
-           //{
-           //    char* buffer = get_array_name(array_list[i]);
-           //    printf("line %d: %s\n", i, buffer);
-           //    free(buffer);
-           //}
+            }
         }
 
         /* Handle the OOB stuff first. For completeness' sake. */
@@ -469,7 +439,15 @@ int main(int argc, char *argv[])
                     {
                         buffer[r] = '\0'; /* To make it a well-formed string. */
                         if (strncmp(buffer, "GET", 3) == 0)
+                        {
                             file_descriptors_want_data[i] = 1;
+                            //strtok(buffer, " ");
+                            printf("buffer: %s\n", buffer);
+                            /*TODO
+                             * check through the monitor ports of the arrays currenly being watched, or the array_names perhaps?
+                             * then give the want_data the correct identifier - this will probably be the monitor port because it's also an int.
+                             * shunt the stuff down. */
+                        }
                         else
                             printf("Got a message not starting with GET: %s\n", buffer);
                     }
@@ -513,6 +491,13 @@ int main(int argc, char *argv[])
                     file_descriptors[i] = -1;
                     file_descriptors_want_data[i] = 0;
                 }
+            }
+        }
+
+        for (i = 0; i < array_list_size; i++)
+        {
+            if (FD_ISSET(array_list[i]->monitor_socket_fd, &wr))
+            {
             }
         }
     }

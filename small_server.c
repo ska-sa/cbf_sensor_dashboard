@@ -41,7 +41,6 @@ enum program_state {
     STARTUP_WAIT_CLIENT_CONFIG_OKAY,
     STARTUP_REQUEST_ARRAY_LIST,
     STARTUP_RECV_ARRAY_LIST,
-    REQUEST_SENSOR_LISTS,
     MONITOR,
     ADD_TO_LIST_REQUEST_MONITOR_PORT,
     ADD_TO_LIST_RECEIVE_MONITOR_PORT
@@ -154,14 +153,7 @@ int main(int argc, char *argv[])
                 FD_SET(katcp_socket_fd, &wr);
                 /* nfds already updated to include this fd, so no need to update it again here. */
                 break;
-            case REQUEST_SENSOR_LISTS:
-                for (i = 0; i < array_list_size; i++)
-                {
-                    FD_SET(array_list[i]->monitor_socket_fd, &wr);
-                    nfds = max(nfds, array_list[i]->monitor_socket_fd);
-                }
-                break;
-            default:
+           default:
                 ;
         }
             
@@ -175,6 +167,29 @@ int main(int argc, char *argv[])
                 if (file_descriptors_want_data[i])
                     FD_SET(file_descriptors[i], &wr);
                 nfds = max(nfds, file_descriptors[i]);
+            }
+        }
+
+        for (i = 0; i < array_list_size; i++)
+        {
+            switch (array_list[i]->state)
+            {
+                case REQUEST_SENSOR_LISTS:
+                    for (i = 0; i < array_list_size; i++)
+                    {
+                        FD_SET(array_list[i]->monitor_socket_fd, &wr);
+                        nfds = max(nfds, array_list[i]->monitor_socket_fd);
+                    }
+                    break;
+                case RECEIVE_SENSOR_LISTS:
+                    for (i = 0; i < array_list_size; i++)
+                    {
+                        FD_SET(array_list[i]->monitor_socket_fd, &rd);
+                        nfds = max(nfds, array_list[i]->monitor_socket_fd);
+                    }
+                    break;
+                default:
+                    ;
             }
         }
 
@@ -319,7 +334,7 @@ int main(int argc, char *argv[])
                         else if (!strcmp(arg_string_katcl(l, 0), "!array-list"))
                         {
                             printf("Finished getting initial array list. Getting sensor lists...\n");
-                            state = REQUEST_SENSOR_LISTS;
+                            state = MONITOR;
                         }
                         break;
                     case MONITOR:
@@ -498,6 +513,29 @@ int main(int argc, char *argv[])
         {
             if (FD_ISSET(array_list[i]->monitor_socket_fd, &wr))
             {
+                switch (array_list[i]->state)
+                {
+                    case REQUEST_SENSOR_LISTS:
+                        request_sensor_list(array_list[i]);
+                        array_list[i]->state = RECEIVE_SENSOR_LISTS;
+                        break;
+                    default:
+                        ;
+                }
+            }
+
+            if (FD_ISSET(array_list[i]->monitor_socket_fd, &rd))
+            {
+                switch (array_list[i]->state)
+                {
+                    case RECEIVE_SENSOR_LISTS:
+                        r = accept_sensor_list(array_list[i]);
+                        if (!r) /* i.e. if r was zero */
+                            array_list[i]->state = MONITOR_SENSORS;
+                        break;
+                    default:
+                        ;
+                }
             }
         }
     }

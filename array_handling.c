@@ -54,6 +54,8 @@ struct cmc_array *create_array(char *array_name, int monitor_port, char *multica
         free(new_array);
         return NULL;
     }
+    new_array->l = create_katcl(new_array->monitor_socket_fd);
+    new_array->state = REQUEST_SENSOR_LISTS;
     return new_array;
 }
 
@@ -68,9 +70,53 @@ void destroy_array(struct cmc_array *array)
 {
     free(array->name);
     free(array->multicast_groups);
+    destroy_katcl(array->l, 1);
     shutdown(array->monitor_socket_fd, SHUT_RDWR);
     close(array->monitor_socket_fd);
     free(array);
+}
+
+int request_sensor_list(struct cmc_array *array)
+{
+    int r;
+    append_string_katcl(array->l, KATCP_FLAG_FIRST | KATCP_FLAG_LAST, "?sensor-list");
+    r = write_katcl(array->l);
+    return r;
+}
+
+int accept_sensor_list(struct cmc_array *array)
+{
+    int r;
+    r = read_katcl(array->l);
+    if (r)
+    {
+        fprintf(stderr, "read failed: %s\n", (r < 0) ? strerror(error_katcl(array->l)) : "connection terminated");
+        perror("read_katcl");
+        return -1;
+    }
+    while (have_katcl(array->l) > 0)
+    {
+        if (!strcmp(arg_string_katcl(array->l, 0), "#sensor-list"))
+        {
+            int i = 0;
+            do {
+                printf("%s ", arg_string_katcl(array->l, i));
+            } while (arg_string_katcl(array->l, i++) != NULL);
+            printf("\n");
+            r = 1;
+        }
+        else if (!strcmp(arg_string_katcl(array->l, 0), "!sensor-list"))
+        {
+            if (!strcmp(arg_string_katcl(array->l, 1), "ok"))
+                r = 0;
+            else
+                r = -1;
+        }
+        else
+            r = -1;
+    }
+    
+    return r;
 }
 
 /* Function takes a port number as an argument and returns a file descriptor

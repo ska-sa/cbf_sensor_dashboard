@@ -10,10 +10,40 @@ enum array_state {
     MONITOR_SENSORS
 };
 
+struct fhost {
+    char *hostname[7]; /* skarab serial numbers are six digits long, plus the terminal null. */
+    int device_status;
+    int netw_rx;
+    int spead_rx;
+    int netw_reor;
+    int dig;
+    int sync;
+    int cd;
+    int pfb;
+    int quant;
+    int ct;
+    int spead_tx;
+    int netw_tx;
+};
+
+struct xhost {
+    char *hostname[7];
+    int device_status;
+    int netw_rx;
+    int netw_reor;
+    int miss_pkt;
+    int spead_rx;
+    int bram_reord;
+    int vacc;
+    int spead_tx;
+    int netw_tx;
+};
+
 struct cmc_array {
     char *name;
     int monitor_port;
     char* multicast_groups;
+    int number_of_antennas;
     int monitor_socket_fd;
     struct katcl_line *l;
     enum array_state state;
@@ -26,6 +56,7 @@ char *get_array_name(struct cmc_array *array); /* user must free the resulting c
 void destroy_array(struct cmc_array *array);
 int request_functional_mapping(struct cmc_array *array);
 int accept_functional_mapping(struct cmc_array *array);
+
 
 int listen_on_socket(int listening_port);
 #endif

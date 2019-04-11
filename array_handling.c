@@ -10,6 +10,23 @@
 #include <netc.h>
 #include "array_handling.h"
 
+static int number_of_multicast_groups(char *multicast_groups)
+{
+   int r = 0;
+   char *temp;
+   temp = strtok(multicast_groups, " ");
+   if (temp)
+   {
+       r++;
+       do {
+           temp = strtok(NULL, " ");
+           if (temp)
+               r++;
+       } while (temp);
+   }
+   return r;
+}
+
 char *read_full_katcp_line(struct katcl_line *l)
 {
     int i = 0;
@@ -43,6 +60,8 @@ struct cmc_array *create_array(char *array_name, int monitor_port, char *multica
 
     new_array->multicast_groups = malloc(strlen(multicast_groups) + 1);
     sprintf(new_array->multicast_groups, "%s", multicast_groups);
+
+    new_array->number_of_antennas = number_of_multicast_groups(multicast_groups) / 2;
 
     new_array->monitor_port = monitor_port;
     new_array->monitor_socket_fd = net_connect(cmc_address, new_array->monitor_port, NETC_VERBOSE_ERRORS | NETC_VERBOSE_STATS);
@@ -88,6 +107,7 @@ int request_functional_mapping(struct cmc_array *array)
 
 int accept_functional_mapping(struct cmc_array *array)
 {
+    /* TODO - figure out a standard for return values so that errors can be handled properly. */
     int r;
     r = read_katcl(array->l);
     if (r)
@@ -100,13 +120,9 @@ int accept_functional_mapping(struct cmc_array *array)
 
     while (have_katcl(array->l) > 0)
     {
-        if (!strcmp(arg_string_katcl(array->l, 0), "#sensor-value"))// && !strcmp(arg_string_katcl(array->l, 3), "hostname-functional-mapping"))
+        if (!strcmp(arg_string_katcl(array->l, 0), "#sensor-value") && !strcmp(arg_string_katcl(array->l, 3), "hostname-functional-mapping"))
         {
-            int i = 0;
-            do {
-                printf("%d: %s\n", i, arg_string_katcl(array->l, i));
-            } while (arg_string_katcl(array->l, i++) != NULL);
-            printf("\n");
+            printf("%s\n", arg_string_katcl(array->l, 5));
             r = 1;
         }
         else if (!strcmp(arg_string_katcl(array->l, 0), "!sensor-value"))
@@ -116,12 +132,8 @@ int accept_functional_mapping(struct cmc_array *array)
         }
         else
         {
-            printf("katcp message seems to be unknown: \n");
-            int i = 0;
-            do {
-                printf("%d: %s\n", i, arg_string_katcl(array->l, i));
-            } while (arg_string_katcl(array->l, i++) != NULL);
-            printf("\n");
+            /* unknown message, ignore. */
+            r = -1;
         }
     }
     

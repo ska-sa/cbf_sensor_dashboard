@@ -1,12 +1,8 @@
 /*
  * small_server.c
  * Author: James Smith
- * Date: 15 March 2019
  *
- * This is a simple program to listen on a given port, read whatever comes from that port and print to stdout.
- *
- * The purpose was to let me figure out both how to use sockets in c, and how to use select(). Turns out,
- * barring a few things to be careful for, it's a pretty straightforward process.
+ * Simple program to display an html-dashboard monitoring the state of the sensors in the correlator.
  *
  */
 
@@ -174,14 +170,14 @@ int main(int argc, char *argv[])
         {
             switch (array_list[i]->state)
             {
-                case REQUEST_SENSOR_LISTS:
+                case REQUEST_FUNCTIONAL_MAPPING:
                     for (i = 0; i < array_list_size; i++)
                     {
                         FD_SET(array_list[i]->monitor_socket_fd, &wr);
                         nfds = max(nfds, array_list[i]->monitor_socket_fd);
                     }
                     break;
-                case RECEIVE_SENSOR_LISTS:
+                case RECEIVE_FUNCTIONAL_MAPPING:
                     for (i = 0; i < array_list_size; i++)
                     {
                         FD_SET(array_list[i]->monitor_socket_fd, &rd);
@@ -515,9 +511,9 @@ int main(int argc, char *argv[])
             {
                 switch (array_list[i]->state)
                 {
-                    case REQUEST_SENSOR_LISTS:
-                        request_sensor_list(array_list[i]);
-                        array_list[i]->state = RECEIVE_SENSOR_LISTS;
+                    case REQUEST_FUNCTIONAL_MAPPING:
+                        request_functional_mapping(array_list[i]);
+                        array_list[i]->state = RECEIVE_FUNCTIONAL_MAPPING;
                         break;
                     default:
                         ;
@@ -528,8 +524,8 @@ int main(int argc, char *argv[])
             {
                 switch (array_list[i]->state)
                 {
-                    case RECEIVE_SENSOR_LISTS:
-                        r = accept_sensor_list(array_list[i]);
+                    case RECEIVE_FUNCTIONAL_MAPPING:
+                        r = accept_functional_mapping(array_list[i]);
                         if (!r) /* i.e. if r was zero */
                             array_list[i]->state = MONITOR_SENSORS;
                         break;

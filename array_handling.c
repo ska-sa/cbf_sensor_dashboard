@@ -55,7 +55,7 @@ struct cmc_array *create_array(char *array_name, int monitor_port, char *multica
         return NULL;
     }
     new_array->l = create_katcl(new_array->monitor_socket_fd);
-    new_array->state = REQUEST_SENSOR_LISTS;
+    new_array->state = REQUEST_FUNCTIONAL_MAPPING;
     return new_array;
 }
 
@@ -76,15 +76,17 @@ void destroy_array(struct cmc_array *array)
     free(array);
 }
 
-int request_sensor_list(struct cmc_array *array)
+int request_functional_mapping(struct cmc_array *array)
 {
     int r;
-    append_string_katcl(array->l, KATCP_FLAG_FIRST | KATCP_FLAG_LAST, "?sensor-list");
+    append_string_katcl(array->l, KATCP_FLAG_FIRST, "?sensor-value");
+    append_string_katcl(array->l, KATCP_FLAG_LAST, "hostname-functional-mapping");
+    printf("Requesting functional mapping from array %s on port %d\n", array->name, array->monitor_port);
     r = write_katcl(array->l);
     return r;
 }
 
-int accept_sensor_list(struct cmc_array *array)
+int accept_functional_mapping(struct cmc_array *array)
 {
     int r;
     r = read_katcl(array->l);
@@ -92,28 +94,35 @@ int accept_sensor_list(struct cmc_array *array)
     {
         fprintf(stderr, "read failed: %s\n", (r < 0) ? strerror(error_katcl(array->l)) : "connection terminated");
         perror("read_katcl");
-        return -1;
     }
+
+    r = 2; /* In case the have_katcl returns nothing, we don't want the function to succeed by accident. */
+
     while (have_katcl(array->l) > 0)
     {
-        if (!strcmp(arg_string_katcl(array->l, 0), "#sensor-list"))
+        if (!strcmp(arg_string_katcl(array->l, 0), "#sensor-value"))// && !strcmp(arg_string_katcl(array->l, 3), "hostname-functional-mapping"))
         {
             int i = 0;
             do {
-                printf("%s ", arg_string_katcl(array->l, i));
+                printf("%d: %s\n", i, arg_string_katcl(array->l, i));
             } while (arg_string_katcl(array->l, i++) != NULL);
             printf("\n");
             r = 1;
         }
-        else if (!strcmp(arg_string_katcl(array->l, 0), "!sensor-list"))
+        else if (!strcmp(arg_string_katcl(array->l, 0), "!sensor-value"))
         {
             if (!strcmp(arg_string_katcl(array->l, 1), "ok"))
                 r = 0;
-            else
-                r = -1;
         }
         else
-            r = -1;
+        {
+            printf("katcp message seems to be unknown: \n");
+            int i = 0;
+            do {
+                printf("%d: %s\n", i, arg_string_katcl(array->l, i));
+            } while (arg_string_katcl(array->l, i++) != NULL);
+            printf("\n");
+        }
     }
     
     return r;

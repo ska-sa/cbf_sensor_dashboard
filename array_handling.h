@@ -5,8 +5,8 @@
 #include <katcl.h>
 
 enum array_state {
-    REQUEST_SENSOR_LISTS,
-    RECEIVE_SENSOR_LISTS,
+    REQUEST_FUNCTIONAL_MAPPING,
+    RECEIVE_FUNCTIONAL_MAPPING,
     MONITOR_SENSORS
 };
 
@@ -24,8 +24,8 @@ char *read_full_katcp_line(struct katcl_line *l);
 struct cmc_array *create_array(char *array_name, int monitor_port, char* multicast_groups, char* cmc_address);
 char *get_array_name(struct cmc_array *array); /* user must free the resulting char* */
 void destroy_array(struct cmc_array *array);
-int request_sensor_list(struct cmc_array *array);
-int accept_sensor_list(struct cmc_array *array);
+int request_functional_mapping(struct cmc_array *array);
+int accept_functional_mapping(struct cmc_array *array);
 
 int listen_on_socket(int listening_port);
 #endif

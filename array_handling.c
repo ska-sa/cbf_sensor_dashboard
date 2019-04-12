@@ -75,6 +75,9 @@ struct cmc_array *create_array(char *array_name, int monitor_port, char *multica
     }
     new_array->l = create_katcl(new_array->monitor_socket_fd);
     new_array->state = REQUEST_FUNCTIONAL_MAPPING;
+    
+    //new_array->fhosts = malloc(sizeof(new_array.fhosts)*new_array->number_of_antennas);
+
     return new_array;
 }
 
@@ -98,45 +101,28 @@ void destroy_array(struct cmc_array *array)
 int request_functional_mapping(struct cmc_array *array)
 {
     int r;
-    append_string_katcl(array->l, KATCP_FLAG_FIRST, "?sensor-value");
-    append_string_katcl(array->l, KATCP_FLAG_LAST, "hostname-functional-mapping");
-    printf("Requesting functional mapping from array %s on port %d\n", array->name, array->monitor_port);
-    r = write_katcl(array->l);
+    r = append_string_katcl(array->l, KATCP_FLAG_FIRST, "?sensor-value");
+    if (!(r<0))
+        r = append_string_katcl(array->l, KATCP_FLAG_LAST, "hostname-functional-mapping");
     return r;
 }
 
 int accept_functional_mapping(struct cmc_array *array)
 {
-    /* TODO - figure out a standard for return values so that errors can be handled properly. */
-    int r;
-    r = read_katcl(array->l);
-    if (r)
-    {
-        fprintf(stderr, "read failed: %s\n", (r < 0) ? strerror(error_katcl(array->l)) : "connection terminated");
-        perror("read_katcl");
-    }
-
-    r = 2; /* In case the have_katcl returns nothing, we don't want the function to succeed by accident. */
-
-    while (have_katcl(array->l) > 0)
+    int r = -1; /* -1 means the message that it got was unknown */
+    if (have_katcl(array->l) > 0)
     {
         if (!strcmp(arg_string_katcl(array->l, 0), "#sensor-value") && !strcmp(arg_string_katcl(array->l, 3), "hostname-functional-mapping"))
         {
             printf("%s\n", arg_string_katcl(array->l, 5));
-            r = 1;
+            r = 1; /* one means we're getting the value we want */
         }
         else if (!strcmp(arg_string_katcl(array->l, 0), "!sensor-value"))
         {
             if (!strcmp(arg_string_katcl(array->l, 1), "ok"))
-                r = 0;
-        }
-        else
-        {
-            /* unknown message, ignore. */
-            r = -1;
+                r = 0; /* 0 means it's complete and we can move on */
         }
     }
-    
     return r;
 }
 

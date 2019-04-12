@@ -61,8 +61,10 @@ int main(int argc, char *argv[])
     char *cmc_address;
     int server_socket_fd, katcp_socket_fd;
     char buffer[BUF_SIZE];
-    int file_descriptors[FD_SETSIZE]; /* We can handle this many connections at once. */
-    int file_descriptors_want_data[FD_SETSIZE]; /* Keep track of the fds that actually want something. */
+
+    struct webpage_client **client_list;
+    int client_list_size = 0;
+
     FILE *template_file;
     int i; /* for use as a loop index */
     struct katcl_line *l;
@@ -74,6 +76,9 @@ int main(int argc, char *argv[])
     int array_list_size = 0;
     char* new_array_name = NULL;
 //    int make_new_array_list = 0;
+
+    struct webpage_client **client_list = NULL;
+    int client_list_size = 0;
 
     /* argc is always one more than the number of arguments passed, because the first one
      * is the name of the executable. */
@@ -112,15 +117,6 @@ int main(int argc, char *argv[])
     else
         l = create_katcl(katcp_socket_fd);
    
-    /* Clear out the array of file descriptors. */
-    for (i = 0; i < FD_SETSIZE; i++)
-    {
-        file_descriptors[i] = -1; /* -1 indicates that it should be ignored. */
-        file_descriptors_want_data[i] = 0;
-    }
-
-
-
     while(!stop) /* to allow for graceful exiting, otherwise we get potential leaks. */
     {
         int nfds = 0; /* number of file descriptors. */
@@ -144,26 +140,23 @@ int main(int argc, char *argv[])
         if (flushing_katcl(l))
             FD_SET(katcp_socket_fd, &wr);
             
-        /* This sets up which file descriptors we'd like to read from on this round. */
-        for (i = 0; i < FD_SETSIZE; i++)
+        /* we're interested in reading from any connected client, and we might have something to write to them */
+        for (i = 0; i < client_list_size; i++)
         {
-            if (file_descriptors[i] > 0)
-            {
-                FD_SET(file_descriptors[i], &rd);
-                FD_SET(file_descriptors[i], &er); /* For completeness... */
-                if (file_descriptors_want_data[i])
-                    FD_SET(file_descriptors[i], &wr);
-                nfds = max(nfds, file_descriptors[i]);
-            }
+            FD_SET(client_list[i]->fd, &rd);
+            if (have_buffer_to_write(client_list[i]->buffer))
+                FD_SET(client_list[i]->fd, &wr);
+            nfds = max(nfds, client_list[i]->fd);
         }
 
+        /* katcp sockets of individual subarrays */
         for (i = 0; i < array_list_size; i++)
         {
-            if (flushing_katcl(array_list[i]->l))
+            if (flushing_katcl(array_list[i]->l)) /* only write if there's something queued. */
             {
                 FD_SET(array_list[i]->monitor_socket_fd, &wr);
             }
-            FD_SET(array_list[i]->monitor_socket_fd, &rd);
+            FD_SET(array_list[i]->monitor_socket_fd, &rd); /* but listen for reading on all */
             nfds = max(nfds, array_list[i]->monitor_socket_fd);
         }
 
@@ -189,7 +182,6 @@ int main(int argc, char *argv[])
         /* If we've decided in the above section to read from the socket... */
         if (FD_ISSET(server_socket_fd, &rd))
         {
-            printf("server socket is set for read\n");
             unsigned int len;
             struct sockaddr_in client_address;
     
@@ -202,18 +194,19 @@ int main(int argc, char *argv[])
             }
             else
             {
-                for (i = 0; i < FD_SETSIZE; i++)
+                struct webpage_client **temp = realloc(client_list, sizeof(*client_list)*(++client_list_size));
+                if (temp)
                 {
-                    if (file_descriptors[i] < 0)
-                    {
-                        file_descriptors[i] = r;
-                        break;
-                    }
-                } 
-                if (i == FD_SETSIZE)
-                    perror("Unable to open additional connections."); /* I have a suspicion that we wont' actually get here because accept() will likely return an error if there are too many file descriptors already open? */
+                    client_list = temp;
+                    client_list[client_list_size-1]->buffer = create_webpage_buffer();
+                }
                 else
-                    printf("Connection from %s\n", inet_ntoa(client_address.sin_addr));
+                {
+                    shutdown(r, SHUT_RDWR);
+                    close(r);
+                    fprintf(stderr, "Unable to allocate memory for another web client\n");
+                    perror("realloc");
+                }
             }
         }
 
@@ -221,7 +214,6 @@ int main(int argc, char *argv[])
         /* handle reading and writing of the katcp sockets */
         if (FD_ISSET(katcp_socket_fd, &rd))
         {
-            printf("main katcp socket is set for read\n");
            r = read_katcl(l);
            if (r)
            {
@@ -231,7 +223,6 @@ int main(int argc, char *argv[])
         }
         if (FD_ISSET(katcp_socket_fd, &wr)) /* Tell the cmc that we'd like to know something about the arrays that are here. */
         {
-            printf("main katcp socket is set for write\n");
             r = write_katcl(l);
             if (r < 0)
             {
@@ -390,58 +381,56 @@ int main(int argc, char *argv[])
                 ;
         }
 
-
-        /* Handle the OOB stuff first. For completeness' sake. */
-        for (i = 0; i < FD_SETSIZE; i++)
-        {
-            if (file_descriptors[i] > 0)
-            {
-                if (FD_ISSET(file_descriptors[i], &er))
-                {
-                    char c;
-                    r = recv(file_descriptors[i], &c, 1, MSG_OOB);
-                    if (r < 1)
-                    {
-                        shutdown(file_descriptors[i], SHUT_RDWR);
-                        close(file_descriptors[i]);
-                        file_descriptors[i] = -1;
-                    }
-                    else
-                        printf("OOB: %c\n", c);
-                }
-            }
-        }
-
         /* Now handle the actual reading from the socket. */
-        for (i = 0; i < FD_SETSIZE; i++)
+        for (i = 0; i < client_list_size; i++)
         {
-            if (file_descriptors[i] > 0)
+            if (FD_ISSET(client_list[i]->fd, &rd))
             {
-                if (FD_ISSET(file_descriptors[i], &rd))
+                r = read(client_list[i]->fd, buffer, BUF_SIZE - 1); /* -1 to prevent overrunning the buffer. */
+                if (r < 1)
                 {
-                    printf("connecting socket %d is set for read\n", file_descriptors[i]);
-                    r = read(file_descriptors[i], buffer, BUF_SIZE - 1); /* -1 to prevent overrunning the buffer. */
-                    if (r < 1)
+                    destroy_webpage_client(client_list[i]);
+                    memmove(&client_list[i], &client_list[i+1], (client_list_size - i - 1)*sizeof(*client_list));
+                    struct webpage_client **temp = realloc(client_list, sizeof(*client_list)*(--client_list_size));
+                    if (temp)
+                        client_list = temp;
+                    printf("client disconnected\n");
+                    i--;
+                }
+                else
+                {
+                    buffer[r] = '\0'; /* To make it a well-formed string. */
+                    if (strncmp(buffer, "GET", 3) == 0)
+                        /* TODO This is where I need to continue. */
                     {
-                        shutdown(file_descriptors[i], SHUT_RDWR);
-                        close(file_descriptors[i]);
-                        file_descriptors[i] = -1;
-                    }
-                    else
-                    {
-                        buffer[r] = '\0'; /* To make it a well-formed string. */
-                        if (strncmp(buffer, "GET", 3) == 0)
+                        r = send_http_ok(client_list[i]);
+                        r = send_html_header(client_list[i]);
+                        r = send_html_body_open(client_list[i]);
+
+                        if (array_list)
                         {
-                            file_descriptors_want_data[i] = 1;
-                            //strtok(buffer, " ");
-                            printf("buffer: %s\n", buffer);
-                            /*TODO
-                             * check through the monitor ports of the arrays currenly being watched, or the array_names perhaps?
-                             * then give the want_data the correct identifier - this will probably be the monitor port because it's also an int.
-                             * shunt the stuff down. */
+                            send_html_table_start(client_list[i]);
+                            send_html_table_arraylist_header(client_list[i]);
+                            int j;
+                            for (j = 0; j < array_list_size; j++)
+                            {
+                                send_html_table_arraylist_row(client_list[i], array_list[j]);
+                            }
+                            send_html_table_end(client_list[i]);
                         }
                         else
-                            printf("Got a message not starting with GET: %s\n", buffer);
+                        {
+                            char message[] = "No arrays currently running, or cmc not yet polled. Please try again later...\n";
+                            /* TODO make this auto-refreshing as well.*/
+                            r = write(client_list[i], message, sizeof(message));
+                        }
+
+                        r = send_html_body_close(client_list[i]);
+
+                        /*TODO
+                         * check through the monitor ports of the arrays currenly being watched, or the array_names perhaps?
+                         * then give the want_data the correct identifier - this will probably be the monitor port because it's also an int.
+                         * shunt the stuff down. */
                     }
                 }
             }
@@ -454,32 +443,7 @@ int main(int argc, char *argv[])
             {
                 if (FD_ISSET(file_descriptors[i], &wr))
                 {  
-                    printf("connecting socket %d is set for write\n", file_descriptors[i]);
-                    r = send_http_ok(file_descriptors[i]);
-                    r = send_html_header(file_descriptors[i]);
-                    r = send_html_body_open(file_descriptors[i]);
-
-                    if (array_list)
-                    {
-                        send_html_table_start(file_descriptors[i]);
-                        send_html_table_arraylist_header(file_descriptors[i]);
-                        int j;
-                        for (j = 0; j < array_list_size; j++)
-                        {
-                            send_html_table_arraylist_row(file_descriptors[i], array_list[j]);
-                        }
-                        send_html_table_end(file_descriptors[i]);
-                    }
-                    else
-                    {
-                        char message[] = "No arrays currently running, or cmc not yet polled. Please try again later...\n";
-                        /* TODO make this auto-refreshing as well.*/
-                        r = write(file_descriptors[i], message, sizeof(message));
-                    }
-
-                    r = send_html_body_close(file_descriptors[i]);
-
-                    shutdown(file_descriptors[i], SHUT_RDWR);
+                                        shutdown(file_descriptors[i], SHUT_RDWR);
                     close(file_descriptors[i]);
                     file_descriptors[i] = -1;
                     file_descriptors_want_data[i] = 0;
@@ -487,35 +451,45 @@ int main(int argc, char *argv[])
             }
         }
 
+        /* Individual array sensor servlet monitoring */
         for (i = 0; i < array_list_size; i++)
         {
             if (FD_ISSET(array_list[i]->monitor_socket_fd, &wr))
             {
-                printf("array %d monitor socket is set for write\n", array_list[i]->monitor_port);
-                switch (array_list[i]->state)
+                r = write_katcl(array_list[i]->l);
+                if (r < 0)
                 {
-                    case REQUEST_FUNCTIONAL_MAPPING:
-                        request_functional_mapping(array_list[i]);
-                        array_list[i]->state = RECEIVE_FUNCTIONAL_MAPPING;
-                        break;
-                    default:
-                        ;
+                    fprintf(stderr, "failed to send katcp message\n");
+                    perror("write_katcl");
+                    destroy_katcl(l, 1);
                 }
+                
             }
 
             if (FD_ISSET(array_list[i]->monitor_socket_fd, &rd))
             {
-                printf("array %d monitor socket is set for read\n", array_list[i]->monitor_port);
-                switch (array_list[i]->state)
-                {
-                    case RECEIVE_FUNCTIONAL_MAPPING:
-                        r = accept_functional_mapping(array_list[i]);
-                        if (!r) /* i.e. if r was zero */
-                            array_list[i]->state = MONITOR_SENSORS;
-                        break;
-                    default:
-                        ;
-                }
+               r = read_katcl(array_list[i]->l);
+               if (r)
+               {
+                   fprintf(stderr, "read failed: %s\n", (r < 0) ? strerror(error_katcl(array_list[i]->l)) : "connection terminated");
+                   perror("read_katcl");
+               }
+            }
+            
+            switch (array_list[i]->state)
+            {
+                case REQUEST_FUNCTIONAL_MAPPING:
+                    r = request_functional_mapping(array_list[i]);
+                    if (r >= 0)
+                        array_list[i]->state = RECEIVE_FUNCTIONAL_MAPPING;
+                    break;
+                case RECEIVE_FUNCTIONAL_MAPPING:
+                    r = accept_functional_mapping(array_list[i]);
+                    if (r == 0) 
+                        array_list[i]->state = MONITOR_SENSORS;
+                    break;
+                 default:
+                    ;
             }
         }
     }

@@ -11,7 +11,7 @@ int send_http_ok(struct webpage_buffer *buffer)
 {
     int r;
     char http_ok_message[] = "HTTP/1.1 200 OK\n\n";
-    r = write(socket_fd, http_ok_message, strlen(http_ok_message));
+    r = add_to_buffer(buffer, http_ok_message);
 
     return r;
 }
@@ -74,6 +74,18 @@ int send_html_section_end(struct webpage_buffer *buffer)
     int r;
     char html_section_end[] = "</section>\n";
     r = add_to_buffer(buffer, html_section_end);
+    return r;
+}
+
+int send_html_paragraph(struct webpage_buffer *buffer, char *line)
+{
+    int r;
+    char *paragraph;
+    size_t needed = snprintf(NULL, 0, "<p>%s</p>\n", line) + 1;
+    paragraph = malloc(needed);
+    sprintf(paragraph, "<p>%s</p>\n", line);
+    r = add_to_buffer(buffer, paragraph);
+    free(paragraph);
     return r;
 }
 

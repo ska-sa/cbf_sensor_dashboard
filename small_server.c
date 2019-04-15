@@ -22,6 +22,7 @@
 #include <netc.h>
 
 #include "array_handling.h"
+#include "http_handling.h"
 #include "html_handling.h"
 
 /* This is handy for keeping track of the number of file descriptors. */
@@ -62,7 +63,7 @@ int main(int argc, char *argv[])
     int server_socket_fd, katcp_socket_fd;
     char buffer[BUF_SIZE];
 
-    struct webpage_client **client_list;
+    struct webpage_client **client_list = NULL;
     int client_list_size = 0;
 
     FILE *template_file;
@@ -76,9 +77,6 @@ int main(int argc, char *argv[])
     int array_list_size = 0;
     char* new_array_name = NULL;
 //    int make_new_array_list = 0;
-
-    struct webpage_client **client_list = NULL;
-    int client_list_size = 0;
 
     /* argc is always one more than the number of arguments passed, because the first one
      * is the name of the executable. */
@@ -198,7 +196,7 @@ int main(int argc, char *argv[])
                 if (temp)
                 {
                     client_list = temp;
-                    client_list[client_list_size-1]->buffer = create_webpage_buffer();
+                    client_list[client_list_size-1] = create_webpage_client(r);
                 }
                 else
                 {
@@ -401,35 +399,34 @@ int main(int argc, char *argv[])
                 {
                     buffer[r] = '\0'; /* To make it a well-formed string. */
                     if (strncmp(buffer, "GET", 3) == 0)
-                        /* TODO This is where I need to continue. */
                     {
-                        r = send_http_ok(client_list[i]);
-                        r = send_html_header(client_list[i]);
-                        r = send_html_body_open(client_list[i]);
+                        r = send_http_ok(client_list[i]->buffer);
+                        r = send_html_header(client_list[i]->buffer);
+                        r = send_html_body_open(client_list[i]->buffer);
 
                         if (array_list)
                         {
-                            send_html_table_start(client_list[i]);
-                            send_html_table_arraylist_header(client_list[i]);
+                            send_html_table_start(client_list[i]->buffer);
+                            send_html_table_arraylist_header(client_list[i]->buffer);
                             int j;
                             for (j = 0; j < array_list_size; j++)
                             {
-                                send_html_table_arraylist_row(client_list[i], array_list[j]);
+                                send_html_table_arraylist_row(client_list[i]->buffer, array_list[j]);
                             }
-                            send_html_table_end(client_list[i]);
+                            send_html_table_end(client_list[i]->buffer);
                         }
                         else
                         {
                             char message[] = "No arrays currently running, or cmc not yet polled. Please try again later...\n";
                             /* TODO make this auto-refreshing as well.*/
-                            r = write(client_list[i], message, sizeof(message));
+                            r = send_html_paragraph(client_list[i]->buffer, message);
                         }
 
-                        r = send_html_body_close(client_list[i]);
+                        r = send_html_body_close(client_list[i]->buffer);
 
                         /*TODO
-                         * check through the monitor ports of the arrays currenly being watched, or the array_names perhaps?
-                         * then give the want_data the correct identifier - this will probably be the monitor port because it's also an int.
+                         * check through the monitor ports of the arrays currenly being watched,
+                         * then give the want_data the correct identifier
                          * shunt the stuff down. */
                     }
                 }
@@ -437,16 +434,20 @@ int main(int argc, char *argv[])
         }
 
         /* Handle the sockets that want to be written to. */
-        for (i = 0; i < FD_SETSIZE; i++)
+        for (i = 0; i < client_list_size; i++)
         {
-            if (file_descriptors[i] > 0)
-            {
-                if (FD_ISSET(file_descriptors[i], &wr))
-                {  
-                                        shutdown(file_descriptors[i], SHUT_RDWR);
-                    close(file_descriptors[i]);
-                    file_descriptors[i] = -1;
-                    file_descriptors_want_data[i] = 0;
+            if (FD_ISSET(client_list[i]->fd, &wr))
+            {  
+                r = write_buffer_to_fd(client_list[i]->fd, client_list[i]->buffer, BUF_SIZE);
+                if (r < 0)
+                {
+                    shutdown(client_list[i]->fd, SHUT_RDWR);
+                    destroy_webpage_client(client_list[i]);
+                    memmove(&client_list[i], &client_list[i+1], (client_list_size - i - 1)*sizeof(*client_list));
+                    struct webpage_client **temp = realloc(client_list, sizeof(*client_list)*(--client_list_size));
+                    if (temp)
+                        client_list = temp;
+                    printf("client disconnected\n");
                 }
             }
         }
@@ -498,7 +499,15 @@ int main(int argc, char *argv[])
     destroy_katcl(l, 1);
     for (i = 0; i < array_list_size; i++)
         destroy_array(array_list[i]);
-    free(array_list);
+    if (array_list_size)
+        free(array_list);
+
+    for (i = 0; i < client_list_size; i++)
+        destroy_webpage_client(client_list[i]);
+    if (client_list_size)
+        free(client_list);
+
+    free(cmc_address);
 
     return 0;
 }

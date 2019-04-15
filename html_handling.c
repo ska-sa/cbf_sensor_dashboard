@@ -108,9 +108,9 @@ int send_html_table_arraylist_row(struct webpage_buffer *buffer, struct cmc_arra
 {
     int r;
     char *html_table_row;
-    size_t needed = snprintf(NULL, 0, "<tr><td>%s</td><td><a href=\"%d\">%d</a></td><td>%s</td>\n</tr>\n", array->name, array->monitor_port, array->monitor_port, array->multicast_groups) + 1;
+    size_t needed = snprintf(NULL, 0, "<tr><td><a href=\"%s\">%s</a></td><td>%d</td><td>%s</td>\n</tr>\n", array->name, array->name, array->monitor_port, array->multicast_groups) + 1;
     html_table_row = malloc(needed);
-    sprintf(html_table_row, "<tr><td>%s</td><td><a href=\"%d\">%d</a></td><td>%s</td>\n</tr>\n", array->name, array->monitor_port, array->monitor_port, array->multicast_groups);
+    sprintf(html_table_row, "<tr><td><a href=\"%s\">%s</a></td><td>%d</td><td>%s</td>\n</tr>\n", array->name, array->name, array->monitor_port, array->multicast_groups);
     r = add_to_buffer(buffer, html_table_row);
     free(html_table_row);
     return r;

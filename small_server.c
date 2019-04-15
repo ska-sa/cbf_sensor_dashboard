@@ -400,6 +400,7 @@ int main(int argc, char *argv[])
                     buffer[r] = '\0'; /* To make it a well-formed string. */
                     if (strncmp(buffer, "GET", 3) == 0)
                     {
+                        /* TODO - figure this out, determine whether it's looking for / or /<array-name> or nothing. */
                         r = send_html_header(client_list[i]->buffer);
                         r = send_html_body_open(client_list[i]->buffer);
 

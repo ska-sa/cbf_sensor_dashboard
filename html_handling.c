@@ -7,16 +7,6 @@
 
 #define BUF_SIZE 1024
 
-int send_http_ok(struct webpage_buffer *buffer)
-{
-    int r;
-    char http_ok_message[] = "HTTP/1.1 200 OK\n\n";
-    r = add_to_buffer(buffer, http_ok_message);
-
-    return r;
-}
-
-
 int send_html_header(struct webpage_buffer *buffer)
 {
     FILE *html_header_file;

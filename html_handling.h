@@ -3,8 +3,6 @@
 
 struct webpage_buffer;
 
-int send_http_ok(struct webpage_buffer *buffer);
-
 int send_html_header(struct webpage_buffer *buffer);
 int send_html_body_open(struct webpage_buffer *buffer);
 int send_html_body_close(struct webpage_buffer *buffer);

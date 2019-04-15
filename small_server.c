@@ -400,7 +400,6 @@ int main(int argc, char *argv[])
                     buffer[r] = '\0'; /* To make it a well-formed string. */
                     if (strncmp(buffer, "GET", 3) == 0)
                     {
-                        r = send_http_ok(client_list[i]->buffer);
                         r = send_html_header(client_list[i]->buffer);
                         r = send_html_body_open(client_list[i]->buffer);
 

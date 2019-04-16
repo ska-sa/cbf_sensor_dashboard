@@ -398,36 +398,60 @@ int main(int argc, char *argv[])
                 else
                 {
                     buffer[r] = '\0'; /* To make it a well-formed string. */
-                    if (strncmp(buffer, "GET", 3) == 0)
+                    char *first_word = strtok(buffer, " ");
+                    if (strcmp(first_word, "GET") == 0)
                     {
                         /* TODO - figure this out, determine whether it's looking for / or /<array-name> or nothing. */
                         r = send_html_header(client_list[i]->buffer);
                         r = send_html_body_open(client_list[i]->buffer);
 
-                        if (array_list)
+                        char *requested_resource = strtok(NULL, " ");
+                        if (strcmp(requested_resource, "/") == 0)
                         {
-                            send_html_table_start(client_list[i]->buffer);
-                            send_html_table_arraylist_header(client_list[i]->buffer);
-                            int j;
-                            for (j = 0; j < array_list_size; j++)
+                            if (array_list)
                             {
-                                send_html_table_arraylist_row(client_list[i]->buffer, array_list[j]);
+                                send_html_table_start(client_list[i]->buffer);
+                                send_html_table_arraylist_header(client_list[i]->buffer);
+                                int j;
+                                for (j = 0; j < array_list_size; j++)
+                                {
+                                    send_html_table_arraylist_row(client_list[i]->buffer, array_list[j]);
+                                }
+                                send_html_table_end(client_list[i]->buffer);
                             }
-                            send_html_table_end(client_list[i]->buffer);
+                            else
+                            {
+                                char message[] = "No arrays currently running, or cmc not yet polled. Please try again later...\n";
+                                r = send_html_paragraph(client_list[i]->buffer, message);
+                            }
                         }
                         else
                         {
-                            char message[] = "No arrays currently running, or cmc not yet polled. Please try again later...\n";
-                            /* TODO make this auto-refreshing as well.*/
-                            r = send_html_paragraph(client_list[i]->buffer, message);
+                            int j;
+                            for (j = 0; j < array_list_size; j++)
+                            {
+                                if (strcmp(requested_resource + 1, array_list[i]->name) == 0)
+                                {
+                                    size_t needed = snprintf(NULL, 0, "Array %s found!", requested_resource + 1) + 1;
+                                    char *message = malloc(needed);
+                                    sprintf(message, "Array %s found!", requested_resource + 1);
+                                    r = send_html_paragraph(client_list[i]->buffer, message);
+                                    free(message);
+                                    break;
+                                }
+                            }
+                            if (j == array_list_size)
+                            {
+                                size_t needed = snprintf(NULL, 0, "Array %s not found running at the moment.", requested_resource + 1) + 1;
+                                char *message = malloc(needed);
+                                sprintf(message, "Array %s not found running at the moment.", requested_resource + 1);
+                                r = send_html_paragraph(client_list[i]->buffer, message);
+                                free(message);
+                            }
+
                         }
 
                         r = send_html_body_close(client_list[i]->buffer);
-
-                        /*TODO
-                         * check through the monitor ports of the arrays currenly being watched,
-                         * then give the want_data the correct identifier
-                         * shunt the stuff down. */
                     }
                 }
             }

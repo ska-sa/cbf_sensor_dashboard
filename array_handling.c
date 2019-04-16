@@ -76,7 +76,8 @@ struct cmc_array *create_array(char *array_name, int monitor_port, char *multica
     new_array->l = create_katcl(new_array->monitor_socket_fd);
     new_array->state = REQUEST_FUNCTIONAL_MAPPING;
     
-    //new_array->fhosts = malloc(sizeof(new_array.fhosts)*new_array->number_of_antennas);
+    new_array->fhosts = malloc(sizeof(*(new_array->fhosts))*new_array->number_of_antennas);
+    new_array->xhosts = malloc(sizeof(*(new_array->xhosts))*new_array->number_of_antennas);
 
     return new_array;
 }
@@ -95,6 +96,14 @@ void destroy_array(struct cmc_array *array)
     destroy_katcl(array->l, 1);
     shutdown(array->monitor_socket_fd, SHUT_RDWR);
     close(array->monitor_socket_fd);
+    int i;
+    for (i = 0; i < array->number_of_antennas; i++)
+    {
+        destroy_fhost(array->fhosts[i]);
+        destroy_xhost(array->xhosts[i]);
+    }
+    free(array->fhosts);
+    free(array->xhosts);
     free(array);
 }
 
@@ -114,7 +123,7 @@ int accept_functional_mapping(struct cmc_array *array)
     {
         if (!strcmp(arg_string_katcl(array->l, 0), "#sensor-value") && !strcmp(arg_string_katcl(array->l, 3), "hostname-functional-mapping"))
         {
-            printf("%s\n", arg_string_katcl(array->l, 5));
+            //printf("%s\n", arg_string_katcl(array->l, 5));
             r = 1; /* one means we're getting the value we want */
         }
         else if (!strcmp(arg_string_katcl(array->l, 0), "!sensor-value"))
@@ -122,6 +131,53 @@ int accept_functional_mapping(struct cmc_array *array)
             if (!strcmp(arg_string_katcl(array->l, 1), "ok"))
                 r = 0; /* 0 means it's complete and we can move on */
         }
+    }
+    return r;
+}
+
+static int ss_append_string_katcl(struct katcl_line *l, char *sensor_name)
+{
+    int r;
+    if ((r = append_string_katcl(l, KATCP_FLAG_FIRST, "?sensor-sampling")) < 0) return r;
+    if ((r = append_string_katcl(l, 0, sensor_name)) < 0) return r;
+    if ((r = append_string_katcl(l, KATCP_FLAG_LAST, "auto")) < 0) return r;
+    return 0;
+}
+
+int request_sensor_sampling(struct cmc_array *array)
+{
+    printf("requesting sensors %s...\n", array->name);
+    int i;
+    for (i = 0; i < array->number_of_antennas; i++)
+    {
+        size_t needed = snprintf(NULL, 0, "fhost%02d.device-status", i) + 1;
+        char *sensor_name = malloc(needed);
+        sprintf(sensor_name, "fhost%02d.device-status", i);
+        ss_append_string_katcl(array->l, sensor_name);
+        free(sensor_name);
+
+        needed = snprintf(NULL, 0, "xhost%02d.device-status", i) + 1;
+        sensor_name = malloc(needed);
+        sprintf(sensor_name, "fhost%02d.device-status", i);
+        ss_append_string_katcl(array->l, sensor_name);
+        free(sensor_name);
+    }
+    return 0;
+}
+
+int process_sensor_status(struct cmc_array *array)
+{
+
+    int r = -1; /* -1 means the message that it got was unknown */
+    if (have_katcl(array->l) > 0)
+    {
+        if (!strcmp(arg_string_katcl(array->l, 0), "#sensor-status"))
+        {
+            printf("%s: %s\n", arg_string_katcl(array->l, 3), arg_string_katcl(array->l, 5));
+            r = 0; 
+        }
+        else
+            printf("%s %s %s %s\n", arg_string_katcl(array->l, 0), arg_string_katcl(array->l, 1), arg_string_katcl(array->l, 2), arg_string_katcl(array->l, 3));
     }
     return r;
 }
@@ -163,5 +219,31 @@ int listen_on_socket(int listening_port)
     printf("Accepting connections on port %d\n", listening_port);
     listen(s, 10); /* turns out 10 is a thumb-suck value but it's pretty sane. A legacy of olden times... */
     return s;
+}
+
+struct fhost *create_fhost(char *hostname)
+{
+    struct fhost *new_fhost = malloc(sizeof(*new_fhost));
+    snprintf(new_fhost->hostname, sizeof(new_fhost->hostname), "%s", hostname);
+
+    return new_fhost;
+}
+
+void destroy_fhost(struct fhost *fhost)
+{
+    free(fhost);
+}
+
+struct xhost *create_xhost(char *hostname)
+{
+    struct xhost *new_xhost = malloc(sizeof(*new_xhost));
+    snprintf(new_xhost->hostname, sizeof(new_xhost->hostname), "%s", hostname);
+
+    return new_xhost;
+}
+
+void destroy_xhost(struct xhost *xhost)
+{
+    free(xhost);
 }
 

@@ -511,9 +511,19 @@ int main(int argc, char *argv[])
                 case RECEIVE_FUNCTIONAL_MAPPING:
                     r = accept_functional_mapping(array_list[i]);
                     if (r == 0) 
+                        array_list[i]->state = REQUEST_SENSOR_SAMPLING;
+                    break;
+                case REQUEST_SENSOR_SAMPLING:
+                    r = request_sensor_sampling(array_list[i]);
+                    if (r == 0)
                         array_list[i]->state = MONITOR_SENSORS;
                     break;
-                 default:
+                case MONITOR_SENSORS:
+                    r = process_sensor_status(array_list[i]);
+                    if (r == 0)
+                        ; /* can't think of anything to do at this point */
+                    break;
+                default:
                     ;
             }
         }

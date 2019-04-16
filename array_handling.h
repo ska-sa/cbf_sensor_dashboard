@@ -7,11 +7,12 @@
 enum array_state {
     REQUEST_FUNCTIONAL_MAPPING,
     RECEIVE_FUNCTIONAL_MAPPING,
+    REQUEST_SENSOR_SAMPLING,
     MONITOR_SENSORS
 };
 
 struct fhost {
-    char *hostname[7]; /* skarab serial numbers are six digits long, plus the terminal null. */
+    char hostname[7]; /* skarab serial numbers are six digits long, plus the terminal null. */
     int device_status;
     int netw_rx;
     int spead_rx;
@@ -27,7 +28,7 @@ struct fhost {
 };
 
 struct xhost {
-    char *hostname[7];
+    char hostname[7];
     int device_status;
     int netw_rx;
     int netw_reor;
@@ -47,6 +48,8 @@ struct cmc_array {
     int monitor_socket_fd;
     struct katcl_line *l;
     enum array_state state;
+    struct fhost **fhosts;
+    struct xhost **xhosts;
 };
 
 char *read_full_katcp_line(struct katcl_line *l);
@@ -56,7 +59,13 @@ char *get_array_name(struct cmc_array *array); /* user must free the resulting c
 void destroy_array(struct cmc_array *array);
 int request_functional_mapping(struct cmc_array *array);
 int accept_functional_mapping(struct cmc_array *array);
+int request_sensor_sampling(struct cmc_array *array);
+int process_sensor_status(struct cmc_array *array);
 
+struct fhost *create_fhost(char *hostname);
+void destroy_fhost(struct fhost *fhost);
+struct xhost *create_xhost(char *hostname);
+void destroy_xhost(struct xhost *xhost);
 
 int listen_on_socket(int listening_port);
 #endif

@@ -34,12 +34,9 @@
 
 
 enum program_state {
-    STARTUP_SEND_CLIENT_CONFIG,
     STARTUP_WAIT_CLIENT_CONFIG_OKAY,
-    STARTUP_REQUEST_ARRAY_LIST,
     STARTUP_RECV_ARRAY_LIST,
     MONITOR,
-    ADD_TO_LIST_REQUEST_MONITOR_PORT,
     ADD_TO_LIST_RECEIVE_MONITOR_PORT
 };
 
@@ -71,7 +68,7 @@ int main(int argc, char *argv[])
     struct katcl_line *l;
     int r; /* dump variable for results of functions */
 
-    enum program_state state = STARTUP_SEND_CLIENT_CONFIG;
+    enum program_state state = STARTUP_WAIT_CLIENT_CONFIG_OKAY;
 
     struct cmc_array **array_list = NULL;
     int array_list_size = 0;
@@ -113,7 +110,11 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
     else
+    {
         l = create_katcl(katcp_socket_fd);
+        append_string_katcl(l, KATCP_FLAG_FIRST, "?client-config");
+        append_string_katcl(l, KATCP_FLAG_LAST, "info-all");
+    }
    
     while(!stop) /* to allow for graceful exiting, otherwise we get potential leaks. */
     {
@@ -240,11 +241,15 @@ int main(int argc, char *argv[])
                     if (!strcmp(arg_string_katcl(l, 0), "!client-config"))
                     {
                         if (!strcmp(arg_string_katcl(l, 1), "ok"))
-                            state = STARTUP_REQUEST_ARRAY_LIST;
+                        {
+                            append_string_katcl(l, KATCP_FLAG_FIRST | KATCP_FLAG_LAST, "?array-list");
+                            state = STARTUP_RECV_ARRAY_LIST;
+                        }
                         else
                         {
                             fprintf(stderr, "!client-config received %s, expected ok\nretrying...\n", arg_string_katcl(l, 1));
-                            state = STARTUP_SEND_CLIENT_CONFIG;
+                            append_string_katcl(l, KATCP_FLAG_FIRST, "?client-config");
+                            append_string_katcl(l, KATCP_FLAG_LAST, "info-all");
                         }
                     }
                     break;
@@ -277,7 +282,7 @@ int main(int argc, char *argv[])
                     }
                     else if (!strcmp(arg_string_katcl(l, 0), "!array-list"))
                     {
-                        printf("Finished getting initial array list. Getting sensor lists...\n");
+                        printf("Finished getting initial array list. Watching for any new ones...\n");
                         state = MONITOR;
                     }
                     break;
@@ -289,7 +294,8 @@ int main(int argc, char *argv[])
                         sprintf(new_array_name, "%s",  strtok(temp, ".")); /* array name will be format steven.control or steven.monitor, so we only need the steven part */
                         /* this needs to be sprintf to ensure that the name persists once this katcl line is moved on to the next thing. */
                         printf("Noticed a new array, %s. Requesting monitor port to connect to...\n", new_array_name);
-                        state = ADD_TO_LIST_REQUEST_MONITOR_PORT;
+                        append_string_katcl(l, KATCP_FLAG_FIRST | KATCP_FLAG_LAST, "?array-list");
+                        state = ADD_TO_LIST_RECEIVE_MONITOR_PORT;
                         break;
                     }
                     else if (!strcmp(arg_string_katcl(l, 0), "#group-destroyed"))
@@ -358,27 +364,6 @@ int main(int argc, char *argv[])
             }
         }
        
-        /* now if we have some to write */
-        switch (state)
-        {
-            case STARTUP_SEND_CLIENT_CONFIG:
-                append_string_katcl(l, KATCP_FLAG_FIRST, "?client-config");
-                append_string_katcl(l, KATCP_FLAG_LAST, "info-all");
-                state = STARTUP_WAIT_CLIENT_CONFIG_OKAY;
-                break;
-            case STARTUP_REQUEST_ARRAY_LIST:
-                append_string_katcl(l, KATCP_FLAG_FIRST | KATCP_FLAG_LAST, "?array-list");
-                state = STARTUP_RECV_ARRAY_LIST;
-                break;
-            case ADD_TO_LIST_REQUEST_MONITOR_PORT:
-                append_string_katcl(l, KATCP_FLAG_FIRST | KATCP_FLAG_LAST, "?array-list");
-                state = ADD_TO_LIST_RECEIVE_MONITOR_PORT;
-                break;
-
-            default: 
-                ;
-        }
-
         /* Now handle the actual reading from the socket. */
         for (i = 0; i < client_list_size; i++)
         {
@@ -432,12 +417,14 @@ int main(int argc, char *argv[])
                             {
                                 if (strcmp(requested_resource + 1, array_list[i]->name) == 0)
                                 {
-                                    size_t needed = snprintf(NULL, 0, "Array %s found!", requested_resource + 1) + 1;
-                                    char *message = malloc(needed);
-                                    sprintf(message, "Array %s found!", requested_resource + 1);
-                                    r = send_html_paragraph(client_list[i]->buffer, message);
-                                    free(message);
-                                    break;
+                                    send_html_table_start(client_list[i]->buffer);
+                                    int k;
+                                    for (k = 0; k < array_list[j]->number_of_antennas; k++)
+                                    {
+                                        send_html_table_sensor_row(client_list[i]->buffer, array_list[i]->fhosts[k], array_list[i]->xhosts[k]);
+                                    }
+                                    send_html_table_end(client_list[i]->buffer);
+                                    break; /* found the array, no need to continue further */
                                 }
                             }
                             if (j == array_list_size)
@@ -501,30 +488,53 @@ int main(int argc, char *argv[])
                }
             }
             
-            switch (array_list[i]->state)
+            if (have_katcl(array_list[i]->l) > 0)
             {
-                case REQUEST_FUNCTIONAL_MAPPING:
-                    r = request_functional_mapping(array_list[i]);
-                    if (r >= 0)
-                        array_list[i]->state = RECEIVE_FUNCTIONAL_MAPPING;
-                    break;
-                case RECEIVE_FUNCTIONAL_MAPPING:
-                    r = accept_functional_mapping(array_list[i]);
-                    if (r == 0) 
-                        array_list[i]->state = REQUEST_SENSOR_SAMPLING;
-                    break;
-                case REQUEST_SENSOR_SAMPLING:
-                    r = request_sensor_sampling(array_list[i]);
-                    if (r == 0)
-                        array_list[i]->state = MONITOR_SENSORS;
-                    break;
-                case MONITOR_SENSORS:
-                    r = process_sensor_status(array_list[i]);
-                    if (r == 0)
-                        ; /* can't think of anything to do at this point */
-                    break;
-                default:
-                    ;
+                if (!strcmp(arg_string_katcl(array_list[i]->l, 0), "#log"))
+                {
+                    ; /*Just explicitly ignore the log, so we don't have to waste cycles comparing. */
+                }
+                else if (!strcmp(arg_string_katcl(array_list[i]->l, 0), "#sensor-status"))
+                {
+                    /*TODO: this is where the sensor value would need to be updated.*/
+                    process_sensor_status(array_list[i]);
+                }
+                else
+                {
+                    switch (array_list[i]->state)
+                    {
+                        case REQUEST_FUNCTIONAL_MAPPING: /*Ask for the hostname-functional-mapping sensor */
+                            r = request_functional_mapping(array_list[i]);
+                            if (r >= 0)
+                                array_list[i]->state = RECEIVE_FUNCTIONAL_MAPPING;
+                            break;
+                        case RECEIVE_FUNCTIONAL_MAPPING:
+                            r = accept_functional_mapping(array_list[i]);
+                            if (r == 0) 
+                            {
+                                r = request_sensor_fhost_device_status(array_list[i]);
+                                array_list[i]->state = RECEIVE_SENSOR_FHOST_DEVICE_STATUS_RESPONSE;
+                            }
+                            break;
+                        case RECEIVE_SENSOR_FHOST_DEVICE_STATUS_RESPONSE:
+                            r = receive_sensor_fhost_device_status_response(array_list[i]);
+                            if (r == 0)
+                            {
+                                if (array_list[i]->host_counter == array_list[i]->number_of_antennas)
+                                {
+                                    array_list[i]->state = MONITOR_SENSORS;
+                                    array_list[i]->host_counter = 0;
+                                }
+                                else
+                                {
+                                    ; /* not sure what to do if this condition is reached. */
+                                }
+                            }
+                            break;
+                        default:
+                            ;
+                    }
+                }
             }
         }
     }

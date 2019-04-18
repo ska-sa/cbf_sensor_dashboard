@@ -76,9 +76,10 @@ struct cmc_array *create_array(char *array_name, int monitor_port, char *multica
     new_array->l = create_katcl(new_array->monitor_socket_fd);
     new_array->state = REQUEST_FUNCTIONAL_MAPPING;
     
+    new_array->host_counter = 0;
     new_array->fhosts = malloc(sizeof(*(new_array->fhosts))*new_array->number_of_antennas);
     new_array->xhosts = malloc(sizeof(*(new_array->xhosts))*new_array->number_of_antennas);
-
+        /* we're not actually going to create the fhosts yet, that is done by the functional mapping */
     return new_array;
 }
 
@@ -96,6 +97,8 @@ void destroy_array(struct cmc_array *array)
     destroy_katcl(array->l, 1);
     shutdown(array->monitor_socket_fd, SHUT_RDWR);
     close(array->monitor_socket_fd);
+    if (array->current_sensor_name)
+        free(array->current_sensor_name);
     int i;
     for (i = 0; i < array->number_of_antennas; i++)
     {
@@ -109,6 +112,7 @@ void destroy_array(struct cmc_array *array)
 
 int request_functional_mapping(struct cmc_array *array)
 {
+    printf("Requesting functional mapping on %s\n", array->name);
     int r;
     r = append_string_katcl(array->l, KATCP_FLAG_FIRST, "?sensor-value");
     if (!(r<0))
@@ -119,11 +123,31 @@ int request_functional_mapping(struct cmc_array *array)
 int accept_functional_mapping(struct cmc_array *array)
 {
     int r = -1; /* -1 means the message that it got was unknown */
-    if (have_katcl(array->l) > 0)
     {
         if (!strcmp(arg_string_katcl(array->l, 0), "#sensor-value") && !strcmp(arg_string_katcl(array->l, 3), "hostname-functional-mapping"))
         {
             //printf("%s\n", arg_string_katcl(array->l, 5));
+            int i;
+            for (i = 0; i < 2*array->number_of_antennas; i++)
+            {
+                char host_type = arg_string_katcl(array->l, 5)[i*30 + 21];
+                int host_number = atoi(strndup(arg_string_katcl(array->l, 5) + (i*30 + 26), 2));
+                char *hostname = strndup(arg_string_katcl(array->l, 5) + (i*30 + 8), 6);
+                switch (host_type)
+                {
+                    case 'f':
+                        printf("Found %s-fhost%02d on physical host skarab%s-01\n", array->name, host_number, hostname);
+                        array->fhosts[host_number] = create_fhost(hostname, host_number);
+                        break;
+                    case 'x':
+                        printf("Found %s-xhost%02d on physical host skarab%s-01\n", array->name, host_number, hostname);
+                        array->xhosts[host_number] = create_xhost(hostname, host_number);
+                        break;
+                    default:
+                        printf("Couldn't parse array properly: got %c from position %d of [%s]\n", host_type, (i*30 + 21), arg_string_katcl(array->l, 5));
+                }
+                free(hostname);
+            }
             r = 1; /* one means we're getting the value we want */
         }
         else if (!strcmp(arg_string_katcl(array->l, 0), "!sensor-value"))
@@ -137,6 +161,7 @@ int accept_functional_mapping(struct cmc_array *array)
 
 static int ss_append_string_katcl(struct katcl_line *l, char *sensor_name)
 {
+    printf("subscribing to sensor %s\n", sensor_name);
     int r;
     if ((r = append_string_katcl(l, KATCP_FLAG_FIRST, "?sensor-sampling")) < 0) return r;
     if ((r = append_string_katcl(l, 0, sensor_name)) < 0) return r;
@@ -144,43 +169,65 @@ static int ss_append_string_katcl(struct katcl_line *l, char *sensor_name)
     return 0;
 }
 
-int request_sensor_sampling(struct cmc_array *array)
+int request_sensor_fhost_device_status(struct cmc_array *array)
 {
     printf("requesting sensors %s...\n", array->name);
-    int i;
-    for (i = 0; i < array->number_of_antennas; i++)
-    {
-        size_t needed = snprintf(NULL, 0, "fhost%02d.device-status", i) + 1;
-        char *sensor_name = malloc(needed);
-        sprintf(sensor_name, "fhost%02d.device-status", i);
-        ss_append_string_katcl(array->l, sensor_name);
-        free(sensor_name);
+    size_t needed = snprintf(NULL, 0, "fhost%02d.device-status", array->host_counter) + 1;
+    array->current_sensor_name = malloc(needed);
+    sprintf(array->current_sensor_name, "fhost%02d.device-status", array->host_counter);
+    ss_append_string_katcl(array->l, array->current_sensor_name);
 
-        needed = snprintf(NULL, 0, "xhost%02d.device-status", i) + 1;
-        sensor_name = malloc(needed);
-        sprintf(sensor_name, "fhost%02d.device-status", i);
-        ss_append_string_katcl(array->l, sensor_name);
-        free(sensor_name);
-    }
     return 0;
 }
 
-int process_sensor_status(struct cmc_array *array)
+int receive_sensor_fhost_device_status_response(struct cmc_array *array)
 {
-
-    int r = -1; /* -1 means the message that it got was unknown */
-    if (have_katcl(array->l) > 0)
+    if (!strcmp(arg_string_katcl(array->l, 0), "!sensor-sampling") && !strcmp(arg_string_katcl(array->l, 2), array->current_sensor_name))
     {
-        if (!strcmp(arg_string_katcl(array->l, 0), "#sensor-status"))
+        // free(array->current_sensor_name); /* need to think of a better place to put this. */
+        if (!strcmp(arg_string_katcl(array->l, 1), "ok"))
         {
-            printf("%s: %s\n", arg_string_katcl(array->l, 3), arg_string_katcl(array->l, 5));
-            r = 0; 
+            printf("sensor-sampling %s ok\n", array->current_sensor_name);
+            array->host_counter++;
+            return 0;
         }
         else
-            printf("%s %s %s %s\n", arg_string_katcl(array->l, 0), arg_string_katcl(array->l, 1), arg_string_katcl(array->l, 2), arg_string_katcl(array->l, 3));
+        {
+            printf("sensor-sampling %s failed: %s\n", array->current_sensor_name, arg_string_katcl(array->l, 3));
+            return -1;
+        }
     }
-    return r;
+    else
+    {
+        printf("unknown katcp message received: %s %s %s %s\n", arg_string_katcl(array->l, 0), arg_string_katcl(array->l, 1), arg_string_katcl(array->l, 2), arg_string_katcl(array->l, 3));
+        return -1;
+    }
 }
+
+void process_sensor_status(struct cmc_array *array)
+{
+    int host_number;
+    char host_type;
+    if (sscanf(arg_string_katcl(array->l, 3), "%chost%02d.device-status", &host_type, &host_number) == 2)
+    {
+        printf("Got %chost%02d.device-status: %s\n", host_type, host_number, arg_string_katcl(array->l, 5));
+        if (host_type == 'f')
+        {
+            sprintf(array->fhosts[host_number]->device_status, "%s", arg_string_katcl(array->l, 4));
+        }
+        else if (host_type == 'x')
+        {
+            sprintf(array->fhosts[host_number]->device_status, "%s", arg_string_katcl(array->l, 4));
+        }
+        else
+        {
+            printf("I don't know what a %chost is.\n", host_type);
+        }
+    }
+    else 
+        printf("Didn't understand what I got: %s %s %s %s %s %s\n", arg_string_katcl(array->l, 0), arg_string_katcl(array->l, 1), arg_string_katcl(array->l, 2), arg_string_katcl(array->l, 3), arg_string_katcl(array->l, 4), arg_string_katcl(array->l, 5));
+}
+
 
 /* Function takes a port number as an argument and returns a file descriptor
  * to the resulting socket. Opens socket on 0.0.0.0. */
@@ -221,11 +268,11 @@ int listen_on_socket(int listening_port)
     return s;
 }
 
-struct fhost *create_fhost(char *hostname)
+struct fhost *create_fhost(char *hostname, int host_number)
 {
     struct fhost *new_fhost = malloc(sizeof(*new_fhost));
     snprintf(new_fhost->hostname, sizeof(new_fhost->hostname), "%s", hostname);
-
+    new_fhost->host_number = host_number;
     return new_fhost;
 }
 
@@ -234,11 +281,11 @@ void destroy_fhost(struct fhost *fhost)
     free(fhost);
 }
 
-struct xhost *create_xhost(char *hostname)
+struct xhost *create_xhost(char *hostname, int host_number)
 {
     struct xhost *new_xhost = malloc(sizeof(*new_xhost));
     snprintf(new_xhost->hostname, sizeof(new_xhost->hostname), "%s", hostname);
-
+    new_xhost->host_number = host_number;
     return new_xhost;
 }
 

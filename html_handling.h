@@ -17,6 +17,7 @@ int send_html_table_end(struct webpage_buffer *buffer);
 int send_html_table_arraylist_header(struct webpage_buffer *buffer);
 int send_html_table_arraylist_row(struct webpage_buffer *buffer, struct cmc_array *array);
 
+int send_html_table_sensor_row(struct webpage_buffer *buffer, struct fhost *fhost, struct xhost *xhost);
 //int send_html_table_row(int socket_fd);
 #endif
 

@@ -2,9 +2,58 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"> 
-<title>HTML5</title>
+<title>CBF Sensor Dashboard</title>
 <style>
-    <!--STYLES-->
+    .nominal {
+      background-color: #4CAF50;
+      border: none;
+      color: white;
+      padding: 15 px 32 px;
+      text-align: center;
+      text-decoration: none;
+      display: inline-block;
+      font-size: 16px;
+      margin: 4px 2px;
+      cursor: pointer;
+      opacity: 0.4;
+      transition: 0.2s;
+      display: inline-block;
+    }
+    .nominal:hover {opacity: 1}
+
+    .warn {
+      background-color: #FF9E1F;
+      border: none;
+      color: white;
+      padding: 15 px 32 px;
+      text-align: center;
+      text-decoration: none;
+      display: inline-block;
+      font-size: 16px;
+      margin: 4px 2px;
+      cursor: pointer;
+      opacity: 0.6;
+      transition: 0.2s;
+      display: inline-block;
+    }
+    .warn:hover {opacity: 1}
+
+    .error {
+      background-color: #FF0000;
+      border: none;
+      color: white;
+      padding: 15 px 32 px;
+      text-align: center;
+      text-decoration: none;
+      display: inline-block;
+      font-size: 16px;
+      margin: 4px 2px;
+      cursor: pointer;
+      opacity: 0.8;
+      transition: 0.2s;
+      display: inline-block;
+    }
+    .error:hover {opacity: 1}
 </style>
 <script>
 function timedRefresh(timeoutPeriod) {

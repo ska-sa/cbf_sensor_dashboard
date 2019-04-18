@@ -12,7 +12,11 @@ int send_html_header(struct webpage_buffer *buffer)
     FILE *html_header_file;
     html_header_file = fopen("head.html", "r");
     if (html_header_file == NULL)
+    {
+        perror("fopen()");
+        fprintf(stderr, "couldn't open head.html\n");
         return -1;
+    }
 
     int r;
     char *res;
@@ -24,11 +28,13 @@ int send_html_header(struct webpage_buffer *buffer)
         if (res != NULL)
         {
             r = add_to_buffer(buffer, line);
-            if (r < 1)
+            printf("%s\n", line);
+            if (r < 0)
                 return r;
         }
     } while (res != NULL);
 
+    printf("Finished reading header.\n");
     fclose(html_header_file);
 
     return 1;
@@ -116,4 +122,13 @@ int send_html_table_arraylist_row(struct webpage_buffer *buffer, struct cmc_arra
     return r;
 }
 
+int send_html_table_sensor_row(struct webpage_buffer *buffer, struct fhost *fhost, struct xhost *xhost)
+{
+    size_t needed = snprintf(NULL, 0, "<tr><td>f%02d %s</td><td><button class=\"%s\">device-status</button></td></tr>\n", fhost->host_number, fhost->hostname, fhost->device_status) + 1;
+    char *html_table_row = malloc(needed);
+    sprintf(html_table_row, "<tr><td>f%02d %s</td><td><button class=\"%s\">device-status</button></td></tr>\n", fhost->host_number, fhost->hostname, fhost->device_status);
+    int r = add_to_buffer(buffer, html_table_row);
+    free(html_table_row);
+    return r;
+}
 

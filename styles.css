@@ -1,4 +1,4 @@
-.greenbutton {
+.nominal {
   background-color: #4CAF50;
   border: none;
   color: white;
@@ -13,9 +13,9 @@
   transition: 0.2s;
   display: inline-block;
 }
-.greenbutton:hover {opacity: 1}
+.nominal:hover {opacity: 1}
 
-.orangebutton {
+.warn {
   background-color: #FF9E1F;
   border: none;
   color: white;
@@ -30,9 +30,9 @@
   transition: 0.2s;
   display: inline-block;
 }
-.orangebutton:hover {opacity: 1}
+.warn:hover {opacity: 1}
 
-.redbutton {
+.error {
   background-color: #FF0000;
   border: none;
   color: white;
@@ -47,6 +47,6 @@
   transition: 0.2s;
   display: inline-block;
 }
-.redbutton:hover {opacity: 1}
+.error:hover {opacity: 1}
 
 

@@ -27,7 +27,8 @@ struct webpage_buffer *create_webpage_buffer()
 
 void destroy_webpage_buffer(struct webpage_buffer *buffer)
 {
-    free(buffer->buffer);
+    if (buffer->buffer)
+        free(buffer->buffer);
     free(buffer);
 }
 
@@ -94,7 +95,8 @@ struct webpage_client *create_webpage_client(int fd)
 
 void destroy_webpage_client(struct webpage_client *client)
 {
-    destroy_webpage_buffer(client->buffer);
+    if (client->buffer)
+        destroy_webpage_buffer(client->buffer);
     free(client);
 }
 

@@ -28,16 +28,14 @@ int send_html_header(struct webpage_buffer *buffer)
         if (res != NULL)
         {
             r = add_to_buffer(buffer, line);
-            printf("%s\n", line);
             if (r < 0)
                 return r;
         }
     } while (res != NULL);
 
-    printf("Finished reading header.\n");
     fclose(html_header_file);
 
-    return 1;
+    return 0;
 }
 
 int send_html_body_open(struct webpage_buffer *buffer)

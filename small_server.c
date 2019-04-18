@@ -198,6 +198,7 @@ int main(int argc, char *argv[])
                 {
                     client_list = temp;
                     client_list[client_list_size-1] = create_webpage_client(r);
+                    printf("webpage client created, list size is now %d\n", client_list_size);
                 }
                 else
                 {
@@ -370,23 +371,24 @@ int main(int argc, char *argv[])
             if (FD_ISSET(client_list[i]->fd, &rd))
             {
                 r = read(client_list[i]->fd, buffer, BUF_SIZE - 1); /* -1 to prevent overrunning the buffer. */
-                if (r < 1)
+                if (r < 0)
                 {
+                    /*TODO add the erro things. */
                     destroy_webpage_client(client_list[i]);
                     memmove(&client_list[i], &client_list[i+1], (client_list_size - i - 1)*sizeof(*client_list));
                     struct webpage_client **temp = realloc(client_list, sizeof(*client_list)*(--client_list_size));
                     if (temp)
                         client_list = temp;
-                    printf("client disconnected\n");
+                    printf("client disconnected, list size is now %d\n", client_list_size);
                     i--;
                 }
-                else
+                else if (r > 0)
                 {
                     buffer[r] = '\0'; /* To make it a well-formed string. */
-                    char *first_word = strtok(buffer, " ");
+                    char first_word[BUF_SIZE];
+                    sprintf(first_word, "%s", strtok(buffer, " "));
                     if (strcmp(first_word, "GET") == 0)
                     {
-                        /* TODO - figure this out, determine whether it's looking for / or /<array-name> or nothing. */
                         r = send_html_header(client_list[i]->buffer);
                         r = send_html_body_open(client_list[i]->buffer);
 
@@ -415,13 +417,13 @@ int main(int argc, char *argv[])
                             int j;
                             for (j = 0; j < array_list_size; j++)
                             {
-                                if (strcmp(requested_resource + 1, array_list[i]->name) == 0)
+                                if (strcmp(requested_resource + 1, array_list[j]->name) == 0)
                                 {
                                     send_html_table_start(client_list[i]->buffer);
                                     int k;
                                     for (k = 0; k < array_list[j]->number_of_antennas; k++)
                                     {
-                                        send_html_table_sensor_row(client_list[i]->buffer, array_list[i]->fhosts[k], array_list[i]->xhosts[k]);
+                                        send_html_table_sensor_row(client_list[i]->buffer, array_list[j]->fhosts[k], array_list[j]->xhosts[k]);
                                     }
                                     send_html_table_end(client_list[i]->buffer);
                                     break; /* found the array, no need to continue further */
@@ -441,6 +443,8 @@ int main(int argc, char *argv[])
                         r = send_html_body_close(client_list[i]->buffer);
                     }
                 }
+                else
+                    ;
             }
         }
 
@@ -452,13 +456,14 @@ int main(int argc, char *argv[])
                 r = write_buffer_to_fd(client_list[i]->fd, client_list[i]->buffer, BUF_SIZE);
                 if (r < 0)
                 {
+                    /*TODO this is error handling I think, -1 is an error, 0 is finished. */
                     shutdown(client_list[i]->fd, SHUT_RDWR);
                     destroy_webpage_client(client_list[i]);
                     memmove(&client_list[i], &client_list[i+1], (client_list_size - i - 1)*sizeof(*client_list));
                     struct webpage_client **temp = realloc(client_list, sizeof(*client_list)*(--client_list_size));
                     if (temp)
                         client_list = temp;
-                    printf("client disconnected\n");
+                    printf("client disconnected, list size is now %d\n", client_list_size);
                 }
             }
         }

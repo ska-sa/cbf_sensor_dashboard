@@ -10,11 +10,12 @@
 
 struct webpage_buffer *create_webpage_buffer()
 {
+    printf("FOOBAR creating...");
     struct webpage_buffer *buffer = malloc(sizeof(*buffer));
     if (buffer)
     {
         buffer->buffer = malloc(1);
-        buffer->buffer[0] = '\0';
+        buffer->buffer[0] = 0;
         buffer->bytes_available = 0;
         buffer->bytes_written = 0;
         return buffer;
@@ -27,13 +28,17 @@ struct webpage_buffer *create_webpage_buffer()
 
 void destroy_webpage_buffer(struct webpage_buffer *buffer)
 {
-    if (buffer->buffer)
+    printf("FOOBAR destroying...");
+    if (buffer->buffer != NULL)
         free(buffer->buffer);
     free(buffer);
 }
 
 int add_to_buffer(struct webpage_buffer *buffer, char *html_text)
 {
+    /* checks because they seem to be needed */
+    if (!buffer->buffer || !html_text)
+        return -1;
     size_t needed = strlen(buffer->buffer) + strlen(html_text) + 1;
     char *temp = realloc(buffer->buffer, needed);
     if (temp)
@@ -67,9 +72,17 @@ int write_buffer_to_fd(int fd, struct webpage_buffer *buffer, int bufsize)
     buffer->bytes_written += r;
     if (buffer->bytes_written == buffer->bytes_available)
     {
-        destroy_webpage_buffer(buffer);
-        buffer = create_webpage_buffer();
-        return 0; /* zero means that the send buffer is now empty */
+        char *temp = realloc(buffer->buffer, 1);
+        if (temp)
+        {
+            buffer->buffer = temp;
+            buffer->buffer[0] = 0;
+            buffer->bytes_available = 0;
+            buffer->bytes_written = 0;
+            return 0; /* zero means that the send buffer is now empty */
+        }
+        else
+            return -1;
     }
     return 1; /* one means that there's still something to send. */
 }

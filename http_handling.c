@@ -10,7 +10,6 @@
 
 struct webpage_buffer *create_webpage_buffer()
 {
-    printf("FOOBAR creating...");
     struct webpage_buffer *buffer = malloc(sizeof(*buffer));
     if (buffer)
     {
@@ -28,10 +27,19 @@ struct webpage_buffer *create_webpage_buffer()
 
 void destroy_webpage_buffer(struct webpage_buffer *buffer)
 {
-    printf("FOOBAR destroying...");
     if (buffer->buffer != NULL)
         free(buffer->buffer);
     free(buffer);
+}
+
+void print_webpage_buffer(struct webpage_buffer *buffer)
+{
+    printf("webpage buffer:\n");
+    if (buffer->buffer)
+        printf("buffer contents: %s\n", buffer->buffer);
+    else
+        printf("buffer contents not allocated\n");
+    printf("bytes available: %ld\nbytes written already: %ld\n", buffer->bytes_available, buffer->bytes_written);
 }
 
 int add_to_buffer(struct webpage_buffer *buffer, char *html_text)
@@ -59,9 +67,9 @@ int write_buffer_to_fd(int fd, struct webpage_buffer *buffer, int bufsize)
 
     if (buffer->bytes_written == 0) /* i.e. this is a new thing, we can send the http header */
     {
-        size_t needed = snprintf(NULL, 0, "HTTP/1.1 200 OK\nContent-Length: %ld\n\n", buffer->bytes_available) + 1;
+        size_t needed = snprintf(NULL, 0, "HTTP/1.1 200 OK\nContent-Length: %ld\nConnection: close\n\n", buffer->bytes_available) + 1;
         char *http_ok_message = malloc(needed);
-        sprintf(http_ok_message, "HTTP/1.1 200 OK\nContent-Length: %ld\n\n", buffer->bytes_available);
+        sprintf(http_ok_message, "HTTP/1.1 200 OK\nContent-Length: %ld\nConnection: close\n\n", buffer->bytes_available);
         r = write(fd, http_ok_message, strlen(http_ok_message));
         free(http_ok_message);
     }
@@ -111,5 +119,15 @@ void destroy_webpage_client(struct webpage_client *client)
     if (client->buffer)
         destroy_webpage_buffer(client->buffer);
     free(client);
+}
+
+void print_webpage_client(struct webpage_client *client)
+{
+    printf("webpage client:\n");
+    if (client->buffer)
+        print_webpage_buffer(client->buffer);
+    else
+        printf("client's child buffer not allocated\n");
+    printf("file descriptor: %d\nwants_data: %d\n", client->fd, client->wants_data);
 }
 

@@ -142,6 +142,7 @@ int main(int argc, char *argv[])
         /* we're interested in reading from any connected client, and we might have something to write to them */
         for (i = 0; i < client_list_size; i++)
         {
+            //print_webpage_client(client_list[i]);
             FD_SET(client_list[i]->fd, &rd);
             if (have_buffer_to_write(client_list[i]->buffer))
                 FD_SET(client_list[i]->fd, &wr);
@@ -164,6 +165,8 @@ int main(int argc, char *argv[])
         //printf("Heading into select with state  %d\n", state);
         r = select(nfds + 1, &rd, &wr, &er, NULL);
         //printf("Selected %d, currently in state %d\n", r, state);
+
+        printf("Client list size: %d\nArray list size: %d\n", client_list_size, array_list_size);
 
 
         /* EINTR just means it was interrupted by a signal or something.
@@ -371,9 +374,9 @@ int main(int argc, char *argv[])
             if (FD_ISSET(client_list[i]->fd, &rd))
             {
                 r = read(client_list[i]->fd, buffer, BUF_SIZE - 1); /* -1 to prevent overrunning the buffer. */
-                if (r < 0)
+                if (r < 1)
                 {
-                    /*TODO add the erro things. */
+                    perror("read()");
                     destroy_webpage_client(client_list[i]);
                     memmove(&client_list[i], &client_list[i+1], (client_list_size - i - 1)*sizeof(*client_list));
                     struct webpage_client **temp = realloc(client_list, sizeof(*client_list)*(--client_list_size));

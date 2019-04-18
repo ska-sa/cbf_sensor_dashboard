@@ -22,6 +22,13 @@ int send_html_header(struct webpage_buffer *buffer)
     char *res;
     char line[BUF_SIZE];
 
+    if (!buffer)
+    {
+        printf("buffer not allocated!\n");
+        perror("send_html_header()");
+        return -1;
+    }
+
     do {
         res = fgets(line, BUF_SIZE, html_header_file);
         /* TODO - this is where to add the parsing. So we'll need to add styles and scripts, and probably a specific header. */
@@ -41,7 +48,8 @@ int send_html_header(struct webpage_buffer *buffer)
 int send_html_body_open(struct webpage_buffer *buffer)
 {
     int r;
-    char html_body_open[] = "<body onload=\"JavaScript:timedRefresh(5000);\">\n";
+    //char html_body_open[] = "<body onload=\"JavaScript:timedRefresh(5000);\">\n";
+    char html_body_open[] = "<body>\n";
     r = add_to_buffer(buffer, html_body_open);
     return r;
 }

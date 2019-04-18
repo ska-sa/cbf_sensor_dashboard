@@ -15,6 +15,7 @@ struct webpage_client {
 
 struct webpage_buffer *create_webpage_buffer();
 void destroy_webpage_buffer(struct webpage_buffer *buffer);
+void print_webpage_buffer(struct webpage_buffer *buffer);
 
 int add_to_buffer(struct webpage_buffer *buffer, char *html_text);
 int write_buffer_to_fd(int fd, struct webpage_buffer *buffer, int bufsize);
@@ -23,6 +24,6 @@ int have_buffer_to_write(struct webpage_buffer *buffer);
 
 struct webpage_client *create_webpage_client(int fd);
 void destroy_webpage_client(struct webpage_client *client);
-
+void print_webpage_client(struct webpage_client *client);
 #endif
 

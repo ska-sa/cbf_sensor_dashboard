@@ -48,8 +48,8 @@ int send_html_header(struct webpage_client *client)
 int send_html_body_open(struct webpage_client *client)
 {
     int r;
-    char html_body_open[] = "<body onload=\"JavaScript:timedRefresh(5000);\">\n";
-    //char html_body_open[] = "<body>\n";
+    //char html_body_open[] = "<body onload=\"JavaScript:timedRefresh(5000);\">\n";
+    char html_body_open[] = "<body>\n";
     r = add_to_buffer(client, html_body_open);
     return r;
 }

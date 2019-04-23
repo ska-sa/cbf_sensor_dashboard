@@ -196,11 +196,12 @@ int main(int argc, char *argv[])
             }
             else
             {
-                struct webpage_client **temp = realloc(client_list, sizeof(*client_list)*(++client_list_size));
+                struct webpage_client **temp = realloc(client_list, sizeof(*client_list)*(client_list_size));
                 if (temp)
                 {
                     client_list = temp;
-                    client_list[client_list_size-1] = create_webpage_client(r);
+                    client_list[client_list_size] = create_webpage_client(r);
+                    client_list_size++;
                     printf("webpage client created, list size is now %d\n", client_list_size);
                 }
                 else
@@ -209,6 +210,7 @@ int main(int argc, char *argv[])
                     close(r);
                     fprintf(stderr, "Unable to allocate memory for another web client\n");
                     perror("realloc");
+                    --client_list_size;
                 }
             }
         }
@@ -260,9 +262,12 @@ int main(int argc, char *argv[])
                 case STARTUP_RECV_ARRAY_LIST:
                     if (!strcmp(arg_string_katcl(l, 0), "#array-list"))
                     {
-                        struct cmc_array **temp = realloc(array_list, sizeof(*array_list)*(++array_list_size));
+                        struct cmc_array **temp = realloc(array_list, sizeof(*array_list)*(array_list_size));
                         if (temp)
+                        {
                             array_list = temp;
+                            array_list_size++;
+                        }
                         char* array_name = arg_string_katcl(l, 1);
                         strtok(arg_string_katcl(l, 2), ","); /* don't need the first bit, that's the control port */
                         int monitor_port = atoi(strtok(NULL, ","));
@@ -321,9 +326,12 @@ int main(int argc, char *argv[])
                             {
                                 destroy_array(array_list[j]);
                                 memmove(&array_list[j], &array_list[j+1], (array_list_size - j - 1)*sizeof(*array_list));
-                                struct cmc_array **temp = realloc(array_list, sizeof(*array_list)*(--array_list_size));
+                                struct cmc_array **temp = realloc(array_list, sizeof(*array_list)*(array_list_size));
                                 if (temp)
+                                {
                                     array_list = temp;
+                                    --array_list_size;
+                                }
                                 printf("No longer monitoring %s - destroyed.\n", name_of_removed_array);
                                 //free(name_of_removed_array);
                             }
@@ -334,9 +342,12 @@ int main(int argc, char *argv[])
                     if (!strcmp(arg_string_katcl(l, 0), "#array-list") && !(strcmp(arg_string_katcl(l, 1), new_array_name)))
                     {
                         printf("Caught the list entry with our new array, %s\n", new_array_name);
-                        struct cmc_array **temp = realloc(array_list, sizeof(*array_list)*(++array_list_size));
+                        struct cmc_array **temp = realloc(array_list, sizeof(*array_list)*(array_list_size));
                         if (temp)
+                        {
                             array_list = temp;
+                            array_list_size++;
+                        }
                         //char* temp_array_name = arg_string_katcl(l, 1);
                         strtok(arg_string_katcl(l, 2), ",");
                         int monitor_port = atoi(strtok(NULL, ","));
@@ -376,12 +387,16 @@ int main(int argc, char *argv[])
                 r = read(client_list[i]->fd, buffer, BUF_SIZE - 1); /* -1 to prevent overrunning the buffer. */
                 if (r < 1)
                 {
-                    perror("read()");
+                    if (r < 0)
+                        perror("read()");
                     destroy_webpage_client(client_list[i]);
                     memmove(&client_list[i], &client_list[i] + 1, (client_list_size - i - 1)*sizeof(*client_list));
-                    struct webpage_client **temp = realloc(client_list, sizeof(*client_list)*(--client_list_size));
+                    struct webpage_client **temp = realloc(client_list, sizeof(*client_list)*(client_list_size - 1));
                     if (temp)
+                    {
                         client_list = temp;
+                        --client_list_size;
+                    }
                     printf("client disconnected, list size is now %d\n", client_list_size);
                     i--;
                 }
@@ -462,15 +477,18 @@ int main(int argc, char *argv[])
             if (FD_ISSET(client_list[i]->fd, &wr))
             {  
                 r = write_buffer_to_fd(client_list[i], BUF_SIZE);
-                if (r < 0)
+                if (r < 1)
                 {
                     /*TODO this is error handling I think, -1 is an error, 0 is finished. */
                     shutdown(client_list[i]->fd, SHUT_RDWR);
                     destroy_webpage_client(client_list[i]);
                     memmove(&client_list[i], &client_list[i+1], (client_list_size - i - 1)*sizeof(*client_list));
-                    struct webpage_client **temp = realloc(client_list, sizeof(*client_list)*(--client_list_size));
+                    struct webpage_client **temp = realloc(client_list, sizeof(*client_list)*(client_list_size - 1));
                     if (temp)
+                    {
                         client_list = temp;
+                        --client_list_size;
+                    }
                     printf("client disconnected, list size is now %d\n", client_list_size);
                 }
             }

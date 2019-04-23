@@ -392,12 +392,16 @@ int main(int argc, char *argv[])
                     destroy_webpage_client(client_list[i]);
                     memmove(&client_list[i], &client_list[i] + 1, (client_list_size - i - 1)*sizeof(*client_list));
                     struct webpage_client **temp = realloc(client_list, sizeof(*client_list)*(client_list_size - 1));
-                    if (temp)
+                    if (temp || client_list_size == 1) /* If we're removing the last client it'll be a null. */
                     {
                         client_list = temp;
                         --client_list_size;
                     }
-                    printf("client disconnected, list size is now %d\n", client_list_size);
+                    else
+                    {
+                        printf("problem is in the read block.\n");
+                    }
+                    printf("client disconnected (read), list size is now %d\n", client_list_size);
                     i--;
                 }
                 else if (r > 1)
@@ -484,12 +488,17 @@ int main(int argc, char *argv[])
                     destroy_webpage_client(client_list[i]);
                     memmove(&client_list[i], &client_list[i+1], (client_list_size - i - 1)*sizeof(*client_list));
                     struct webpage_client **temp = realloc(client_list, sizeof(*client_list)*(client_list_size - 1));
-                    if (temp)
+                    if (temp || client_list_size == 1)
                     {
                         client_list = temp;
                         --client_list_size;
                     }
-                    printf("client disconnected, list size is now %d\n", client_list_size);
+                    else
+                    {
+                        printf("problem is in the write block.\n");
+                        printf("Temp: %ld\n", temp);
+                    }
+                    printf("client disconnected (write), list size is now %d\n", client_list_size);
                 }
             }
         }

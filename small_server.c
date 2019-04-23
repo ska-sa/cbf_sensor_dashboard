@@ -144,7 +144,7 @@ int main(int argc, char *argv[])
         {
             //print_webpage_client(client_list[i]);
             FD_SET(client_list[i]->fd, &rd);
-            if (have_buffer_to_write(client_list[i]->buffer))
+            if (have_buffer_to_write(client_list[i]))
                 FD_SET(client_list[i]->fd, &wr);
             nfds = max(nfds, client_list[i]->fd);
         }
@@ -166,7 +166,7 @@ int main(int argc, char *argv[])
         r = select(nfds + 1, &rd, &wr, &er, NULL);
         //printf("Selected %d, currently in state %d\n", r, state);
 
-        printf("Client list size: %d\nArray list size: %d\n", client_list_size, array_list_size);
+        //printf("Client list size: %d\nArray list size: %d\n", client_list_size, array_list_size);
 
 
         /* EINTR just means it was interrupted by a signal or something.
@@ -378,41 +378,41 @@ int main(int argc, char *argv[])
                 {
                     perror("read()");
                     destroy_webpage_client(client_list[i]);
-                    memmove(&client_list[i], &client_list[i+1], (client_list_size - i - 1)*sizeof(*client_list));
+                    memmove(&client_list[i], &client_list[i] + 1, (client_list_size - i - 1)*sizeof(*client_list));
                     struct webpage_client **temp = realloc(client_list, sizeof(*client_list)*(--client_list_size));
                     if (temp)
                         client_list = temp;
                     printf("client disconnected, list size is now %d\n", client_list_size);
                     i--;
                 }
-                else if (r > 0)
+                else if (r > 1)
                 {
                     buffer[r] = '\0'; /* To make it a well-formed string. */
                     char first_word[BUF_SIZE];
                     sprintf(first_word, "%s", strtok(buffer, " "));
                     if (strcmp(first_word, "GET") == 0)
                     {
-                        r = send_html_header(client_list[i]->buffer);
-                        r = send_html_body_open(client_list[i]->buffer);
+                        r = send_html_header(client_list[i]);
+                        r = send_html_body_open(client_list[i]);
 
                         char *requested_resource = strtok(NULL, " ");
                         if (strcmp(requested_resource, "/") == 0)
                         {
                             if (array_list)
                             {
-                                send_html_table_start(client_list[i]->buffer);
-                                send_html_table_arraylist_header(client_list[i]->buffer);
+                                send_html_table_start(client_list[i]);
+                                send_html_table_arraylist_header(client_list[i]);
                                 int j;
                                 for (j = 0; j < array_list_size; j++)
                                 {
-                                    send_html_table_arraylist_row(client_list[i]->buffer, array_list[j]);
+                                    send_html_table_arraylist_row(client_list[i], array_list[j]);
                                 }
-                                send_html_table_end(client_list[i]->buffer);
+                                send_html_table_end(client_list[i]);
                             }
                             else
                             {
                                 char message[] = "No arrays currently running, or cmc not yet polled. Please try again later...\n";
-                                r = send_html_paragraph(client_list[i]->buffer, message);
+                                r = send_html_paragraph(client_list[i], message);
                             }
                         }
                         else
@@ -422,32 +422,37 @@ int main(int argc, char *argv[])
                             {
                                 if (strcmp(requested_resource + 1, array_list[j]->name) == 0)
                                 {
-                                    send_html_table_start(client_list[i]->buffer);
+                                    send_html_table_start(client_list[i]);
                                     int k;
-                                    for (k = 0; k < array_list[j]->number_of_antennas; k++)
-                                    {
-                                        send_html_table_sensor_row(client_list[i]->buffer, array_list[j]->fhosts[k], array_list[j]->xhosts[k]);
-                                    }
-                                    send_html_table_end(client_list[i]->buffer);
-                                    break; /* found the array, no need to continue further */
+                                    if (array_list[j]->fhosts != NULL && array_list[j]->xhosts[j] != NULL)
+                                        for (k = 0; k < array_list[j]->number_of_antennas; k++)
+                                                send_html_table_sensor_row(client_list[i], array_list[j]->fhosts[k], array_list[j]->xhosts[k]); 
                                 }
+                                else
+                                {
+                                    size_t needed = snprintf(NULL, 0, "Array %s sensor info not yet retrieved.", requested_resource + 1) + 1;
+                                    char *message = malloc(needed);
+                                    sprintf(message, "Array %s sensor info not yet retrieved.", requested_resource + 1);
+                                    r = send_html_paragraph(client_list[i], message);
+                                    free(message);
+                                }
+                                    send_html_table_end(client_list[i]);
+                                    break; /* found the array, no need to continue further */
                             }
                             if (j == array_list_size)
                             {
                                 size_t needed = snprintf(NULL, 0, "Array %s not found running at the moment.", requested_resource + 1) + 1;
                                 char *message = malloc(needed);
                                 sprintf(message, "Array %s not found running at the moment.", requested_resource + 1);
-                                r = send_html_paragraph(client_list[i]->buffer, message);
+                                r = send_html_paragraph(client_list[i], message);
                                 free(message);
                             }
-
+                            r = send_html_body_close(client_list[i]);
                         }
-
-                        r = send_html_body_close(client_list[i]->buffer);
                     }
+                    else
+                        ; /*TODO decide whether I need this. */
                 }
-                else
-                    ;
             }
         }
 
@@ -456,7 +461,7 @@ int main(int argc, char *argv[])
         {
             if (FD_ISSET(client_list[i]->fd, &wr))
             {  
-                r = write_buffer_to_fd(client_list[i]->fd, client_list[i]->buffer, BUF_SIZE);
+                r = write_buffer_to_fd(client_list[i], BUF_SIZE);
                 if (r < 0)
                 {
                     /*TODO this is error handling I think, -1 is an error, 0 is finished. */

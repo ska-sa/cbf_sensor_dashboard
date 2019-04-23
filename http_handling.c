@@ -8,85 +8,51 @@
 
 #include "http_handling.h"
 
-struct webpage_buffer *create_webpage_buffer()
-{
-    struct webpage_buffer *buffer = malloc(sizeof(*buffer));
-    if (buffer)
-    {
-        buffer->buffer = malloc(1);
-        buffer->buffer[0] = 0;
-        buffer->bytes_available = 0;
-        buffer->bytes_written = 0;
-        return buffer;
-    }
-    else
-    {
-        return NULL;
-    }
-}
-
-void destroy_webpage_buffer(struct webpage_buffer *buffer)
-{
-    if (buffer->buffer != NULL)
-        free(buffer->buffer);
-    free(buffer);
-}
-
-void print_webpage_buffer(struct webpage_buffer *buffer)
-{
-    printf("webpage buffer:\n");
-    if (buffer->buffer)
-        printf("buffer contents: %s\n", buffer->buffer);
-    else
-        printf("buffer contents not allocated\n");
-    printf("bytes available: %ld\nbytes written already: %ld\n", buffer->bytes_available, buffer->bytes_written);
-}
-
-int add_to_buffer(struct webpage_buffer *buffer, char *html_text)
+int add_to_buffer(struct webpage_client *client, char *html_text)
 {
     /* checks because they seem to be needed */
-    if (!buffer->buffer || !html_text)
+    if (client->buffer == NULL || html_text == NULL)
         return -1;
-    size_t needed = strlen(buffer->buffer) + strlen(html_text) + 1;
-    char *temp = realloc(buffer->buffer, needed);
+    size_t needed = strlen(client->buffer) + strlen(html_text) + 1;
+    char *temp = realloc(client->buffer, needed);
     if (temp)
     {
-        buffer->buffer = temp;
-        strcat(buffer->buffer, html_text);
-        buffer->bytes_available += strlen(html_text);
+        client->buffer = temp;
+        strcat(client->buffer, html_text);
+        client->bytes_available += strlen(html_text);
         return 0;
     }
     return -1;
 }
 
-int write_buffer_to_fd(int fd, struct webpage_buffer *buffer, int bufsize)
+int write_buffer_to_fd(struct webpage_client *client, int bufsize)
 {
     int r;
-    int bytes_ready = buffer->bytes_available - buffer->bytes_written;
+    int bytes_ready = client->bytes_available - client->bytes_written;
     int bytes_to_write = (bytes_ready > bufsize) ? bufsize : bytes_ready;
 
-    if (buffer->bytes_written == 0) /* i.e. this is a new thing, we can send the http header */
+    if (client->bytes_written == 0) /* i.e. this is a new thing, we can send the http header */
     {
-        size_t needed = snprintf(NULL, 0, "HTTP/1.1 200 OK\nContent-Length: %ld\nConnection: close\n\n", buffer->bytes_available) + 1;
+        size_t needed = snprintf(NULL, 0, "HTTP/1.1 200 OK\nContent-Length: %ld\nConnection: close\n\n", client->bytes_available) + 1;
         char *http_ok_message = malloc(needed);
-        sprintf(http_ok_message, "HTTP/1.1 200 OK\nContent-Length: %ld\nConnection: close\n\n", buffer->bytes_available);
-        r = write(fd, http_ok_message, strlen(http_ok_message));
+        sprintf(http_ok_message, "HTTP/1.1 200 OK\nContent-Length: %ld\nConnection: close\n\n", client->bytes_available);
+        r = write(client->fd, http_ok_message, strlen(http_ok_message));
         free(http_ok_message);
     }
 
-    r = write(fd, buffer->buffer + buffer->bytes_written, bytes_to_write);
+    r = write(client->fd, client->buffer + client->bytes_written, bytes_to_write);
     if (r < 0)
         return -1; /* minus one means an error */
-    buffer->bytes_written += r;
-    if (buffer->bytes_written == buffer->bytes_available)
+    client->bytes_written += r;
+    if (client->bytes_written == client->bytes_available)
     {
-        char *temp = realloc(buffer->buffer, 1);
+        char *temp = realloc(client->buffer, 1);
         if (temp)
         {
-            buffer->buffer = temp;
-            buffer->buffer[0] = 0;
-            buffer->bytes_available = 0;
-            buffer->bytes_written = 0;
+            client->buffer = temp;
+            client->buffer[0] = 0;
+            client->bytes_available = 0;
+            client->bytes_written = 0;
             return 0; /* zero means that the send buffer is now empty */
         }
         else
@@ -95,20 +61,21 @@ int write_buffer_to_fd(int fd, struct webpage_buffer *buffer, int bufsize)
     return 1; /* one means that there's still something to send. */
 }
 
-
-int have_buffer_to_write(struct webpage_buffer *buffer)
+int have_buffer_to_write(struct webpage_client *client)
 {
-    if (buffer->bytes_available > buffer->bytes_written)
+    if (client->bytes_available > client->bytes_written)
         return 1;
     else
         return 0;
 }
 
-
 struct webpage_client *create_webpage_client(int fd)
 {
     struct webpage_client *new_client = malloc(sizeof(*new_client));
-    new_client->buffer = create_webpage_buffer();
+    new_client->buffer = malloc(1);
+    new_client->buffer[0] = '\0';
+    new_client->bytes_available = 0;
+    new_client->bytes_written = 0;
     new_client->fd = fd;
     new_client->wants_data = 0;
     return new_client;
@@ -116,18 +83,7 @@ struct webpage_client *create_webpage_client(int fd)
 
 void destroy_webpage_client(struct webpage_client *client)
 {
-    if (client->buffer)
-        destroy_webpage_buffer(client->buffer);
+    free(client->buffer);
     free(client);
-}
-
-void print_webpage_client(struct webpage_client *client)
-{
-    printf("webpage client:\n");
-    if (client->buffer)
-        print_webpage_buffer(client->buffer);
-    else
-        printf("client's child buffer not allocated\n");
-    printf("file descriptor: %d\nwants_data: %d\n", client->fd, client->wants_data);
 }
 

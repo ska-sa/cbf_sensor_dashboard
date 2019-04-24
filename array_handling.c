@@ -80,7 +80,7 @@ struct cmc_array *create_array(char *array_name, int monitor_port, char *multica
     new_array->xhosts = malloc(sizeof(*(new_array->xhosts))*new_array->number_of_antennas);
         /* we're not actually going to create the fhosts yet, that is done by the functional mapping */
 
-    int number_of_sensors_per_antenna = 4; /* for now - should be 17 eventually */
+    int number_of_sensors_per_antenna = 8; /* for now - should be 17 eventually */
     new_array->sensor_names = malloc(sizeof(*(new_array->sensor_names))*new_array->number_of_antennas*number_of_sensors_per_antenna);
     int i;
     for (i = 0; i < new_array->number_of_antennas; i++)
@@ -88,7 +88,7 @@ struct cmc_array *create_array(char *array_name, int monitor_port, char *multica
         /* Putting each sensor in its own little scope so that I can reuse variable names. */
         {
             char format[] = "fhost%02d.network.device-status";
-            int sensornum = 0;
+            int sensornum = 0; 
             size_t needed = snprintf(NULL, 0, format, i) + 1;
             new_array->sensor_names[i*number_of_sensors_per_antenna + sensornum] = malloc(needed);
             sprintf(new_array->sensor_names[i*number_of_sensors_per_antenna + sensornum], format, i);
@@ -109,7 +109,42 @@ struct cmc_array *create_array(char *array_name, int monitor_port, char *multica
         }
         {
             char format[] = "xhost%02d.spead-rx.device-status";
-            int sensornum = 3;
+            int sensornum = 3; 
+            size_t needed = snprintf(NULL, 0, format, i) + 1;
+            new_array->sensor_names[i*number_of_sensors_per_antenna + sensornum] = malloc(needed);
+            sprintf(new_array->sensor_names[i*number_of_sensors_per_antenna + sensornum], format, i);
+        }
+        {
+            char format[] = "fhost%02d.network-reorder.device-status";
+            int sensornum = 4;
+            size_t needed = snprintf(NULL, 0, format, i) + 1;
+            new_array->sensor_names[i*number_of_sensors_per_antenna + sensornum] = malloc(needed);
+            sprintf(new_array->sensor_names[i*number_of_sensors_per_antenna + sensornum], format, i);
+        }
+        {
+            char format[] = "xhost%02d.network-reorder.device-status";
+            int sensornum = 5;
+            size_t needed = snprintf(NULL, 0, format, i) + 1;
+            new_array->sensor_names[i*number_of_sensors_per_antenna + sensornum] = malloc(needed);
+            sprintf(new_array->sensor_names[i*number_of_sensors_per_antenna + sensornum], format, i);
+        }
+        {
+            char format[] = "fhost%02d.dig.device-status";
+            int sensornum = 6;
+            size_t needed = snprintf(NULL, 0, format, i) + 1;
+            new_array->sensor_names[i*number_of_sensors_per_antenna + sensornum] = malloc(needed);
+            sprintf(new_array->sensor_names[i*number_of_sensors_per_antenna + sensornum], format, i);
+        }
+        {
+            char format[] = "fhost%02d.spead-tx.device-status";
+            int sensornum = 7;
+            size_t needed = snprintf(NULL, 0, format, i) + 1;
+            new_array->sensor_names[i*number_of_sensors_per_antenna + sensornum] = malloc(needed);
+            sprintf(new_array->sensor_names[i*number_of_sensors_per_antenna + sensornum], format, i);
+        }
+        {
+            char format[] = "xhost%02d.missing-pkts.device-status";
+            int sensornum = 8;
             size_t needed = snprintf(NULL, 0, format, i) + 1;
             new_array->sensor_names[i*number_of_sensors_per_antenna + sensornum] = malloc(needed);
             sprintf(new_array->sensor_names[i*number_of_sensors_per_antenna + sensornum], format, i);
@@ -222,7 +257,7 @@ void request_next_sensor(struct cmc_array *array)
 
 int receive_next_sensor_ok(struct cmc_array *array)
 {
-    if (!strcmp(arg_string_katcl(array->l, 0), "!sensor-sampling") && !strcmp(arg_string_katcl(array->l, 2), array->current_sensor_name))
+    if (!strcmp(arg_string_katcl(array->l, 0), "!sensor-sampling"))
     {
         if (!strcmp(arg_string_katcl(array->l, 1), "ok"))
         {
@@ -305,7 +340,82 @@ void process_sensor_status(struct cmc_array *array)
                 }
             }
         }
-
+        else if (!strcmp(component_name, "network-reorder"))
+        {
+            if (!strcmp(sensor_name, "device-status"))
+            {
+                printf("Got %chost%02d.network-reorder.device-status: %s\n", host_type, host_number, arg_string_katcl(array->l, 5));
+                if (host_type == 'f')
+                {
+                    sprintf(array->fhosts[host_number]->netw_reor, "%s", arg_string_katcl(array->l, 4));
+                }
+                else if (host_type == 'x')
+                {
+                    sprintf(array->xhosts[host_number]->netw_reor, "%s", arg_string_katcl(array->l, 4));
+                }
+                else
+                {
+                    printf("I don't know what a %chost is.\n", host_type);
+                }
+            }
+        }
+        else if (!strcmp(component_name, "dig"))
+        {
+            if (!strcmp(sensor_name, "device-status"))
+            {
+                printf("Got %chost%02d.dig.device-status: %s\n", host_type, host_number, arg_string_katcl(array->l, 5));
+                if (host_type == 'f')
+                {
+                    sprintf(array->fhosts[host_number]->dig, "%s", arg_string_katcl(array->l, 4));
+                }
+                else if (host_type == 'x')
+                {
+                    printf("xhost doesn't have a dig sensor???\n");
+                }
+                else
+                {
+                    printf("I don't know what a %chost is.\n", host_type);
+                }
+            }
+        }
+        else if (!strcmp(component_name, "spead-tx"))
+        {
+            if (!strcmp(sensor_name, "device-status"))
+            {
+                printf("Got %chost%02d.spead-tx.device-status: %s\n", host_type, host_number, arg_string_katcl(array->l, 5));
+                if (host_type == 'f')
+                {
+                    sprintf(array->fhosts[host_number]->spead_tx, "%s", arg_string_katcl(array->l, 4));
+                }
+                else if (host_type == 'x')
+                {
+                    //sprintf(array->xhosts[host_number]->spead_tx, "%s", arg_string_katcl(array->l, 4));
+                }
+                else
+                {
+                    printf("I don't know what a %chost is.\n", host_type);
+                }
+            }
+        }
+        else if (!strcmp(component_name, "missing-pkts"))
+        {
+            if (!strcmp(sensor_name, "device-status"))
+            {
+                printf("Got %chost%02d.missing-pkts.device-status: %s\n", host_type, host_number, arg_string_katcl(array->l, 5));
+                if (host_type == 'f')
+                {
+                    printf("fhost doesn't have a missing pkts sensor????\n");
+                }
+                else if (host_type == 'x')
+                {
+                    sprintf(array->xhosts[host_number]->miss_pkt, "%s", arg_string_katcl(array->l, 4));
+                }
+                else
+                {
+                    printf("I don't know what a %chost is.\n", host_type);
+                }
+            }
+        }
     }
     else 
         printf("Didn't understand what I got: %s %s %s %s %s %s\n", arg_string_katcl(array->l, 0), arg_string_katcl(array->l, 1), arg_string_katcl(array->l, 2), arg_string_katcl(array->l, 3), arg_string_katcl(array->l, 4), arg_string_katcl(array->l, 5));
@@ -369,6 +479,7 @@ struct xhost *create_xhost(char *hostname, int host_number)
     struct xhost *new_xhost = malloc(sizeof(*new_xhost));
     snprintf(new_xhost->hostname, sizeof(new_xhost->hostname), "%s", hostname);
     new_xhost->host_number = host_number;
+    sprintf(new_xhost->spead_tx, "unknown");
     return new_xhost;
 }
 

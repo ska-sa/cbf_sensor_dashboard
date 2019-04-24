@@ -138,10 +138,10 @@ int send_html_table_sensor_row(struct webpage_client *client, struct fhost *fhos
         int r = add_to_buffer(client, message);
         return r;
     }
-    char format[] = "<tr><td>f%02d %s</td><td><button class=\"%s\">netw-rx</button></td><td><button class=\"%s\">spead-rx</button></td><td><button class=\"%s\">netw-tx</button></td><td>x%02d %s</td><td><button class=\"%s\">netw-rx</button></td><td><button class=\"%s\">spead-rx</button></td><td><button class=\"%s\">netw-tx</button></td></tr>\n";
-    size_t needed = snprintf(NULL, 0, format, fhost->host_number, fhost->hostname, fhost->netw_rx, fhost->spead_rx, fhost->netw_tx, xhost->host_number, xhost->hostname, xhost->netw_rx, xhost->spead_rx, xhost->netw_tx) + 1;
+    char format[] = "<tr><td>f%02d %s</td><td><button class=\"%s\">netw-rx</button></td><td><button class=\"%s\">spead-rx</button></td><td><button class=\"%s\">netw-reor</button></td><td><button class=\"%s\">dig</button><td><button class=\"%s\">spead-tx</button></td><td><button class=\"%s\">netw-tx</button></td><td>x%02d %s</td><td><button class=\"%s\">netw-rx</button></td><td><button class=\"%s\">spead-rx</button></td><td><button class=\"%s\">netw-reor</button></td><td><button class=\"%s\">miss-pkt</button></td><td><button class=\"%s\">spead-tx</button></td><td><button class=\"%s\">netw-tx</button></td></tr>\n";
+    size_t needed = snprintf(NULL, 0, format, fhost->host_number, fhost->hostname, fhost->netw_rx, fhost->spead_rx, fhost->netw_reor, fhost->dig, fhost->spead_tx, fhost->netw_tx, xhost->host_number, xhost->hostname, xhost->netw_rx, xhost->miss_pkt, xhost->spead_rx, xhost->netw_reor, xhost->spead_tx, xhost->netw_tx) + 1;
     char *html_table_row = malloc(needed);
-    sprintf(html_table_row, format, fhost->host_number, fhost->hostname, fhost->netw_rx, fhost->spead_rx, fhost->netw_tx, xhost->host_number, xhost->hostname, xhost->netw_rx, xhost->spead_rx, xhost->netw_tx);
+    sprintf(html_table_row, format, fhost->host_number, fhost->hostname, fhost->netw_rx, fhost->spead_rx, fhost->netw_reor, fhost->dig, fhost->spead_tx, fhost->netw_tx, xhost->host_number, xhost->hostname, xhost->netw_rx, xhost->miss_pkt, xhost->spead_rx, xhost->netw_reor, xhost->spead_tx, xhost->netw_tx);
     int r = add_to_buffer(client, html_table_row);
     free(html_table_row);
     return r;

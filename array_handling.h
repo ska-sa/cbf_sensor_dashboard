@@ -17,14 +17,14 @@ struct fhost {
     char device_status[8]; /*nominal warn error*/
     char netw_rx[8];
     char spead_rx[8];
-    //int netw_reor;
-    //int dig;
+    char netw_reor[8];
+    char dig[8];
     //int sync;
     //int cd;
     //int pfb;
     //int quant;
     //int ct;
-    //int spead_tx;
+    char spead_tx[8];
     char netw_tx[8];
 };
 
@@ -32,7 +32,10 @@ struct xhost {
     char hostname[7];
     int host_number;
     char netw_rx[8];
+    char miss_pkt[8];
     char spead_rx[8];
+    char netw_reor[8];
+    char spead_tx[8];
     char netw_tx[8];
 };
 

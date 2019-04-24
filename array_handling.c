@@ -260,23 +260,52 @@ void process_sensor_status(struct cmc_array *array)
 {
     int host_number;
     char host_type;
-    if (sscanf(arg_string_katcl(array->l, 3), "%chost%02d.foobar.device-status", &host_type, &host_number) == 2)
+    char *host_info = strtok(arg_string_katcl(array->l, 3), ".");
+    char *component_name = strtok(NULL, ".");
+    char *sensor_name = strtok(NULL, ".");
+    if (sscanf(host_info, "%chost%02d", &host_type, &host_number) == 2)
     {
-        printf("Got %chost%02d.network.device-status: %s\n", host_type, host_number, arg_string_katcl(array->l, 5));
-        if (host_type == 'f')
+        if (!strcmp(component_name, "network"))
         {
-            sprintf(array->fhosts[host_number]->netw_rx, "%s", arg_string_katcl(array->l, 4));
-            sprintf(array->fhosts[host_number]->netw_tx, "%s", arg_string_katcl(array->l, 4));
+            if (!strcmp(sensor_name, "device-status"))
+            {
+                printf("Got %chost%02d.network.device-status: %s\n", host_type, host_number, arg_string_katcl(array->l, 5));
+                if (host_type == 'f')
+                {
+                    sprintf(array->fhosts[host_number]->netw_rx, "%s", arg_string_katcl(array->l, 4));
+                    sprintf(array->fhosts[host_number]->netw_tx, "%s", arg_string_katcl(array->l, 4));
+                }
+                else if (host_type == 'x')
+                {
+                    sprintf(array->xhosts[host_number]->netw_rx, "%s", arg_string_katcl(array->l, 4));
+                    sprintf(array->xhosts[host_number]->netw_tx, "%s", arg_string_katcl(array->l, 4));
+                }
+                else
+                {
+                    printf("I don't know what a %chost is.\n", host_type);
+                }
+            }
         }
-        else if (host_type == 'x')
+        else if (!strcmp(component_name, "spead-rx"))
         {
-            sprintf(array->xhosts[host_number]->netw_rx, "%s", arg_string_katcl(array->l, 4));
-            sprintf(array->xhosts[host_number]->netw_tx, "%s", arg_string_katcl(array->l, 4));
+            if (!strcmp(sensor_name, "device-status"))
+            {
+                printf("Got %chost%02d.spead-rx.device-status: %s\n", host_type, host_number, arg_string_katcl(array->l, 5));
+                if (host_type == 'f')
+                {
+                    sprintf(array->fhosts[host_number]->spead_rx, "%s", arg_string_katcl(array->l, 4));
+                }
+                else if (host_type == 'x')
+                {
+                    sprintf(array->xhosts[host_number]->spead_rx, "%s", arg_string_katcl(array->l, 4));
+                }
+                else
+                {
+                    printf("I don't know what a %chost is.\n", host_type);
+                }
+            }
         }
-        else
-        {
-            printf("I don't know what a %chost is.\n", host_type);
-        }
+
     }
     else 
         printf("Didn't understand what I got: %s %s %s %s %s %s\n", arg_string_katcl(array->l, 0), arg_string_katcl(array->l, 1), arg_string_katcl(array->l, 2), arg_string_katcl(array->l, 3), arg_string_katcl(array->l, 4), arg_string_katcl(array->l, 5));

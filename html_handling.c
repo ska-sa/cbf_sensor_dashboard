@@ -48,8 +48,8 @@ int send_html_header(struct webpage_client *client)
 int send_html_body_open(struct webpage_client *client)
 {
     int r;
-    //char html_body_open[] = "<body onload=\"JavaScript:timedRefresh(5000);\">\n";
-    char html_body_open[] = "<body>\n";
+    char html_body_open[] = "<body onload=\"JavaScript:timedRefresh(5000);\">\n";
+    //char html_body_open[] = "<body>\n";
     r = add_to_buffer(client, html_body_open);
     return r;
 }
@@ -83,9 +83,10 @@ int send_html_paragraph(struct webpage_client *client, char *line)
 {
     int r;
     char *paragraph;
-    size_t needed = snprintf(NULL, 0, "<p>%s</p>\n", line) + 1;
+    char format[] = "<p>%s</p>\n";
+    size_t needed = snprintf(NULL, 0, format, line) + 1;
     paragraph = malloc(needed);
-    sprintf(paragraph, "<p>%s</p>\n", line);
+    sprintf(paragraph, format, line);
     r = add_to_buffer(client, paragraph);
     free(paragraph);
     return r;
@@ -120,9 +121,10 @@ int send_html_table_arraylist_row(struct webpage_client *client, struct cmc_arra
 {
     int r;
     char *html_table_row;
-    size_t needed = snprintf(NULL, 0, "<tr><td><a href=\"%s\">%s</a></td><td>%d</td><td>%s</td>\n</tr>\n", array->name, array->name, array->monitor_port, array->multicast_groups) + 1;
+    char format[] = "<tr><td><a href=\"%s\">%s</a></td><td>%d</td><td>%s</td>\n</tr>\n";
+    size_t needed = snprintf(NULL, 0, format, array->name, array->name, array->monitor_port, array->multicast_groups) + 1;
     html_table_row = malloc(needed);
-    sprintf(html_table_row, "<tr><td><a href=\"%s\">%s</a></td><td>%d</td><td>%s</td>\n</tr>\n", array->name, array->name, array->monitor_port, array->multicast_groups);
+    sprintf(html_table_row, format, array->name, array->name, array->monitor_port, array->multicast_groups);
     r = add_to_buffer(client, html_table_row);
     free(html_table_row);
     return r;
@@ -132,16 +134,14 @@ int send_html_table_sensor_row(struct webpage_client *client, struct fhost *fhos
 {
     if (client == NULL || fhost == NULL || xhost == NULL)
     {
-        size_t needed = snprintf(NULL, 0, "Something went wrong. Please refresh later.") + 1;
-        char *message = malloc(needed);
-        sprintf(message, "%s", "Something went wrong. Please refresh later.");
+        char message[] = "Something went wrong. Please refresh later.";
         int r = add_to_buffer(client, message);
-        free(message);
         return r;
     }
-    size_t needed = snprintf(NULL, 0, "<tr><td>f%02d %s</td><td><button class=\"%s\">device-status</button></td></tr>\n", fhost->host_number, fhost->hostname, fhost->device_status) + 1;
+    char format[] = "<tr><td>f%02d %s</td><td><button class=\"%s\">device-status</button></td></tr>\n";
+    size_t needed = snprintf(NULL, 0, format, fhost->host_number, fhost->hostname, fhost->devoce_status) + 1;
     char *html_table_row = malloc(needed);
-    sprintf(html_table_row, "<tr><td>f%02d %s</td><td><button class=\"%s\">device-status</button></td></tr>\n", fhost->host_number, fhost->hostname, fhost->device_status);
+    sprintf(html_table_row, format, fhost->host_number, fhost->hostname, fhost->device_status);
     int r = add_to_buffer(client, html_table_row);
     free(html_table_row);
     return r;

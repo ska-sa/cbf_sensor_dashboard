@@ -33,9 +33,10 @@ int write_buffer_to_fd(struct webpage_client *client, int bufsize)
 
     if (client->bytes_written == 0) /* i.e. this is a new thing, we can send the http header */
     {
-        size_t needed = snprintf(NULL, 0, "HTTP/1.1 200 OK\nContent-Length: %ld\nConnection: close\n\n", client->bytes_available) + 1;
+        char format[] = "HTTP/1.1 200 OK\nContent-Length: %ld\nConnection: close\n\n";
+        size_t needed = snprintf(NULL, 0, format, client->bytes_available) + 1;
         char *http_ok_message = malloc(needed);
-        sprintf(http_ok_message, "HTTP/1.1 200 OK\nContent-Length: %ld\nConnection: close\n\n", client->bytes_available);
+        sprintf(http_ok_message, format, client->bytes_available);
         r = write(client->fd, http_ok_message, strlen(http_ok_message));
         free(http_ok_message);
     }

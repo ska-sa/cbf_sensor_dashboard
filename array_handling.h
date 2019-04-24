@@ -54,6 +54,7 @@ struct cmc_array {
     char *current_sensor_name;
     struct fhost **fhosts;
     struct xhost **xhosts;
+    char **sensor_names;
 };
 
 char *read_full_katcp_line(struct katcl_line *l);

@@ -397,10 +397,6 @@ int main(int argc, char *argv[])
                         client_list = temp;
                         --client_list_size;
                     }
-                    else
-                    {
-                        printf("problem is in the read block.\n");
-                    }
                     printf("client disconnected (read), list size is now %d\n", client_list_size);
                     i--;
                 }
@@ -449,9 +445,10 @@ int main(int argc, char *argv[])
                                 }
                                 else
                                 {
-                                    size_t needed = snprintf(NULL, 0, "Array %s sensor info not yet retrieved.", requested_resource + 1) + 1;
+                                    char format[] = "Array %s sensor info not yet retrieved.";
+                                    size_t needed = snprintf(NULL, 0, format, requested_resource + 1) + 1;
                                     char *message = malloc(needed);
-                                    sprintf(message, "Array %s sensor info not yet retrieved.", requested_resource + 1);
+                                    sprintf(message, format, requested_resource + 1);
                                     r = send_html_paragraph(client_list[i], message);
                                     free(message);
                                 }
@@ -460,9 +457,10 @@ int main(int argc, char *argv[])
                             }
                             if (j == array_list_size)
                             {
-                                size_t needed = snprintf(NULL, 0, "Array %s not found running at the moment.", requested_resource + 1) + 1;
+                                char format[] = "Array %s not found running at the moment.";
+                                size_t needed = snprintf(NULL, 0, format, requested_resource + 1) + 1;
                                 char *message = malloc(needed);
-                                sprintf(message, "Array %s not found running at the moment.", requested_resource + 1);
+                                sprintf(message, format, requested_resource + 1);
                                 r = send_html_paragraph(client_list[i], message);
                                 free(message);
                             }
@@ -492,11 +490,6 @@ int main(int argc, char *argv[])
                     {
                         client_list = temp;
                         --client_list_size;
-                    }
-                    else
-                    {
-                        printf("problem is in the write block.\n");
-                        printf("Temp: %ld\n", temp);
                     }
                     printf("client disconnected (write), list size is now %d\n", client_list_size);
                 }

@@ -80,6 +80,14 @@ struct cmc_array *create_array(char *array_name, int monitor_port, char *multica
     new_array->fhosts = malloc(sizeof(*(new_array->fhosts))*new_array->number_of_antennas);
     new_array->xhosts = malloc(sizeof(*(new_array->xhosts))*new_array->number_of_antennas);
         /* we're not actually going to create the fhosts yet, that is done by the functional mapping */
+
+    int number_of_sensors_per_antenna = 2; /* for now - should be 17 eventually */
+    new_array->sensor_names = malloc(sizeof(*(new_array->sensor_names))*number_of_sensors_per_antenna);
+    int i;
+    for (i = 0; i < new_array->number_of_antennas; i++)
+    {
+        
+    }
     return new_array;
 }
 
@@ -107,6 +115,7 @@ void destroy_array(struct cmc_array *array)
     }
     free(array->fhosts);
     free(array->xhosts);
+    free(array->sensor_names);
     free(array);
 }
 
@@ -172,9 +181,10 @@ static int ss_append_string_katcl(struct katcl_line *l, char *sensor_name)
 int request_sensor_fhost_device_status(struct cmc_array *array)
 {
     printf("requesting sensors %s...\n", array->name);
-    size_t needed = snprintf(NULL, 0, "fhost%02d.device-status", array->host_counter) + 1;
+    char format[] = "fhost%02d.device-status";
+    size_t needed = snprintf(NULL, 0, format, array->host_counter) + 1;
     array->current_sensor_name = malloc(needed);
-    sprintf(array->current_sensor_name, "fhost%02d.device-status", array->host_counter);
+    sprintf(array->current_sensor_name, format, array->host_counter);
     ss_append_string_katcl(array->l, array->current_sensor_name);
 
     return 0;

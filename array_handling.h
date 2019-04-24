@@ -15,31 +15,25 @@ struct fhost {
     char hostname[7]; /* skarab serial numbers are six digits long, plus the terminal null. */
     int host_number;
     char device_status[8]; /*nominal warn error*/
-    int netw_rx;
-    int spead_rx;
-    int netw_reor;
-    int dig;
-    int sync;
-    int cd;
-    int pfb;
-    int quant;
-    int ct;
-    int spead_tx;
-    int netw_tx;
+    char netw_rx[8];
+    char spead_rx[8];
+    //int netw_reor;
+    //int dig;
+    //int sync;
+    //int cd;
+    //int pfb;
+    //int quant;
+    //int ct;
+    //int spead_tx;
+    char netw_tx[8];
 };
 
 struct xhost {
     char hostname[7];
     int host_number;
-    int device_status;
-    int netw_rx;
-    int netw_reor;
-    int miss_pkt;
-    int spead_rx;
-    int bram_reord;
-    int vacc;
-    int spead_tx;
-    int netw_tx;
+    char netw_rx[8];
+    char spead_rx[8];
+    char netw_tx[8];
 };
 
 struct cmc_array {

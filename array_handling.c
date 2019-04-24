@@ -80,7 +80,7 @@ struct cmc_array *create_array(char *array_name, int monitor_port, char *multica
     new_array->xhosts = malloc(sizeof(*(new_array->xhosts))*new_array->number_of_antennas);
         /* we're not actually going to create the fhosts yet, that is done by the functional mapping */
 
-    int number_of_sensors_per_antenna = 2; /* for now - should be 17 eventually */
+    int number_of_sensors_per_antenna = 4; /* for now - should be 17 eventually */
     new_array->sensor_names = malloc(sizeof(*(new_array->sensor_names))*new_array->number_of_antennas*number_of_sensors_per_antenna);
     int i;
     for (i = 0; i < new_array->number_of_antennas; i++)
@@ -96,6 +96,20 @@ struct cmc_array *create_array(char *array_name, int monitor_port, char *multica
         {
             char format[] = "xhost%02d.network.device-status";
             int sensornum = 1;
+            size_t needed = snprintf(NULL, 0, format, i) + 1;
+            new_array->sensor_names[i*number_of_sensors_per_antenna + sensornum] = malloc(needed);
+            sprintf(new_array->sensor_names[i*number_of_sensors_per_antenna + sensornum], format, i);
+        }
+        {
+            char format[] = "fhost%02d.spead-rx.device-status";
+            int sensornum = 2;
+            size_t needed = snprintf(NULL, 0, format, i) + 1;
+            new_array->sensor_names[i*number_of_sensors_per_antenna + sensornum] = malloc(needed);
+            sprintf(new_array->sensor_names[i*number_of_sensors_per_antenna + sensornum], format, i);
+        }
+        {
+            char format[] = "xhost%02d.spead-rx.device-status";
+            int sensornum = 3;
             size_t needed = snprintf(NULL, 0, format, i) + 1;
             new_array->sensor_names[i*number_of_sensors_per_antenna + sensornum] = malloc(needed);
             sprintf(new_array->sensor_names[i*number_of_sensors_per_antenna + sensornum], format, i);
@@ -122,8 +136,6 @@ void destroy_array(struct cmc_array *array)
     destroy_katcl(array->l, 1);
     shutdown(array->monitor_socket_fd, SHUT_RDWR);
     close(array->monitor_socket_fd);
-    if (array->current_sensor_name)
-        free(array->current_sensor_name);
     int i;
     for (i = 0; i < array->number_of_antennas; i++)
     {
@@ -134,8 +146,6 @@ void destroy_array(struct cmc_array *array)
     free(array->xhosts);
     for (i = 0; i < array->number_of_sensors; i++)
         free(array->sensor_names[i]);
-    if (array->current_sensor_name != NULL)
-        free(array->current_sensor_name);
     free(array->sensor_names);
     free(array);
 }
@@ -250,16 +260,18 @@ void process_sensor_status(struct cmc_array *array)
 {
     int host_number;
     char host_type;
-    if (sscanf(arg_string_katcl(array->l, 3), "%chost%02d.device-status", &host_type, &host_number) == 2)
+    if (sscanf(arg_string_katcl(array->l, 3), "%chost%02d.foobar.device-status", &host_type, &host_number) == 2)
     {
-        printf("Got %chost%02d.device-status: %s\n", host_type, host_number, arg_string_katcl(array->l, 5));
+        printf("Got %chost%02d.network.device-status: %s\n", host_type, host_number, arg_string_katcl(array->l, 5));
         if (host_type == 'f')
         {
-            sprintf(array->fhosts[host_number]->device_status, "%s", arg_string_katcl(array->l, 4));
+            sprintf(array->fhosts[host_number]->netw_rx, "%s", arg_string_katcl(array->l, 4));
+            sprintf(array->fhosts[host_number]->netw_tx, "%s", arg_string_katcl(array->l, 4));
         }
         else if (host_type == 'x')
         {
-            sprintf(array->fhosts[host_number]->device_status, "%s", arg_string_katcl(array->l, 4));
+            sprintf(array->xhosts[host_number]->netw_rx, "%s", arg_string_katcl(array->l, 4));
+            sprintf(array->xhosts[host_number]->netw_tx, "%s", arg_string_katcl(array->l, 4));
         }
         else
         {

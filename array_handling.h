@@ -7,7 +7,7 @@
 enum array_state {
     REQUEST_FUNCTIONAL_MAPPING,
     RECEIVE_FUNCTIONAL_MAPPING,
-    RECEIVE_SENSOR_FHOST_DEVICE_STATUS_RESPONSE,
+    RECEIVE_SENSOR_SAMPLING_OK,
     MONITOR_SENSORS
 };
 
@@ -50,11 +50,13 @@ struct cmc_array {
     int monitor_socket_fd;
     struct katcl_line *l;
     enum array_state state;
-    int host_counter;
-    char *current_sensor_name;
     struct fhost **fhosts;
     struct xhost **xhosts;
     char **sensor_names;
+    int number_of_sensors;
+    int current_sensor;
+    char *current_sensor_name;
+
 };
 
 char *read_full_katcp_line(struct katcl_line *l);
@@ -64,9 +66,13 @@ char *get_array_name(struct cmc_array *array); /* user must free the resulting c
 void destroy_array(struct cmc_array *array);
 int request_functional_mapping(struct cmc_array *array);
 int accept_functional_mapping(struct cmc_array *array);
-int request_sensor_fhost_device_status(struct cmc_array *array);
-int receive_sensor_fhost_device_status_response(struct cmc_array *array);
 
+void request_next_sensor(struct cmc_array *array);
+int receive_next_sensor_ok(struct cmc_array *array);
+
+/*int request_sensor_fhost_device_status(struct cmc_array *array);
+int receive_sensor_fhost_device_status_response(struct cmc_array *array);
+*/
 void process_sensor_status(struct cmc_array *array);
 
 struct fhost *create_fhost(char *hostname, int host_number);

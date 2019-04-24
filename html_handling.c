@@ -139,7 +139,7 @@ int send_html_table_sensor_row(struct webpage_client *client, struct fhost *fhos
         return r;
     }
     char format[] = "<tr><td>f%02d %s</td><td><button class=\"%s\">device-status</button></td></tr>\n";
-    size_t needed = snprintf(NULL, 0, format, fhost->host_number, fhost->hostname, fhost->devoce_status) + 1;
+    size_t needed = snprintf(NULL, 0, format, fhost->host_number, fhost->hostname, fhost->device_status) + 1;
     char *html_table_row = malloc(needed);
     sprintf(html_table_row, format, fhost->host_number, fhost->hostname, fhost->device_status);
     int r = add_to_buffer(client, html_table_row);

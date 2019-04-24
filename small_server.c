@@ -34,6 +34,7 @@
 
 
 enum program_state {
+    STARTUP_WAIT_VERSION_CONNECT,
     STARTUP_WAIT_CLIENT_CONFIG_OKAY,
     STARTUP_RECV_ARRAY_LIST,
     MONITOR,
@@ -68,7 +69,7 @@ int main(int argc, char *argv[])
     struct katcl_line *l;
     int r; /* dump variable for results of functions */
 
-    enum program_state state = STARTUP_WAIT_CLIENT_CONFIG_OKAY;
+    enum program_state state = STARTUP_WAIT_VERSION_CONNECT;
 
     struct cmc_array **array_list = NULL;
     int array_list_size = 0;
@@ -112,8 +113,6 @@ int main(int argc, char *argv[])
     else
     {
         l = create_katcl(katcp_socket_fd);
-        append_string_katcl(l, KATCP_FLAG_FIRST, "?client-config");
-        append_string_katcl(l, KATCP_FLAG_LAST, "info-all");
     }
    
     while(!stop) /* to allow for graceful exiting, otherwise we get potential leaks. */
@@ -222,7 +221,7 @@ int main(int argc, char *argv[])
            r = read_katcl(l);
            if (r)
            {
-               fprintf(stderr, "read failed: %s\n", (r < 0) ? strerror(error_katcl(l)) : "connection terminated");
+               fprintf(stderr, "read224 failed: %s\n", (r < 0) ? strerror(error_katcl(l)) : "connection terminated");
                perror("read_katcl");
            }
         }
@@ -243,6 +242,19 @@ int main(int argc, char *argv[])
        {
             switch (state)
             {
+                case STARTUP_WAIT_VERSION_CONNECT:
+                    if (!strcmp(arg_string_katcl(l, 0), "#version-connect") && !strcmp(arg_string_katcl(l, 1), "katcp-protocol"))
+                    {
+                        printf("Finished version-connect messages, requesting client-config info-all\n");
+                        append_string_katcl(l, KATCP_FLAG_FIRST, "?client-config");
+                        append_string_katcl(l, KATCP_FLAG_LAST, "info-all");
+                        state = STARTUP_WAIT_CLIENT_CONFIG_OKAY;
+                    }
+                    else
+                    {
+                        printf("Not understanding %s %s %s %s %s\n", arg_string_katcl(l, 0), arg_string_katcl(l, 1), arg_string_katcl(l, 2), arg_string_katcl(l, 3), arg_string_katcl(l, 4));
+                    }
+                    break;
                 case STARTUP_WAIT_CLIENT_CONFIG_OKAY:
                     if (!strcmp(arg_string_katcl(l, 0), "!client-config"))
                     {
@@ -516,7 +528,7 @@ int main(int argc, char *argv[])
                r = read_katcl(array_list[i]->l);
                if (r)
                {
-                   fprintf(stderr, "read failed: %s\n", (r < 0) ? strerror(error_katcl(array_list[i]->l)) : "connection terminated");
+                   fprintf(stderr, "read528 failed: %s\n", (r < 0) ? strerror(error_katcl(array_list[i]->l)) : "connection terminated");
                    perror("read_katcl");
                }
             }
@@ -545,22 +557,23 @@ int main(int argc, char *argv[])
                             r = accept_functional_mapping(array_list[i]);
                             if (r == 0) 
                             {
-                                r = request_sensor_fhost_device_status(array_list[i]);
-                                array_list[i]->state = RECEIVE_SENSOR_FHOST_DEVICE_STATUS_RESPONSE;
+                                request_next_sensor(array_list[i]);
+                                array_list[i]->state = RECEIVE_SENSOR_SAMPLING_OK;
                             }
                             break;
-                        case RECEIVE_SENSOR_FHOST_DEVICE_STATUS_RESPONSE:
-                            r = receive_sensor_fhost_device_status_response(array_list[i]);
+                        case RECEIVE_SENSOR_SAMPLING_OK:
+                            r = receive_next_sensor_ok(array_list[i]);
                             if (r == 0)
                             {
-                                if (array_list[i]->host_counter == array_list[i]->number_of_antennas)
+                                if (array_list[i]->current_sensor == array_list[i]->number_of_sensors)
                                 {
+                                    printf("%s requested sampling all %d sensors, monitoring...\n", array_list[i]->name, array_list[i]->number_of_sensors);
                                     array_list[i]->state = MONITOR_SENSORS;
-                                    array_list[i]->host_counter = 0;
+                                    array_list[i]->current_sensor = 0;
                                 }
                                 else
                                 {
-                                    ; /* not sure what to do if this condition is reached. */
+                                    request_next_sensor(array_list[i]);
                                 }
                             }
                             break;
@@ -575,12 +588,18 @@ int main(int argc, char *argv[])
     /* cleanup */
     destroy_katcl(l, 1);
     for (i = 0; i < array_list_size; i++)
+    {
+        printf("destroying array %d\n", i);
         destroy_array(array_list[i]);
+    }
     if (array_list_size)
         free(array_list);
 
     for (i = 0; i < client_list_size; i++)
+    {
+        printf("destroying client %d\n", i);
         destroy_webpage_client(client_list[i]);
+    }
     if (client_list_size)
         free(client_list);
 

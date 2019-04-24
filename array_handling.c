@@ -76,18 +76,35 @@ struct cmc_array *create_array(char *array_name, int monitor_port, char *multica
     new_array->l = create_katcl(new_array->monitor_socket_fd);
     new_array->state = REQUEST_FUNCTIONAL_MAPPING;
     
-    new_array->host_counter = 0;
     new_array->fhosts = malloc(sizeof(*(new_array->fhosts))*new_array->number_of_antennas);
     new_array->xhosts = malloc(sizeof(*(new_array->xhosts))*new_array->number_of_antennas);
         /* we're not actually going to create the fhosts yet, that is done by the functional mapping */
 
     int number_of_sensors_per_antenna = 2; /* for now - should be 17 eventually */
-    new_array->sensor_names = malloc(sizeof(*(new_array->sensor_names))*number_of_sensors_per_antenna);
+    new_array->sensor_names = malloc(sizeof(*(new_array->sensor_names))*new_array->number_of_antennas*number_of_sensors_per_antenna);
     int i;
     for (i = 0; i < new_array->number_of_antennas; i++)
     {
-        
+        /* Putting each sensor in its own little scope so that I can reuse variable names. */
+        {
+            char format[] = "fhost%02d.network.device-status";
+            int sensornum = 0;
+            size_t needed = snprintf(NULL, 0, format, i) + 1;
+            new_array->sensor_names[i*number_of_sensors_per_antenna + sensornum] = malloc(needed);
+            sprintf(new_array->sensor_names[i*number_of_sensors_per_antenna + sensornum], format, i);
+        }
+        {
+            char format[] = "xhost%02d.network.device-status";
+            int sensornum = 1;
+            size_t needed = snprintf(NULL, 0, format, i) + 1;
+            new_array->sensor_names[i*number_of_sensors_per_antenna + sensornum] = malloc(needed);
+            sprintf(new_array->sensor_names[i*number_of_sensors_per_antenna + sensornum], format, i);
+        }
     }
+    new_array->current_sensor = 0;
+    new_array->number_of_sensors = new_array->number_of_antennas * number_of_sensors_per_antenna;
+    //new_array->current_sensor_name = malloc(1);
+    //new_array->current_sensor_name[0] = '\0';
     return new_array;
 }
 
@@ -115,6 +132,10 @@ void destroy_array(struct cmc_array *array)
     }
     free(array->fhosts);
     free(array->xhosts);
+    for (i = 0; i < array->number_of_sensors; i++)
+        free(array->sensor_names[i]);
+    if (array->current_sensor_name != NULL)
+        free(array->current_sensor_name);
     free(array->sensor_names);
     free(array);
 }
@@ -140,7 +161,8 @@ int accept_functional_mapping(struct cmc_array *array)
             for (i = 0; i < 2*array->number_of_antennas; i++)
             {
                 char host_type = arg_string_katcl(array->l, 5)[i*30 + 21];
-                int host_number = atoi(strndup(arg_string_katcl(array->l, 5) + (i*30 + 26), 2));
+                char *host_number_str = strndup(arg_string_katcl(array->l, 5) + (i*30 + 26), 2);
+                int host_number = atoi(host_number_str);
                 char *hostname = strndup(arg_string_katcl(array->l, 5) + (i*30 + 8), 6);
                 switch (host_type)
                 {
@@ -156,6 +178,7 @@ int accept_functional_mapping(struct cmc_array *array)
                         printf("Couldn't parse array properly: got %c from position %d of [%s]\n", host_type, (i*30 + 21), arg_string_katcl(array->l, 5));
                 }
                 free(hostname);
+                free(host_number_str);
             }
             r = 1; /* one means we're getting the value we want */
         }
@@ -170,7 +193,7 @@ int accept_functional_mapping(struct cmc_array *array)
 
 static int ss_append_string_katcl(struct katcl_line *l, char *sensor_name)
 {
-    printf("subscribing to sensor %s\n", sensor_name);
+    /*printf("subscribing to sensor %s\n", sensor_name);*/
     int r;
     if ((r = append_string_katcl(l, KATCP_FLAG_FIRST, "?sensor-sampling")) < 0) return r;
     if ((r = append_string_katcl(l, 0, sensor_name)) < 0) return r;
@@ -178,27 +201,24 @@ static int ss_append_string_katcl(struct katcl_line *l, char *sensor_name)
     return 0;
 }
 
-int request_sensor_fhost_device_status(struct cmc_array *array)
+void request_next_sensor(struct cmc_array *array)
 {
-    printf("requesting sensors %s...\n", array->name);
-    char format[] = "fhost%02d.device-status";
-    size_t needed = snprintf(NULL, 0, format, array->host_counter) + 1;
+    printf("requesting sensor %s on %s (number %d of %d)\n", array->sensor_names[array->current_sensor], array->name, array->current_sensor, array->number_of_sensors); 
+    ss_append_string_katcl(array->l, array->sensor_names[array->current_sensor]);
+    size_t needed = strlen(array->sensor_names[array->current_sensor]) + 1;
     array->current_sensor_name = malloc(needed);
-    sprintf(array->current_sensor_name, format, array->host_counter);
-    ss_append_string_katcl(array->l, array->current_sensor_name);
-
-    return 0;
+    sprintf(array->current_sensor_name, "%s", array->sensor_names[array->current_sensor]);
 }
 
-int receive_sensor_fhost_device_status_response(struct cmc_array *array)
+int receive_next_sensor_ok(struct cmc_array *array)
 {
     if (!strcmp(arg_string_katcl(array->l, 0), "!sensor-sampling") && !strcmp(arg_string_katcl(array->l, 2), array->current_sensor_name))
     {
-        // free(array->current_sensor_name); /* need to think of a better place to put this. */
         if (!strcmp(arg_string_katcl(array->l, 1), "ok"))
         {
-            printf("sensor-sampling %s ok\n", array->current_sensor_name);
-            array->host_counter++;
+            printf("sensor-sampling %s ok (number %d of %d)\n", array->current_sensor_name, array->current_sensor, array->number_of_sensors);
+            free(array->current_sensor_name); /* need to think of a better place to put this. */
+            array->current_sensor++;
             return 0;
         }
         else
@@ -213,6 +233,18 @@ int receive_sensor_fhost_device_status_response(struct cmc_array *array)
         return -1;
     }
 }
+
+/*int request_sensor_fhost_device_status(struct cmc_array *array)
+{
+    printf("requesting sensors %s...\n", array->name);
+    char format[] = "fhost%02d.device-status";
+    size_t needed = snprintf(NULL, 0, format, array->host_counter) + 1;
+    array->current_sensor_name = malloc(needed);
+    sprintf(array->current_sensor_name, format, array->host_counter);
+    ss_append_string_katcl(array->l, array->current_sensor_name);
+
+    return 0;
+}*/
 
 void process_sensor_status(struct cmc_array *array)
 {

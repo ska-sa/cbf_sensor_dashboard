@@ -143,6 +143,11 @@ int send_html_table_sensor_row(struct webpage_client *client, struct fhost *fhos
         "<td><button class=\"%s\">spead-rx</button></td>"
         "<td><button class=\"%s\">netw-reor</button></td>"
         "<td><button class=\"%s\">dig</button></td>"
+        "<td><button class=\"%s\">sync</button></td>"
+        "<td><button class=\"%s\">cd</button></td>"
+        "<td><button class=\"%s\">pfb</button></td>"
+        "<td><button class=\"%s\">quant</button></td>"
+        "<td><button class=\"%s\">ct</button></td>"
         "<td><button class=\"%s\">spead-tx</button></td>"
         "<td><button class=\"%s\">netw-tx</button></td>"
         "<td>x%02d %s</td>"
@@ -158,6 +163,11 @@ int send_html_table_sensor_row(struct webpage_client *client, struct fhost *fhos
             fhost->spead_rx,
             fhost->netw_reor,
             fhost->dig,
+            fhost->sync,
+            fhost->cd,
+            fhost->pfb,
+            fhost->quant,
+            fhost->ct,
             fhost->spead_tx,
             fhost->netw_tx,
             xhost->host_number, xhost->hostname,
@@ -173,6 +183,11 @@ int send_html_table_sensor_row(struct webpage_client *client, struct fhost *fhos
             fhost->spead_rx,
             fhost->netw_reor,
             fhost->dig,
+            fhost->sync,
+            fhost->cd,
+            fhost->pfb,
+            fhost->quant,
+            fhost->ct,
             fhost->spead_tx,
             fhost->netw_tx,
             xhost->host_number,

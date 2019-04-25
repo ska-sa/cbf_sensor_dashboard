@@ -19,11 +19,11 @@ struct fhost {
     char spead_rx[8];
     char netw_reor[8];
     char dig[8];
-    //int sync;
-    //int cd;
-    //int pfb;
-    //int quant;
-    //int ct;
+    char sync[8];
+    char cd[8];
+    char pfb[8];
+    char quant[8];
+    char ct[8];
     char spead_tx[8];
     char netw_tx[8];
 };

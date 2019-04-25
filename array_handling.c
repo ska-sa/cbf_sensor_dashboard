@@ -80,7 +80,7 @@ struct cmc_array *create_array(char *array_name, int monitor_port, char *multica
     new_array->xhosts = malloc(sizeof(*(new_array->xhosts))*new_array->number_of_antennas);
         /* we're not actually going to create the fhosts yet, that is done by the functional mapping */
 
-    int number_of_sensors_per_antenna = 9; /* for now - should be 17 eventually */
+    int number_of_sensors_per_antenna = 14; /* for now - should be 17 eventually */
     new_array->sensor_names = malloc(sizeof(*(new_array->sensor_names))*new_array->number_of_antennas*number_of_sensors_per_antenna);
     int i;
     for (i = 0; i < new_array->number_of_antennas; i++)
@@ -145,6 +145,41 @@ struct cmc_array *create_array(char *array_name, int monitor_port, char *multica
         {
             char format[] = "xhost%02d.missing-pkts.device-status";
             int sensornum = 8;
+            size_t needed = snprintf(NULL, 0, format, i) + 1;
+            new_array->sensor_names[i*number_of_sensors_per_antenna + sensornum] = malloc(needed);
+            sprintf(new_array->sensor_names[i*number_of_sensors_per_antenna + sensornum], format, i);
+        }
+        {
+            char format[] = "fhost%02d.sync.device-status";
+            int sensornum = 9;
+            size_t needed = snprintf(NULL, 0, format, i) + 1;
+            new_array->sensor_names[i*number_of_sensors_per_antenna + sensornum] = malloc(needed);
+            sprintf(new_array->sensor_names[i*number_of_sensors_per_antenna + sensornum], format, i);
+        }
+        {
+            char format[] = "fhost%02d.cd.device-status";
+            int sensornum = 10;
+            size_t needed = snprintf(NULL, 0, format, i) + 1;
+            new_array->sensor_names[i*number_of_sensors_per_antenna + sensornum] = malloc(needed);
+            sprintf(new_array->sensor_names[i*number_of_sensors_per_antenna + sensornum], format, i);
+        }
+        {
+            char format[] = "fhost%02d.pfb.device-status";
+            int sensornum = 11;
+            size_t needed = snprintf(NULL, 0, format, i) + 1;
+            new_array->sensor_names[i*number_of_sensors_per_antenna + sensornum] = malloc(needed);
+            sprintf(new_array->sensor_names[i*number_of_sensors_per_antenna + sensornum], format, i);
+        }
+        {
+            char format[] = "fhost%02d.quant.device-status";
+            int sensornum = 12;
+            size_t needed = snprintf(NULL, 0, format, i) + 1;
+            new_array->sensor_names[i*number_of_sensors_per_antenna + sensornum] = malloc(needed);
+            sprintf(new_array->sensor_names[i*number_of_sensors_per_antenna + sensornum], format, i);
+        }
+        {
+            char format[] = "fhost%02d.ct.device-status";
+            int sensornum = 13;
             size_t needed = snprintf(NULL, 0, format, i) + 1;
             new_array->sensor_names[i*number_of_sensors_per_antenna + sensornum] = malloc(needed);
             sprintf(new_array->sensor_names[i*number_of_sensors_per_antenna + sensornum], format, i);
@@ -409,6 +444,101 @@ void process_sensor_status(struct cmc_array *array)
                 else if (host_type == 'x')
                 {
                     sprintf(array->xhosts[host_number]->miss_pkt, "%s", arg_string_katcl(array->l, 4));
+                }
+                else
+                {
+                    printf("I don't know what a %chost is.\n", host_type);
+                }
+            }
+        }
+        else if (!strcmp(component_name, "sync"))
+        {
+            if (!strcmp(sensor_name, "device-status"))
+            {
+                printf("Got %chost%02d.sync.device-status: %s\n", host_type, host_number, arg_string_katcl(array->l, 5));
+                if (host_type == 'f')
+                {
+                    sprintf(array->fhosts[host_number]->sync, "%s", arg_string_katcl(array->l, 4));
+                }
+                else if (host_type == 'x')
+                {
+                    printf("xhost doesn't have a sync sensor???\n");
+                }
+                else
+                {
+                    printf("I don't know what a %chost is.\n", host_type);
+                }
+            }
+        }
+        else if (!strcmp(component_name, "cd"))
+        {
+            if (!strcmp(sensor_name, "device-status"))
+            {
+                printf("Got %chost%02d.cd.device-status: %s\n", host_type, host_number, arg_string_katcl(array->l, 5));
+                if (host_type == 'f')
+                {
+                    sprintf(array->fhosts[host_number]->cd, "%s", arg_string_katcl(array->l, 4));
+                }
+                else if (host_type == 'x')
+                {
+                    printf("xhost doesn't have a cd sensor???\n");
+                }
+                else
+                {
+                    printf("I don't know what a %chost is.\n", host_type);
+                }
+            }
+        }
+        else if (!strcmp(component_name, "pfb"))
+        {
+            if (!strcmp(sensor_name, "device-status"))
+            {
+                printf("Got %chost%02d.pfb.device-status: %s\n", host_type, host_number, arg_string_katcl(array->l, 5));
+                if (host_type == 'f')
+                {
+                    sprintf(array->fhosts[host_number]->pfb, "%s", arg_string_katcl(array->l, 4));
+                }
+                else if (host_type == 'x')
+                {
+                    printf("xhost doesn't have a pfb sensor???\n");
+                }
+                else
+                {
+                    printf("I don't know what a %chost is.\n", host_type);
+                }
+            }
+        }
+        else if (!strcmp(component_name, "quant"))
+        {
+            if (!strcmp(sensor_name, "device-status"))
+            {
+                printf("Got %chost%02d.quant.device-status: %s\n", host_type, host_number, arg_string_katcl(array->l, 5));
+                if (host_type == 'f')
+                {
+                    sprintf(array->fhosts[host_number]->quant, "%s", arg_string_katcl(array->l, 4));
+                }
+                else if (host_type == 'x')
+                {
+                    printf("xhost doesn't have a quant sensor???\n");
+                }
+                else
+                {
+                    printf("I don't know what a %chost is.\n", host_type);
+                }
+            }
+        }
+        else if (!strcmp(component_name, "ct"))
+        {
+            if (!strcmp(sensor_name, "device-status"))
+            {
+                printf("Got %chost%02d.ct.device-status: %s\n", host_type, host_number, arg_string_katcl(array->l, 5));
+                if (host_type == 'f')
+                {
+                    sprintf(array->fhosts[host_number]->ct, "%s", arg_string_katcl(array->l, 4));
+                }
+                else if (host_type == 'x')
+                {
+                    printf("xhost doesn't have a ct sensor???\n");
                 }
                 else
                 {

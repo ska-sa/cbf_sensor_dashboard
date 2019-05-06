@@ -136,7 +136,12 @@ int main(int argc, char *argv[])
 
         /* we only need to write to the socket if there's something queued */
         if (flushing_katcl(l))
+        {
+#ifdef DEBUG
+            printf("flushing_katcl() returned true - we would like to tell %s something.\n", cmc_address);
+#endif
             FD_SET(katcp_socket_fd, &wr);
+        }
             
         /* we're interested in reading from any connected client, and we might have something to write to them */
         for (i = 0; i < client_list_size; i++)
@@ -159,13 +164,17 @@ int main(int argc, char *argv[])
             nfds = max(nfds, array_list[i]->monitor_socket_fd);
         }
 
+#ifdef DEBUG
+        printf("--------------------------------\nApprocahing select()\nClient list size: %d\nArray list size: %d\n", client_list_size, array_list_size);
+#endif
+
         /* Passing select() a NULL as the last parameter blocks here, and can even be swapped,
          * until such time as there's something to be done on one of the file-descriptors*/
         //printf("Heading into select with state  %d\n", state);
         r = select(nfds + 1, &rd, &wr, &er, NULL);
-        //printf("Selected %d, currently in state %d\n", r, state);
-
-        //printf("Client list size: %d\nArray list size: %d\n", client_list_size, array_list_size);
+#ifdef DEBUG
+        printf("Selected %d, currently in state %d\n--------------------------------\n", r, state);
+#endif
 
 
         /* EINTR just means it was interrupted by a signal or something.
@@ -183,9 +192,12 @@ int main(int argc, char *argv[])
         /* If we've decided in the above section to read from the socket... */
         if (FD_ISSET(server_socket_fd, &rd))
         {
+#ifdef DEBUG
+            printf("server_socket_fd is set to read.\n");
+#endif
             unsigned int len;
             struct sockaddr_in client_address;
-    
+
             /* accept (i.e. open) the connection, get a new file descriptor for the open connection. */
             memset(&client_address, 0, len = sizeof(client_address));
             r = accept(server_socket_fd, (struct sockaddr *) &client_address, &len);
@@ -218,6 +230,9 @@ int main(int argc, char *argv[])
         /* handle reading and writing of the katcp sockets */
         if (FD_ISSET(katcp_socket_fd, &rd))
         {
+#ifdef DEBUG
+            printf("katcp_socket_fd set for reading.\n");
+#endif
            r = read_katcl(l);
            if (r)
            {
@@ -227,7 +242,10 @@ int main(int argc, char *argv[])
         }
         if (FD_ISSET(katcp_socket_fd, &wr)) /* Tell the cmc that we'd like to know something about the arrays that are here. */
         {
-            r = write_katcl(l);
+#ifdef DEBUG
+            printf("katcp_socket_fd set for writing.\n");
+#endif
+          r = write_katcl(l);
             if (r < 0)
             {
                 fprintf(stderr, "failed to send katcp message\n");
@@ -238,22 +256,28 @@ int main(int argc, char *argv[])
 
             
        /* first if we have some katcl to read */
-       if (have_katcl(l) > 0)
+       while (have_katcl(l) > 0)
        {
+#ifdef DEBUG
+           printf("have_katcl() returned true - %s has something to tell us:\n", cmc_address);
+           printf("%s %s %s %s %s\n", arg_string_katcl(l, 0), arg_string_katcl(l, 1), arg_string_katcl(l, 2), arg_string_katcl(l, 3), arg_string_katcl(l, 4)); 
+#endif
             switch (state)
             {
                 case STARTUP_WAIT_VERSION_CONNECT:
-                    if (!strcmp(arg_string_katcl(l, 0), "#version-connect") && !strcmp(arg_string_katcl(l, 1), "katcp-protocol"))
+                    if (!strcmp(arg_string_katcl(l, 0), "#version-connect") /*&& !strcmp(arg_string_katcl(l, 1), "katcp-protocol")*/)
                     {
+#ifdef DEBUG
                         printf("Finished version-connect messages, requesting client-config info-all\n");
+#endif
                         append_string_katcl(l, KATCP_FLAG_FIRST, "?client-config");
                         append_string_katcl(l, KATCP_FLAG_LAST, "info-all");
                         state = STARTUP_WAIT_CLIENT_CONFIG_OKAY;
                     }
-                    else
+                    /*else
                     {
                         printf("Not understanding %s %s %s %s %s\n", arg_string_katcl(l, 0), arg_string_katcl(l, 1), arg_string_katcl(l, 2), arg_string_katcl(l, 3), arg_string_katcl(l, 4));
-                    }
+                    }*/
                     break;
                 case STARTUP_WAIT_CLIENT_CONFIG_OKAY:
                     if (!strcmp(arg_string_katcl(l, 0), "!client-config"))
@@ -303,7 +327,7 @@ int main(int argc, char *argv[])
                     }
                     else if (!strcmp(arg_string_katcl(l, 0), "!array-list"))
                     {
-                        printf("Finished getting initial array list. Watching for any new ones...\n");
+                        printf("Finished getting initial array list, %d running subarrays found. Watching for any new ones...\n", array_list_size);
                         state = MONITOR;
                     }
                     break;
@@ -396,6 +420,9 @@ int main(int argc, char *argv[])
         {
             if (FD_ISSET(client_list[i]->fd, &rd))
             {
+#ifdef DEBUG
+                printf("client_list[%d] selected for read.\n", i);
+#endif
                 r = read(client_list[i]->fd, buffer, BUF_SIZE - 1); /* -1 to prevent overrunning the buffer. */
                 if (r < 1)
                 {
@@ -486,10 +513,14 @@ int main(int argc, char *argv[])
         }
 
         /* Handle the sockets that want to be written to. */
+        /*TODO - consider merging this into one for loop above. */
         for (i = 0; i < client_list_size; i++)
         {
             if (FD_ISSET(client_list[i]->fd, &wr))
             {  
+#ifdef DEBUG
+                printf("client_list[%d] marked for write.\n", i);
+#endif
                 r = write_buffer_to_fd(client_list[i], BUF_SIZE);
                 if (r < 1)
                 {
@@ -513,6 +544,9 @@ int main(int argc, char *argv[])
         {
             if (FD_ISSET(array_list[i]->monitor_socket_fd, &wr))
             {
+#ifdef DEBUG
+                printf("array_list[%d] marked for write.\n", i);
+#endif
                 r = write_katcl(array_list[i]->l);
                 if (r < 0)
                 {
@@ -525,6 +559,9 @@ int main(int argc, char *argv[])
 
             if (FD_ISSET(array_list[i]->monitor_socket_fd, &rd))
             {
+#ifdef DEBUG
+                printf("array_list[%d] marked for read.\n", i);
+#endif
                r = read_katcl(array_list[i]->l);
                if (r)
                {
@@ -533,8 +570,11 @@ int main(int argc, char *argv[])
                }
             }
             
-            if (have_katcl(array_list[i]->l) > 0)
+            while (have_katcl(array_list[i]->l) > 0)
             {
+#ifdef DEBUG
+                printf("array_list[%d] has katcl\n", i);
+#endif
                 if (!strcmp(arg_string_katcl(array_list[i]->l, 0), "#log"))
                 {
                     ; /*Just explicitly ignore the log, so we don't have to waste cycles comparing. */

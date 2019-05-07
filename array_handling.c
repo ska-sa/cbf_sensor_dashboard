@@ -596,6 +596,7 @@ int listen_on_socket(int listening_port)
 struct fhost *create_fhost(char *hostname, int host_number)
 {
     struct fhost *new_fhost = malloc(sizeof(*new_fhost));
+    memset(new_fhost, 0, sizeof(*new_fhost)); /*make sure no funny stuff comes up later*/
     snprintf(new_fhost->hostname, sizeof(new_fhost->hostname), "%s", hostname);
     new_fhost->host_number = host_number;
     return new_fhost;
@@ -609,6 +610,7 @@ void destroy_fhost(struct fhost *fhost)
 struct xhost *create_xhost(char *hostname, int host_number)
 {
     struct xhost *new_xhost = malloc(sizeof(*new_xhost));
+    memset(new_xhost, 0, sizeof(*new_xhost)); /*make sure no funny stuff comes up later*/
     snprintf(new_xhost->hostname, sizeof(new_xhost->hostname), "%s", hostname);
     new_xhost->host_number = host_number;
     sprintf(new_xhost->spead_tx, "unknown");

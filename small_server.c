@@ -579,7 +579,7 @@ int main(int argc, char *argv[])
                r = read_katcl(array_list[i]->l);
                if (r)
                {
-                   fprintf(stderr, "read528 failed: %s\n", (r < 0) ? strerror(error_katcl(array_list[i]->l)) : "connection terminated");
+                   fprintf(stderr, "read582 failed: %s\n", (r < 0) ? strerror(error_katcl(array_list[i]->l)) : "connection terminated");
                    perror("read_katcl");
                }
             }

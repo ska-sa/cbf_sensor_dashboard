@@ -258,9 +258,11 @@ int main(int argc, char *argv[])
        /* first if we have some katcl to read */
        while (have_katcl(l) > 0)
        {
+            if (!strcmp(arg_string_katcl(l, 0), "#log"))
+                continue; /* just ignore the log stuff.*/
 #ifdef DEBUG
-           printf("have_katcl() returned true - %s has something to tell us:\n", cmc_address);
-           printf("%s %s %s %s %s\n", arg_string_katcl(l, 0), arg_string_katcl(l, 1), arg_string_katcl(l, 2), arg_string_katcl(l, 3), arg_string_katcl(l, 4)); 
+            printf("have_katcl() returned true - %s has something to tell us:\n", cmc_address);
+            printf("%s %s %s %s %s\n", arg_string_katcl(l, 0), arg_string_katcl(l, 1), arg_string_katcl(l, 2), arg_string_katcl(l, 3), arg_string_katcl(l, 4)); 
 #endif
             switch (state)
             {

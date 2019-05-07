@@ -341,7 +341,7 @@ void process_sensor_status(struct cmc_array *array)
         {
             if (!strcmp(sensor_name, "device-status"))
             {
-                printf("Got %chost%02d.network.device-status: %s\n", host_type, host_number, arg_string_katcl(array->l, 5));
+                printf("%s: Got %chost%02d.network.device-status: %s\n", array->name, host_type, host_number, arg_string_katcl(array->l, 5));
                 if (host_type == 'f')
                 {
                     sprintf(array->fhosts[host_number]->netw_rx, "%s", arg_string_katcl(array->l, 4));
@@ -362,7 +362,7 @@ void process_sensor_status(struct cmc_array *array)
         {
             if (!strcmp(sensor_name, "device-status"))
             {
-                printf("Got %chost%02d.spead-rx.device-status: %s\n", host_type, host_number, arg_string_katcl(array->l, 5));
+                printf("%s: Got %chost%02d.spead-rx.device-status: %s\n", array->name, host_type, host_number, arg_string_katcl(array->l, 5));
                 if (host_type == 'f')
                 {
                     sprintf(array->fhosts[host_number]->spead_rx, "%s", arg_string_katcl(array->l, 4));
@@ -381,7 +381,7 @@ void process_sensor_status(struct cmc_array *array)
         {
             if (!strcmp(sensor_name, "device-status"))
             {
-                printf("Got %chost%02d.network-reorder.device-status: %s\n", host_type, host_number, arg_string_katcl(array->l, 5));
+                printf("%s: Got %chost%02d.network-reorder.device-status: %s\n", array->name, host_type, host_number, arg_string_katcl(array->l, 5));
                 if (host_type == 'f')
                 {
                     sprintf(array->fhosts[host_number]->netw_reor, "%s", arg_string_katcl(array->l, 4));
@@ -400,7 +400,7 @@ void process_sensor_status(struct cmc_array *array)
         {
             if (!strcmp(sensor_name, "device-status"))
             {
-                printf("Got %chost%02d.dig.device-status: %s\n", host_type, host_number, arg_string_katcl(array->l, 5));
+                printf("%s: Got %chost%02d.dig.device-status: %s\n", array->name, host_type, host_number, arg_string_katcl(array->l, 5));
                 if (host_type == 'f')
                 {
                     sprintf(array->fhosts[host_number]->dig, "%s", arg_string_katcl(array->l, 4));
@@ -419,7 +419,7 @@ void process_sensor_status(struct cmc_array *array)
         {
             if (!strcmp(sensor_name, "device-status"))
             {
-                printf("Got %chost%02d.spead-tx.device-status: %s\n", host_type, host_number, arg_string_katcl(array->l, 5));
+                printf("%s: Got %chost%02d.spead-tx.device-status: %s\n", array->name, host_type, host_number, arg_string_katcl(array->l, 5));
                 if (host_type == 'f')
                 {
                     sprintf(array->fhosts[host_number]->spead_tx, "%s", arg_string_katcl(array->l, 4));
@@ -438,7 +438,7 @@ void process_sensor_status(struct cmc_array *array)
         {
             if (!strcmp(sensor_name, "device-status"))
             {
-                printf("Got %chost%02d.missing-pkts.device-status: %s\n", host_type, host_number, arg_string_katcl(array->l, 5));
+                printf("%s: Got %chost%02d.missing-pkts.device-status: %s\n", array->name, host_type, host_number, arg_string_katcl(array->l, 5));
                 if (host_type == 'f')
                 {
                     printf("fhost doesn't have a missing pkts sensor????\n");
@@ -457,7 +457,7 @@ void process_sensor_status(struct cmc_array *array)
         {
             if (!strcmp(sensor_name, "device-status"))
             {
-                printf("Got %chost%02d.sync.device-status: %s\n", host_type, host_number, arg_string_katcl(array->l, 5));
+                printf("%s: Got %chost%02d.sync.device-status: %s\n", array->name, host_type, host_number, arg_string_katcl(array->l, 5));
                 if (host_type == 'f')
                 {
                     sprintf(array->fhosts[host_number]->sync, "%s", arg_string_katcl(array->l, 4));
@@ -476,7 +476,7 @@ void process_sensor_status(struct cmc_array *array)
         {
             if (!strcmp(sensor_name, "device-status"))
             {
-                printf("Got %chost%02d.cd.device-status: %s\n", host_type, host_number, arg_string_katcl(array->l, 5));
+                printf("%s: Got %chost%02d.cd.device-status: %s\n", array->name, host_type, host_number, arg_string_katcl(array->l, 5));
                 if (host_type == 'f')
                 {
                     sprintf(array->fhosts[host_number]->cd, "%s", arg_string_katcl(array->l, 4));
@@ -495,7 +495,7 @@ void process_sensor_status(struct cmc_array *array)
         {
             if (!strcmp(sensor_name, "device-status"))
             {
-                printf("Got %chost%02d.pfb.device-status: %s\n", host_type, host_number, arg_string_katcl(array->l, 5));
+                printf("%s: Got %chost%02d.pfb.device-status: %s\n", array->name, host_type, host_number, arg_string_katcl(array->l, 5));
                 if (host_type == 'f')
                 {
                     sprintf(array->fhosts[host_number]->pfb, "%s", arg_string_katcl(array->l, 4));
@@ -514,7 +514,7 @@ void process_sensor_status(struct cmc_array *array)
         {
             if (!strcmp(sensor_name, "device-status"))
             {
-                printf("Got %chost%02d.quant.device-status: %s\n", host_type, host_number, arg_string_katcl(array->l, 5));
+                printf("%s: Got %chost%02d.quant.device-status: %s\n", array->name, host_type, host_number, arg_string_katcl(array->l, 5));
                 if (host_type == 'f')
                 {
                     sprintf(array->fhosts[host_number]->quant, "%s", arg_string_katcl(array->l, 4));
@@ -533,7 +533,7 @@ void process_sensor_status(struct cmc_array *array)
         {
             if (!strcmp(sensor_name, "device-status"))
             {
-                printf("Got %chost%02d.ct.device-status: %s\n", host_type, host_number, arg_string_katcl(array->l, 5));
+                printf("%s: Got %chost%02d.ct.device-status: %s\n", array->name, host_type, host_number, arg_string_katcl(array->l, 5));
                 if (host_type == 'f')
                 {
                     sprintf(array->fhosts[host_number]->ct, "%s", arg_string_katcl(array->l, 4));

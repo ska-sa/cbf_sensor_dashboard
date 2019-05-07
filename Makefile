@@ -2,7 +2,7 @@ CC = gcc
 CFLAGS = -Wall
 #CFLAGS += -O2
 CFLAGS += -ggdb
-CFLAGS += -DDEBUG
+#CFLAGS += -DDEBUG
 
 KATCPDIR=../katcp_devel/katcp
 

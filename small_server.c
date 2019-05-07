@@ -540,6 +540,7 @@ int main(int argc, char *argv[])
                 {
                     /*TODO this is error handling I think, -1 is an error, 0 is finished. */
                     shutdown(client_list[i]->fd, SHUT_RDWR);
+                    close(client_list[i]->fd);
                     destroy_webpage_client(client_list[i]);
                     memmove(&client_list[i], &client_list[i+1], (client_list_size - i - 1)*sizeof(*client_list));
                     struct webpage_client **temp = realloc(client_list, sizeof(*client_list)*(client_list_size - 1));

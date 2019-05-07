@@ -303,14 +303,16 @@ int receive_next_sensor_ok(struct cmc_array *array)
         }
         else
         {
-            printf("sensor-sampling %s failed: %s\n", array->current_sensor_name, arg_string_katcl(array->l, 3));
+            printf("sensor-sampling %s failed: %s\n", array->current_sensor_name, arg_string_katcl(array->l, 2));
+            free(array->current_sensor_name); /* need to think of a better place to put this. */
+            array->current_sensor++;
             return -1;
         }
     }
     else
     {
         printf("unknown katcp message received: %s %s %s %s\n", arg_string_katcl(array->l, 0), arg_string_katcl(array->l, 1), arg_string_katcl(array->l, 2), arg_string_katcl(array->l, 3));
-        return -1;
+        return -2;
     }
 }
 

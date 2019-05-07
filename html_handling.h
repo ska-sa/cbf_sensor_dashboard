@@ -18,6 +18,9 @@ int send_html_table_arraylist_header(struct webpage_client *client);
 int send_html_table_arraylist_row(struct webpage_client *client, struct cmc_array *array);
 
 int send_html_table_sensor_row(struct webpage_client *client, struct fhost *fhost, struct xhost *xhost);
+
+int send_quad(struct webpage_client *client);
+
 //int send_html_table_row(int socket_fd);
 #endif
 

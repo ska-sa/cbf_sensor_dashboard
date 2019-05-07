@@ -446,10 +446,16 @@ int main(int argc, char *argv[])
                     sprintf(first_word, "%s", strtok(buffer, " "));
                     if (strcmp(first_word, "GET") == 0)
                     {
+#ifdef DEBUG
+                        printf("received a GET request from client_list[%d]: ", i);
+#endif
                         r = send_html_header(client_list[i]);
                         r = send_html_body_open(client_list[i]);
 
                         char *requested_resource = strtok(NULL, " ");
+#ifdef DEBUG
+                        printf("requested resource %s\n", requested_resource);
+#endif
                         if (strcmp(requested_resource, "/") == 0)
                         {
                             if (array_list)
@@ -469,6 +475,12 @@ int main(int argc, char *argv[])
                                 r = send_html_paragraph(client_list[i], message);
                             }
                         }
+                        /*else if (strcmp(requested_resource + 1, "quad") == 0)
+                        {
+                                send_html_table_start(client_list[i]);
+                                send_quad(client_list[i]);
+                                send_html_table_end(client_list[i]);
+                        }*/
                         else
                         {
                             int j;
@@ -603,7 +615,7 @@ int main(int argc, char *argv[])
                             break;
                         case RECEIVE_SENSOR_SAMPLING_OK:
                             r = receive_next_sensor_ok(array_list[i]);
-                            if (r == 0)
+                            if (r == 0 || r == -1) 
                             {
                                 if (array_list[i]->current_sensor == array_list[i]->number_of_sensors)
                                 {

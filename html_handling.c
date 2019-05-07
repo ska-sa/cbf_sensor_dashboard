@@ -203,3 +203,11 @@ int send_html_table_sensor_row(struct webpage_client *client, struct fhost *fhos
     return r;
 }
 
+int send_quad(struct webpage_client *client)
+{
+    int r;
+    char quadrow[] = "<tr><td><iframe src=\"array_0.i0\"></iframe></td><td><iframe src=\"array_1.i0\"></iframe></td></tr>\n<tr><td><iframe src=\"array_2.i0\"></iframe></td><td><iframe src=\"array_3.i0\"></iframe></td></tr>\n";
+    r = add_to_buffer(client, quadrow);
+    return r;
+}
+

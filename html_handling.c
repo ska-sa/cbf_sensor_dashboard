@@ -156,6 +156,7 @@ int send_html_table_sensor_row(struct webpage_client *client, struct fhost *fhos
         "<td><button class=\"%s\">miss-pkt</button></td>"
         "<td><button class=\"%s\">spead-rx</button></td>"
         "<td><button class=\"%s\">bram-reord</button></td>"
+        "<td><button class=\"%s\">vacc</button></td>"
         "<td><button class=\"%s\">spead-tx</button></td>"
         "<td><button class=\"%s\">netw-tx</button></td></tr>\n";
     size_t needed = snprintf(NULL, 0, format,
@@ -177,6 +178,7 @@ int send_html_table_sensor_row(struct webpage_client *client, struct fhost *fhos
             xhost->miss_pkt,
             xhost->spead_rx,
             xhost->bram_reord,
+            xhost->vacc,
             xhost->spead_tx,
             xhost->netw_tx) + 1;
     char *html_table_row = malloc(needed);
@@ -199,6 +201,7 @@ int send_html_table_sensor_row(struct webpage_client *client, struct fhost *fhos
             xhost->miss_pkt,
             xhost->spead_rx,
             xhost->bram_reord,
+            xhost->vacc,
             xhost->spead_tx,
             xhost->netw_tx);
     int r = add_to_buffer(client, html_table_row);

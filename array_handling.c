@@ -80,7 +80,7 @@ struct cmc_array *create_array(char *array_name, int monitor_port, char *multica
     new_array->xhosts = malloc(sizeof(*(new_array->xhosts))*new_array->number_of_antennas);
         /* we're not actually going to create the fhosts yet, that is done by the functional mapping */
 
-    int number_of_sensors_per_antenna = 18; /* for now */
+    int number_of_sensors_per_antenna = 22; /* for now */
     new_array->sensor_names = malloc(sizeof(*(new_array->sensor_names))*new_array->number_of_antennas*number_of_sensors_per_antenna);
     int i;
     for (i = 0; i < new_array->number_of_antennas; i++)
@@ -208,6 +208,34 @@ struct cmc_array *create_array(char *array_name, int monitor_port, char *multica
         {
             char format[] = "xhost%02d.xeng3.bram-reorder.device-status";
             int sensornum = 17;
+            size_t needed = snprintf(NULL, 0, format, i) + 1;
+            new_array->sensor_names[i*number_of_sensors_per_antenna + sensornum] = malloc(needed);
+            sprintf(new_array->sensor_names[i*number_of_sensors_per_antenna + sensornum], format, i);
+        }
+        {
+            char format[] = "xhost%02d.xeng0.vacc.device-status";
+            int sensornum = 18;
+            size_t needed = snprintf(NULL, 0, format, i) + 1;
+            new_array->sensor_names[i*number_of_sensors_per_antenna + sensornum] = malloc(needed);
+            sprintf(new_array->sensor_names[i*number_of_sensors_per_antenna + sensornum], format, i);
+        }
+        {
+            char format[] = "xhost%02d.xeng1.vacc.device-status";
+            int sensornum = 19;
+            size_t needed = snprintf(NULL, 0, format, i) + 1;
+            new_array->sensor_names[i*number_of_sensors_per_antenna + sensornum] = malloc(needed);
+            sprintf(new_array->sensor_names[i*number_of_sensors_per_antenna + sensornum], format, i);
+        }
+        {
+            char format[] = "xhost%02d.xeng2.vacc.device-status";
+            int sensornum = 20;
+            size_t needed = snprintf(NULL, 0, format, i) + 1;
+            new_array->sensor_names[i*number_of_sensors_per_antenna + sensornum] = malloc(needed);
+            sprintf(new_array->sensor_names[i*number_of_sensors_per_antenna + sensornum], format, i);
+        }
+        {
+            char format[] = "xhost%02d.xeng3.vacc.device-status";
+            int sensornum = 21;
             size_t needed = snprintf(NULL, 0, format, i) + 1;
             new_array->sensor_names[i*number_of_sensors_per_antenna + sensornum] = malloc(needed);
             sprintf(new_array->sensor_names[i*number_of_sensors_per_antenna + sensornum], format, i);
@@ -617,6 +645,46 @@ void process_sensor_status(struct cmc_array *array)
                     if (!strcmp(array->xhosts[host_number]->xeng0_bram_reord, "unknown") || !strcmp(array->xhosts[host_number]->xeng1_bram_reord, "unknown") || !strcmp(array->xhosts[host_number]->xeng2_bram_reord, "unknown") || !strcmp(array->xhosts[host_number]->xeng3_bram_reord, "unknown"))
                     {
                         sprintf(array->xhosts[host_number]->bram_reord, "unknown");
+                    }
+                }
+            }
+            else if (!strcmp(sensor_name, "vacc"))
+            {
+                if (!strcmp(actual_sensor_name, "device-status"))
+                {
+                    switch (xeng_number)
+                    {
+                        case 0:
+                            sprintf(array->xhosts[host_number]->xeng0_vacc, "%s", arg_string_katcl(array->l, 4));
+                            break;
+                        case 1:
+                            sprintf(array->xhosts[host_number]->xeng1_vacc, "%s", arg_string_katcl(array->l, 4));
+                            break;
+                        case 2:
+                            sprintf(array->xhosts[host_number]->xeng2_vacc, "%s", arg_string_katcl(array->l, 4));
+                            break;
+                        case 3:
+                            sprintf(array->xhosts[host_number]->xeng3_vacc, "%s", arg_string_katcl(array->l, 4));
+                            break;
+                        default:
+                            fprintf(stderr, "xhost%02d doesn't have an xeng%d!\n", host_number, xeng_number);
+                    }
+                    /*All of them need to be nominal for the parent to be nominal.*/
+                    if (!strcmp(array->xhosts[host_number]->xeng0_vacc, "nominal") && !strcmp(array->xhosts[host_number]->xeng1_vacc, "nominal") && !strcmp(array->xhosts[host_number]->xeng2_vacc, "nominal") && !strcmp(array->xhosts[host_number]->xeng3_vacc, "nominal"))
+                    {
+                        sprintf(array->xhosts[host_number]->vacc, "nominal");
+                    }
+                    if (!strcmp(array->xhosts[host_number]->xeng0_vacc, "warn") || !strcmp(array->xhosts[host_number]->xeng1_vacc, "warn") || !strcmp(array->xhosts[host_number]->xeng2_vacc, "warn") || !strcmp(array->xhosts[host_number]->xeng3_vacc, "warn"))
+                    {
+                        sprintf(array->xhosts[host_number]->vacc, "warn");
+                    }
+                    if (!strcmp(array->xhosts[host_number]->xeng0_vacc, "error") || !strcmp(array->xhosts[host_number]->xeng1_vacc, "error") || !strcmp(array->xhosts[host_number]->xeng2_vacc, "error") || !strcmp(array->xhosts[host_number]->xeng3_vacc, "error"))
+                    {
+                        sprintf(array->xhosts[host_number]->vacc, "error");
+                    }
+                    if (!strcmp(array->xhosts[host_number]->xeng0_vacc, "unknown") || !strcmp(array->xhosts[host_number]->xeng1_vacc, "unknown") || !strcmp(array->xhosts[host_number]->xeng2_vacc, "unknown") || !strcmp(array->xhosts[host_number]->xeng3_vacc, "unknown"))
+                    {
+                        sprintf(array->xhosts[host_number]->vacc, "unknown");
                     }
                 }
             }

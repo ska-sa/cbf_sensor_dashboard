@@ -40,6 +40,11 @@ struct xhost {
     char xeng1_bram_reord[8];
     char xeng2_bram_reord[8];
     char xeng3_bram_reord[8];
+    char vacc[8];
+    char xeng0_vacc[8];
+    char xeng1_vacc[8];
+    char xeng2_vacc[8];
+    char xeng3_vacc[8];
     char spead_tx[8];
     char netw_tx[8];
 };

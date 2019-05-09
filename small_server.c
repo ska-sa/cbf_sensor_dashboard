@@ -64,7 +64,6 @@ int main(int argc, char *argv[])
     struct webpage_client **client_list = NULL;
     int client_list_size = 0;
 
-    FILE *template_file;
     int i; /* for use as a loop index */
     struct katcl_line *l;
     int r; /* dump variable for results of functions */
@@ -78,7 +77,7 @@ int main(int argc, char *argv[])
 
     /* argc is always one more than the number of arguments passed, because the first one
      * is the name of the executable. */
-    if (argc != 5)
+    if (argc != 3)
     {
         fprintf(stderr, "%s\n", "Usage:\n\tserver <listen-port> <html-template-file> <katcp-server> <katcp-port>");
         exit(EXIT_FAILURE);
@@ -93,21 +92,13 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    template_file = fopen(argv[2], "r");
-    if (template_file == NULL)
-    {
-        fprintf(stderr, "Unable to open HTML template file %s\n", argv[2]);
-        exit(EXIT_FAILURE);
-    }
-    fclose(template_file); /* Will open it again later. */
-
-    katcp_port = atoi(argv[4]);
-    cmc_address = malloc(strlen(argv[3]) + 1);
-    sprintf(cmc_address, "%s", argv[3]);
+    katcp_port = 7147;
+    cmc_address = malloc(strlen(argv[2]) + 1);
+    sprintf(cmc_address, "%s", argv[2]);
     katcp_socket_fd = net_connect(cmc_address, katcp_port, NETC_VERBOSE_ERRORS | NETC_VERBOSE_STATS);
     if (katcp_socket_fd == -1)
     {
-        fprintf(stderr, "Unable to connect to katcp server %s:%d\n", argv[3], katcp_port);
+        fprintf(stderr, "Unable to connect to katcp server %s:%d\n", argv[2], katcp_port);
         exit(EXIT_FAILURE);
     }
     else

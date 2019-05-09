@@ -32,9 +32,14 @@ struct xhost {
     char hostname[7];
     int host_number;
     char netw_rx[8];
+    char netw_reor[8];
     char miss_pkt[8];
     char spead_rx[8];
-    char netw_reor[8];
+    char bram_reord[8];
+    char xeng0_bram_reord[8];
+    char xeng1_bram_reord[8];
+    char xeng2_bram_reord[8];
+    char xeng3_bram_reord[8];
     char spead_tx[8];
     char netw_tx[8];
 };

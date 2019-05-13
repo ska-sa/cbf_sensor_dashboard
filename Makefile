@@ -13,7 +13,7 @@ LDFLAGS =
 
 RM = rm -f 
 
-SRC = small_server.c array_handling.c html_handling.c http_handling.c
+SRC = small_server.c array_handling.c html_handling.c http_handling.c sensor_parsing.c
 EXE = small_server
 OBJ = $(patsubst %.c,%.o,$(SRC))
 

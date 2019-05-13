@@ -204,7 +204,9 @@ int main(int argc, char *argv[])
                     client_list = temp;
                     client_list[client_list_size] = create_webpage_client(r);
                     client_list_size++;
+#ifdef DEBUG
                     printf("webpage client created, list size is now %d\n", client_list_size);
+#endif
                 }
                 else
                 {
@@ -429,7 +431,9 @@ int main(int argc, char *argv[])
                         client_list = temp;
                         --client_list_size;
                     }
+#ifdef DEBUG
                     printf("client disconnected (read), list size is now %d\n", client_list_size);
+#endif
                     i--;
                 }
                 else if (r > 1)
@@ -540,7 +544,9 @@ int main(int argc, char *argv[])
                         client_list = temp;
                         --client_list_size;
                     }
+#ifdef DEBUG
                     printf("client disconnected (write), list size is now %d\n", client_list_size);
+#endif
                 }
             }
         }

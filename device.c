@@ -37,7 +37,7 @@ void device_destroy(struct device *this_device)
         unsigned int i;
         for (i = 0; i < this_device->number_of_sensors; i++)
         {
-            free(this_device->sensor_list[i]);
+            sensor_destroy(this_device->sensor_list[i]);
         }
         free(this_device->sensor_list);
     }

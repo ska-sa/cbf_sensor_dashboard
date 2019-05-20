@@ -32,10 +32,12 @@ struct sensor *sensor_create(char *new_name)
 
 void sensor_destroy(struct sensor *the_sensor)
 {
-    if (the_sensor->name != NULL)
-        free(the_sensor->name);
     if (the_sensor != NULL)
+    {
+        free(the_sensor->name);
+        free(the_sensor->value);
         free(the_sensor);
+    }
 }
 
 

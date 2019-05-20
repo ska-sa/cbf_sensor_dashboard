@@ -8,7 +8,7 @@ static int host_update_sensor_value_function(struct host *this_host, char *senso
 }
 
 
-struct host *create_host(char type)
+struct host *host_create(char type)
 {
     struct host *new_host = malloc(sizeof(*new_host));
     if (new_host != NULL)

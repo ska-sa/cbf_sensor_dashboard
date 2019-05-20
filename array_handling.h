@@ -11,6 +11,12 @@ enum array_state {
     MONITOR_SENSORS
 };
 
+struct antenna {
+    unsigned char index;
+    struct fhost;
+    struct xhost;
+}
+
 struct fhost {
     char hostname[7]; /* skarab serial numbers are six digits long, plus the terminal null. */
     int host_number;
@@ -57,6 +63,7 @@ struct cmc_array {
     int monitor_socket_fd;
     struct katcl_line *l;
     enum array_state state;
+    struct antenna **antennas;
     struct fhost **fhosts;
     struct xhost **xhosts;
     char **sensor_names;

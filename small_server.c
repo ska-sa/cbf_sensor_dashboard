@@ -487,9 +487,29 @@ int main(int argc, char *argv[])
                                 {
                                     send_html_table_start(client_list[i]);
                                     int k;
-                                    if (array_list[j]->fhosts != NULL && array_list[j]->xhosts[j] != NULL)
+#ifdef DEBUG
+                                    printf("sending sensors for array_list[%d] which has %d antennas...\n", j, array_list[j]->number_of_antennas);
+#endif
+                                    /*if (array_list[j]->fhosts != NULL && array_list[j]->xhosts[j] != NULL)*/
+                                    {
                                         for (k = 0; k < array_list[j]->number_of_antennas; k++)
-                                                send_html_table_sensor_row(client_list[i], array_list[j]->fhosts[k], array_list[j]->xhosts[k]); 
+                                        {
+#ifdef DEBUG
+                                            printf("sending sensor row number %d\n", k);
+#endif
+                                            send_html_table_sensor_row(client_list[i], array_list[j]->fhosts[k], array_list[j]->xhosts[k]); 
+                                        }
+                                    }
+                                    /*else
+                                    {
+                                        char format[] = "Array %s has a null pointer somewhere. Fhost: %ld, Xhost: %ld";
+                                        size_t needed = snprintf(NULL, 0, format, requested_resource + 1, array_list[j]->fhosts, array_list[j]->xhosts) + 1;
+                                        char *message = malloc(needed);
+                                        sprintf(message, format, requested_resource + 1);
+                                        r = send_html_paragraph(client_list[i], message);
+                                        free(message);
+                                    }*/
+                                    send_html_table_end(client_list[i]);
                                 }
                                 else
                                 {
@@ -500,8 +520,7 @@ int main(int argc, char *argv[])
                                     r = send_html_paragraph(client_list[i], message);
                                     free(message);
                                 }
-                                    send_html_table_end(client_list[i]);
-                                    break; /* found the array, no need to continue further */
+                                break; /* found the array, no need to continue further */
                             }
                             if (j == array_list_size)
                             {

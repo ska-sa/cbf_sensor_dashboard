@@ -12,19 +12,14 @@ struct device {
 };
 
 
-struct device *device_create(char *new_name, char **sensor_names, unsigned int number_of_sensors)
+struct device *device_create(char *new_name)
 {
     struct device *new_device = malloc(sizeof(*new_device));
     if (new_device != NULL)
     {
         new_device->name = strdup(new_name);
-        new_device->sensor_list = malloc(sizeof(*(new_device->sensor_list))*number_of_sensors);
-        unsigned int i;
-        for (i = 0; i < number_of_sensors; i++)
-        {
-            new_device->sensor_list[i] = sensor_create(sensor_names[i]);
-        }
-        new_device->number_of_sensors = number_of_sensors;
+        new_device->number_of_sensors = 0;
+        new_device->sensor_list = NULL;
     }
     return new_device;
 }
@@ -49,6 +44,16 @@ char *device_get_name(struct device *this_device)
     return this_device->name;
 }
 
+int device_add_sensor(struct device *this_device, char *new_sensor_name)
+{
+    this_device->sensor_list = realloc(this_device->sensor_list, \
+            sizeof(*(this_device->sensor_list))*(this_device->number_of_sensors + 1));
+    this_device->sensor_list[this_device->number_of_sensors] = sensor_create(new_sensor_name);
+    this_device->number_of_sensors++;
+    return 0; /*no error checking yet, this should be fine. */
+}
+
+
 char **device_get_sensor_names(struct device *this_device, int *number_of_sensors)
 {
     *number_of_sensors = this_device->number_of_sensors;
@@ -63,28 +68,24 @@ char **device_get_sensor_names(struct device *this_device, int *number_of_sensor
 
 char *device_get_sensor_value(struct device *this_device, char *sensor_name)
 {
-    char *sensor_value = NULL;
     unsigned int i;
     for (i = 0; i < this_device->number_of_sensors; i++)
     {
         if (!strcmp(sensor_name, sensor_get_name(this_device->sensor_list[i])))
         {
-            sensor_value = sensor_get_value(this_device->sensor_list[i]);
-            return sensor_value;
+            return sensor_get_value(this_device->sensor_list[i]);
         }
     }
 }
 
 char *device_get_sensor_status(struct device *this_device, char *sensor_name)
 {
-    char *sensor_status = NULL;
     unsigned int i;
     for (i = 0; i < this_device->number_of_sensors; i++)
     {
         if (!strcmp(sensor_name, sensor_get_name(this_device->sensor_list[i])))
         {
-            sensor_status = sensor_get_status(this_device->sensor_list[i]);
-            return sensor_status;
+            return sensor_get_status(this_device->sensor_list[i]);
         }
     }
 }
@@ -96,8 +97,7 @@ int device_update_sensor(struct device *this_device, char *sensor_name, char *ne
     {
         if (!strcmp(sensor_name, sensor_get_name(this_device->sensor_list[i])))
         {
-            sensor_update(this_device->sensor_list[i], new_sensor_value, new_sensor_status);
-            return 0;
+            return sensor_update(this_device->sensor_list[i], new_sensor_value, new_sensor_status);
         }
     }
     return -1;

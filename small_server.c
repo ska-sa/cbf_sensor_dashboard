@@ -373,7 +373,7 @@ int main(int argc, char *argv[])
                     if (!strcmp(arg_string_katcl(l, 0), "#array-list") && !(strcmp(arg_string_katcl(l, 1), new_array_name)))
                     {
                         printf("Caught the list entry with our new array, %s\n", new_array_name);
-                        struct cmc_array **temp = realloc(array_list, sizeof(*array_list)*(array_list_size));
+                        struct cmc_array **temp = realloc(array_list, sizeof(*array_list)*(array_list_size + 1));
                         if (temp)
                         {
                             array_list = temp;

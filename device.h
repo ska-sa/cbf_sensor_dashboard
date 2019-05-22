@@ -3,9 +3,10 @@
 
 struct device;
 
-struct device *device_create(char *new_name, char **sensor_names, unsigned int number_of_sensors);
+struct device *device_create(char *new_name);
 void device_destroy(struct device *this_device);
 char *device_get_name(struct device *this_device);
+int device_add_sensor(struct device *this_device, char *new_sensor_name); /* I don't think we need the capability to remove sensors for the time being. */
 char **device_get_sensor_names(struct device *this_device, int *number_of_sensors);
 char *device_get_sensor_value(struct device *this_device, char *sensor_name);
 char *device_get_sensor_status(struct device *this_device, char *sensor_name);

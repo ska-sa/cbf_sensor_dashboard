@@ -6,14 +6,7 @@
 struct sensor {
     char *name;
     char *value;
-};
-
-
-struct compound_sensor {
-    char *engine_name;
-    char *name;
-    struct sensor **sensor_list;
-    char *value;
+    char *status;
 };
 
 
@@ -25,18 +18,20 @@ struct sensor *sensor_create(char *new_name)
     {
         new_sensor->name = strdup(new_name);
         new_sensor->value = strdup("unused");
+        new_sensor->status = strdup("unknown");
     }
     return new_sensor;
 }
 
 
-void sensor_destroy(struct sensor *the_sensor)
+void sensor_destroy(struct sensor *this_sensor)
 {
-    if (the_sensor != NULL)
+    if (this_sensor != NULL)
     {
-        free(the_sensor->name);
-        free(the_sensor->value);
-        free(the_sensor);
+        free(this_sensor->name);
+        free(this_sensor->value);
+        free(this_sensor->status);
+        free(this_sensor);
     }
 }
 
@@ -53,12 +48,22 @@ char *sensor_get_value(struct sensor *this_sensor)
 }
 
 
-int sensor_update_value(struct sensor *this_sensor, char *new_value)
+char *sensor_get_status(struct sensor *this_sensor)
+{
+    return this_sensor->status;
+}
+
+
+int sensor_update(struct sensor *this_sensor, char *new_value, char *new_status)
 {
     if (this_sensor->value != NULL)
         free(this_sensor->value);
+    if (this_sensor->status != NULL)
+        free(this_sensor->status);
     this_sensor->value = strdup(new_value);
-    if (this_sensor->value != NULL)
+    this_sensor->status = strdup(new_status);
+
+    if (this_sensor->value != NULL && this_sensor->status != NULL)
         return 0;
     else
         return -1;

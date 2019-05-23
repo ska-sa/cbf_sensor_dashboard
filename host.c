@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 #include "host.h"
 #include "device.h"
@@ -7,30 +8,25 @@
 
 
 struct host {
-    char type;
+    char *hostname;
     struct device **device_list;
     unsigned int number_of_devices;
     struct vdevice **vdevice_list;
     unsigned int number_of_vdevices;
-    struct host **host_list;
-    unsigned int number_of_hosts;
+    struct host **engine_list;
+    unsigned int number_of_engines;
 };
     
 
-struct host *host_create(char type)
+struct host *host_create()
 {
     struct host *new_host = malloc(sizeof(*new_host));
     if (new_host != NULL)
     {
-        new_host->type = type;
-        switch (type) {
-            case 'f':
-                break;
-            case 'x':
-                break;
-            default:
-                free(new_host);
-        }
+        new_host->hostname = strdup("unknown");
+        new_host->number_of_devices = 0;
+        new_host->number_of_vdevices = 0;
+        new_host->number_of_engines = 0;
     }
     return new_host;
 }
@@ -45,8 +41,8 @@ void host_destroy(struct host *this_host)
             vdevice_destroy(this_host->vdevice_list[i]);
         for (i = 0; i < this_host->number_of_devices; i++)
             device_destroy(this_host->device_list[i]);
-        for (i = 0; i < this_host->number_of_hosts; i++)
-            host_destroy(this_host->host_list[i]);
+        for (i = 0; i < this_host->number_of_engines; i++)
+            host_destroy(this_host->engine_list[i]);
         free(this_host);
     }
 }
@@ -60,6 +56,7 @@ int host_add_device(struct host *this_host, char *new_device_name)
     this_host->number_of_devices++;
     return 0;
 }
+
 
 int host_add_sensor_to_device(struct host *this_host, char *device_name, char *new_sensor_name)
 {
@@ -86,6 +83,7 @@ char *host_get_sensor_value(struct host *this_host, char *device_name, char *sen
             return device_get_sensor_value(this_host->device_list[i], sensor_name);
         }
     }
+    return NULL;
 }
 
 
@@ -109,6 +107,7 @@ char *host_get_sensor_status(struct host *this_host, char *device_name, char *se
             }
         }
     }
+    return NULL;
 }
 
 

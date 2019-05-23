@@ -1,11 +1,9 @@
-#ifdef _HOST_H_
+#ifndef _HOST_H_
 #define _HOST_H_
-
-#include "sensor.h"
 
 struct host;
 
-struct host *host_create(char type);
+struct host *host_create();
 void host_destroy(struct host *this_host);
 
 int host_add_device(struct host *this_host, char *new_device_name);

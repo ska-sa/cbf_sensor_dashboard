@@ -82,6 +82,7 @@ char *engine_get_sensor_value(struct engine *this_engine, char *device_name, cha
             return device_get_sensor_value(this_engine->device_list[i], sensor_name);
         }
     }
+    return NULL;
 }
 
 
@@ -95,6 +96,7 @@ char *engine_get_sensor_status(struct engine *this_engine, char *device_name, ch
             return device_get_sensor_status(this_engine->device_list[i], sensor_name);
         }
     }
+    return NULL;
 }
 
 

@@ -50,26 +50,39 @@ void host_destroy(struct host *this_host)
 
 int host_add_device(struct host *this_host, char *new_device_name)
 {
-    this_host->device_list = realloc(this_host->device_list, \
+    /*First check whether the device already exists.*/
+    unsigned int i;
+    for (i = 0; i < this_host->number_of_devices; i++)
+    {
+        if (!strcmp(new_device_name, device_get_name(this_host->device_list[i])))
+        {
+            return i;
+        }
+    }
+    /*If we got here then clearly it doesnt.*/
+    struct device **temp = realloc(this_host->device_list, \
             sizeof(*(this_host->device_list))*(this_host->number_of_devices + 1));
-    this_host->device_list[this_host->number_of_devices] = device_create(new_device_name);
-    this_host->number_of_devices++;
-    return 0;
+    if (temp != NULL) /*i.e. realloc was successful*/
+    {
+        this_host->device_list = temp;
+        this_host->device_list[this_host->number_of_devices] = device_create(new_device_name);
+        this_host->number_of_devices++;
+        return this_host->number_of_devices - 1;
+    }
+    else
+        return -1;
 }
 
 
 int host_add_sensor_to_device(struct host *this_host, char *device_name, char *new_sensor_name)
 {
-    unsigned int i;
-    for (i = 0; i < this_host->number_of_devices; i++)
+    int r = host_add_device(this_host, device_name);
+    if (r >= 0)
     {
-        if (!strcmp(device_name, device_get_name(this_host->device_list[i])))
-        {
-            device_add_sensor(this_host->device_list[i], new_sensor_name);
-            return 0;
-        }
+        return device_add_sensor(this_host->device_list[i], new_sensor_name);
     }
-    return -1;
+    else
+        return -1;
 }
 
 

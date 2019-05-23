@@ -46,11 +46,12 @@ char *device_get_name(struct device *this_device)
 
 int device_add_sensor(struct device *this_device, char *new_sensor_name)
 {
+    /*TODO check whether the sensor already exists. Update return values accordingly.*/
     this_device->sensor_list = realloc(this_device->sensor_list, \
             sizeof(*(this_device->sensor_list))*(this_device->number_of_sensors + 1));
     this_device->sensor_list[this_device->number_of_sensors] = sensor_create(new_sensor_name);
     this_device->number_of_sensors++;
-    return 0; /*no error checking yet, this should be fine. */
+    return 0; 
 }
 
 

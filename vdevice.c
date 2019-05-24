@@ -90,4 +90,3 @@ char *vdevice_get_status(struct vdevice *this_vdevice)
     return this_vdevice->status;
 }
 
-

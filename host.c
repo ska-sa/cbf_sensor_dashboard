@@ -27,6 +27,7 @@ struct host *host_create()
         new_host->number_of_devices = 0;
         new_host->number_of_vdevices = 0;
         new_host->number_of_engines = 0;
+        /*TODO: do I need to explicitly make pointers null?*/
     }
     return new_host;
 }

@@ -14,35 +14,42 @@ struct device {
 
 struct device *device_create(char *new_name)
 {
+    /*TODO think about sanitising the name*/
     struct device *new_device = malloc(sizeof(*new_device));
     if (new_device != NULL)
     {
         new_device->name = strdup(new_name);
         new_device->number_of_sensors = 0;
-        new_device->sensor_list = NULL;
+        new_device->sensor_list = NULL; /*Making this explicit probably not necessary?*/
     }
     return new_device;
 }
 
+
 void device_destroy(struct device *this_device)
 {
-    if (this_device->name != NULL)
+    if (this_device != NULL)
     {
-        free(this_device->name);
-        unsigned int i;
-        for (i = 0; i < this_device->number_of_sensors; i++)
+        if (this_device->name != NULL)
         {
-            sensor_destroy(this_device->sensor_list[i]);
+            free(this_device->name);
+            unsigned int i;
+            for (i = 0; i < this_device->number_of_sensors; i++)
+            {
+                sensor_destroy(this_device->sensor_list[i]);
+            }
+            free(this_device->sensor_list);
         }
-        free(this_device->sensor_list);
+        free(this_device);
     }
-    free(this_device);
 }
+
 
 char *device_get_name(struct device *this_device)
 {
     return this_device->name;
 }
+
 
 int device_add_sensor(struct device *this_device, char *new_sensor_name)
 {
@@ -57,8 +64,10 @@ int device_add_sensor(struct device *this_device, char *new_sensor_name)
 
 char **device_get_sensor_names(struct device *this_device, int *number_of_sensors)
 {
-    *number_of_sensors = this_device->number_of_sensors;
-    char **sensor_names = malloc(sizeof(*sensor_names)*(*number_of_sensors));
+    *number_of_sensors = this_device->number_of_sensors; /*need to return this to the caller*/
+    if (this_device->number_of_sensors == 0)
+        return NULL; /*Not useful to return a pointer to zero memory space.*/
+    char **sensor_names = malloc(sizeof(*sensor_names)*(*number_of_sensors)); 
     int i;
     for (i = 0; i < *number_of_sensors; i++)
     {
@@ -66,6 +75,7 @@ char **device_get_sensor_names(struct device *this_device, int *number_of_sensor
     }
     return sensor_names;
 }
+
 
 char *device_get_sensor_value(struct device *this_device, char *sensor_name)
 {
@@ -80,6 +90,7 @@ char *device_get_sensor_value(struct device *this_device, char *sensor_name)
     return NULL;
 }
 
+
 char *device_get_sensor_status(struct device *this_device, char *sensor_name)
 {
     unsigned int i;
@@ -92,6 +103,7 @@ char *device_get_sensor_status(struct device *this_device, char *sensor_name)
     }
     return NULL;
 }
+
 
 int device_update_sensor(struct device *this_device, char *sensor_name, char *new_sensor_value, char *new_sensor_status)
 {

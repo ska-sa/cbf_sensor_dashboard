@@ -28,17 +28,20 @@ struct engine *engine_create(char *new_name)
 
 void engine_destroy(struct engine *this_engine)
 {
-    if (this_engine->name != NULL)
+    if (this_engine != NULL)
     {
-        free(this_engine->name);
-        unsigned int i;
-        for (i = 0; i < this_engine->number_of_devices; i++)
+        if (this_engine->name != NULL)
         {
-            device_destroy(this_engine->device_list[i]);
+            free(this_engine->name);
+            unsigned int i;
+            for (i = 0; i < this_engine->number_of_devices; i++)
+            {
+                device_destroy(this_engine->device_list[i]);
+            }
+            free(this_engine->device_list);
         }
-        free(this_engine->device_list);
+        free(this_engine);
     }
-    free(this_engine);
 }
 
 
@@ -50,6 +53,7 @@ char *engine_get_name(struct engine *this_engine)
 
 int engine_add_device(struct engine *this_engine, char *new_device_name)
 {
+    /*TODO make it return -1 if there's a failure.*/
     this_engine->device_list = realloc(this_engine->device_list, \
             sizeof(*(this_engine->device_list))*(this_engine->number_of_devices + 1));
     this_engine->device_list[this_engine->number_of_devices] = device_create(new_device_name);

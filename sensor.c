@@ -56,6 +56,8 @@ char *sensor_get_status(struct sensor *this_sensor)
 
 int sensor_update(struct sensor *this_sensor, char *new_value, char *new_status)
 {
+    if (this_sensor == NULL)
+        return -2;
     if (this_sensor->value != NULL)
         free(this_sensor->value);
     if (this_sensor->status != NULL)

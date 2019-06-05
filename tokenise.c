@@ -15,7 +15,7 @@ int tokenise_string(char* input_string, char delim, char ***tokens)
     int i;
     for (i = 0; i < string_len; i++)
     {
-        if (string[i] == delim)
+        if (string[i] == delim || string[i] == '\n')
         {
             string[i] = 0;
             (*tokens) = realloc((*tokens), sizeof(*(*tokens))*(num_tokens + 1));

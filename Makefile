@@ -2,7 +2,7 @@ CC = gcc
 CFLAGS = -Wall
 #CFLAGS += -O2
 CFLAGS += -ggdb
-CFLAGS += -DDEBUG
+#CFLAGS += -DDEBUG
 
 KATCPDIR=../katcp_devel/katcp
 
@@ -13,8 +13,9 @@ LDFLAGS =
 
 RM = rm -f 
 
-SRC = small_server.c array_handling.c html_handling.c http_handling.c sensor_parsing.c
-EXE = small_server
+#SRC = small_server.c array_handling.c html_handling.c http_handling.c sensor_parsing.c
+SRC = test_program.c sensor.c device.c engine.c vdevice.c host.c tokenise.c
+EXE = test_program
 OBJ = $(patsubst %.c,%.o,$(SRC))
 
 all: $(EXE)

@@ -80,7 +80,7 @@ int host_add_sensor_to_device(struct host *this_host, char *device_name, char *n
     int r = host_add_device(this_host, device_name);
     if (r >= 0)
     {
-        return device_add_sensor(this_host->device_list[i], new_sensor_name);
+        return device_add_sensor(this_host->device_list[r], new_sensor_name);
     }
     else
         return -1;

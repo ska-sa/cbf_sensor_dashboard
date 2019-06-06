@@ -13,7 +13,7 @@ struct host {
     unsigned int number_of_devices;
     struct vdevice **vdevice_list;
     unsigned int number_of_vdevices;
-    struct host **engine_list;
+    struct engine **engine_list;
     unsigned int number_of_engines;
 };
     
@@ -43,8 +43,9 @@ void host_destroy(struct host *this_host)
         for (i = 0; i < this_host->number_of_devices; i++)
             device_destroy(this_host->device_list[i]);
         for (i = 0; i < this_host->number_of_engines; i++)
-            host_destroy(this_host->engine_list[i]);
+            engine_destroy(this_host->engine_list[i]);
         free(this_host);
+        this_host = NULL;
     }
 }
 
@@ -77,13 +78,68 @@ int host_add_device(struct host *this_host, char *new_device_name)
 
 int host_add_sensor_to_device(struct host *this_host, char *device_name, char *new_sensor_name)
 {
-    int r = host_add_device(this_host, device_name);
-    if (r >= 0)
+    unsigned int i;
+    for (i = 0; i < this_host->number_of_devices; i++)
     {
-        return device_add_sensor(this_host->device_list[r], new_sensor_name);
+        if (!strcmp(device_name, device_get_name(this_host->device_list[i])))
+        {
+            return device_add_sensor(this_host->device_list[i], new_sensor_name);
+        }
     }
-    else
-        return -1;
+    return -1;
+}
+
+
+int host_add_engine(struct host *this_host, char *new_engine_name)
+{
+    /*First check whether the engine already exists.*/
+    unsigned int i;
+    for (i = 0; i < this_host->number_of_engines; i++)
+    {
+        if (!strcmp(new_engine_name, engine_get_name(this_host->engine_list[i])))
+        {
+            return 1;
+        }
+    }
+    /*Clearly it doesnt.*/
+    struct engine **temp = realloc(this_host->engine_list, \
+            sizeof(*(this_host->engine_list))*(this_host->number_of_engines + 1));
+    if (temp != NULL)
+    {
+        this_host->engine_list = temp;
+        this_host->engine_list[this_host->number_of_engines] = engine_create(new_engine_name);
+        this_host->number_of_engines++;
+        return this_host->number_of_engines - 1;
+    }
+    return -1;
+}
+
+
+int host_add_device_to_engine(struct host *this_host, char *engine_name, char *new_device_name)
+{
+    unsigned int i;
+    for (i = 0; i < this_host->number_of_engines; i++)
+    {
+        if (!strcmp(engine_name, engine_get_name(this_host->engine_list[i])))
+        {
+            return engine_add_device(this_host->engine_list[i], new_device_name);
+        }
+    }
+    return -1;
+}
+
+
+int host_add_sensor_to_engine_device(struct host *this_host, char *engine_name, char *device_name, char *new_sensor_name)
+{
+    unsigned int i;
+    for (i = 0; i < this_host->number_of_engines; i++)
+    {
+        if (!strcmp(engine_name, engine_get_name(this_host->engine_list[i])))
+        {
+            return engine_add_sensor_to_device(this_host->engine_list[i], device_name, new_sensor_name);
+        }
+    }
+    return -1;
 }
 
 
@@ -133,6 +189,20 @@ int host_update_sensor(struct host *this_host, char *device_name, char *sensor_n
         if (!strcmp(device_name, device_get_name(this_host->device_list[i])))
         {
             return device_update_sensor(this_host->device_list[i], sensor_name, new_sensor_value, new_sensor_status);
+        }
+    }
+    return -1;
+}
+
+
+int host_update_engine_sensor(struct host *this_host, char *engine_name, char *device_name, char *sensor_name, char *new_sensor_value, char *new_sensor_status)
+{
+    unsigned int i;
+    for (i = 0; i < this_host->number_of_engines; i++)
+    {
+        if (!strcmp(engine_name, engine_get_name(this_host->engine_list[i])))
+        {
+            return engine_update_sensor(this_host->engine_list[i], device_name, sensor_name, new_sensor_value, new_sensor_status);
         }
     }
     return -1;

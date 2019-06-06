@@ -7,8 +7,11 @@
 
 #define BUF_SIZE 1024
 
-int parse_sensor_list_file(char *filename)
+int main()
 {
+    char filename[] = "sensor_list";
+    int number_of_antennas = 4;
+    int xengines_per_xhost = 4;
     FILE *sensor_list_file = fopen(filename, "r");
     if (sensor_list_file == NULL)
         return -1;
@@ -23,25 +26,23 @@ int parse_sensor_list_file(char *filename)
         char **tokens = NULL;
         int num_tokens;
         num_tokens = tokenise_string(buffer, '.', &tokens);
-        if (num_tokens > 0)
-        {   
-            int i;
-            for (i = 0; i < num_tokens; i++)
-            {
-                printf("%s ", tokens[i]);
-            }
-            printf("\n");
+
+        switch (num_tokens) {
+            case 3:
+                switch (tokens[0][0]) {
+                    case 'f':
+
+                    case 'x':
+
+                    default:
+                        return -1;
+                }
+            case 4:
+
+            default:
+                return -1; /*for now*/
         }
     } 
-    return 0;
-}
-
-
-int main()
-{
-
-    char filename[] = "sensor_list";
-    parse_sensor_list_file(filename);
 
     return 0;
 }

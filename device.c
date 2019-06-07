@@ -62,7 +62,7 @@ int device_add_sensor(struct device *this_device, char *new_sensor_name)
 }
 
 
-char **device_get_sensor_names(struct device *this_device, int *number_of_sensors)
+char **device_get_sensor_names(struct device *this_device, unsigned int *number_of_sensors)
 {
     *number_of_sensors = this_device->number_of_sensors; /*need to return this to the caller*/
     if (this_device->number_of_sensors == 0)

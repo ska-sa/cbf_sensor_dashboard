@@ -10,11 +10,11 @@
 struct host {
     char *hostname;
     struct device **device_list;
-    unsigned int number_of_devices;
+    size_t number_of_devices;
     struct vdevice **vdevice_list;
-    unsigned int number_of_vdevices;
+    size_t number_of_vdevices;
     struct engine **engine_list;
-    unsigned int number_of_engines;
+    size_t number_of_engines;
 };
     
 
@@ -53,7 +53,7 @@ void host_destroy(struct host *this_host)
 int host_add_device(struct host *this_host, char *new_device_name)
 {
     /*First check whether the device already exists.*/
-    unsigned int i;
+    int i;
     for (i = 0; i < this_host->number_of_devices; i++)
     {
         if (!strcmp(new_device_name, device_get_name(this_host->device_list[i])))
@@ -69,7 +69,7 @@ int host_add_device(struct host *this_host, char *new_device_name)
         this_host->device_list = temp;
         this_host->device_list[this_host->number_of_devices] = device_create(new_device_name);
         this_host->number_of_devices++;
-        return this_host->number_of_devices - 1;
+        return (int) this_host->number_of_devices - 1;
     }
     else
         return -1;
@@ -78,7 +78,7 @@ int host_add_device(struct host *this_host, char *new_device_name)
 
 int host_add_sensor_to_device(struct host *this_host, char *device_name, char *new_sensor_name)
 {
-    unsigned int i;
+    int i;
     for (i = 0; i < this_host->number_of_devices; i++)
     {
         if (!strcmp(device_name, device_get_name(this_host->device_list[i])))
@@ -93,7 +93,7 @@ int host_add_sensor_to_device(struct host *this_host, char *device_name, char *n
 int host_add_engine(struct host *this_host, char *new_engine_name)
 {
     /*First check whether the engine already exists.*/
-    unsigned int i;
+    int i;
     for (i = 0; i < this_host->number_of_engines; i++)
     {
         if (!strcmp(new_engine_name, engine_get_name(this_host->engine_list[i])))
@@ -109,7 +109,7 @@ int host_add_engine(struct host *this_host, char *new_engine_name)
         this_host->engine_list = temp;
         this_host->engine_list[this_host->number_of_engines] = engine_create(new_engine_name);
         this_host->number_of_engines++;
-        return this_host->number_of_engines - 1;
+        return (int) this_host->number_of_engines - 1;
     }
     return -1;
 }
@@ -117,7 +117,7 @@ int host_add_engine(struct host *this_host, char *new_engine_name)
 
 int host_add_device_to_engine(struct host *this_host, char *engine_name, char *new_device_name)
 {
-    unsigned int i;
+    int i;
     for (i = 0; i < this_host->number_of_engines; i++)
     {
         if (!strcmp(engine_name, engine_get_name(this_host->engine_list[i])))
@@ -131,7 +131,7 @@ int host_add_device_to_engine(struct host *this_host, char *engine_name, char *n
 
 int host_add_sensor_to_engine_device(struct host *this_host, char *engine_name, char *device_name, char *new_sensor_name)
 {
-    unsigned int i;
+    int i;
     for (i = 0; i < this_host->number_of_engines; i++)
     {
         if (!strcmp(engine_name, engine_get_name(this_host->engine_list[i])))
@@ -145,7 +145,7 @@ int host_add_sensor_to_engine_device(struct host *this_host, char *engine_name, 
 
 char *host_get_sensor_value(struct host *this_host, char *device_name, char *sensor_name)
 {
-    unsigned int i;
+    int i;
     for (i = 0; i < this_host->number_of_devices; i++)
     {
         if (!strcmp(device_name, device_get_name(this_host->device_list[i])))
@@ -159,7 +159,7 @@ char *host_get_sensor_value(struct host *this_host, char *device_name, char *sen
 
 char *host_get_sensor_status(struct host *this_host, char *device_name, char *sensor_name)
 {
-    unsigned int i;
+    int i;
     for (i = 0; i < this_host->number_of_devices; i++)
     {
         if (!strcmp(device_name, device_get_name(this_host->device_list[i])))
@@ -183,7 +183,7 @@ char *host_get_sensor_status(struct host *this_host, char *device_name, char *se
 
 int host_update_sensor(struct host *this_host, char *device_name, char *sensor_name, char *new_sensor_value, char *new_sensor_status)
 {
-    unsigned int i;
+    int i;
     for (i = 0; i < this_host->number_of_devices; i++)
     {
         if (!strcmp(device_name, device_get_name(this_host->device_list[i])))
@@ -197,7 +197,7 @@ int host_update_sensor(struct host *this_host, char *device_name, char *sensor_n
 
 int host_update_engine_sensor(struct host *this_host, char *engine_name, char *device_name, char *sensor_name, char *new_sensor_value, char *new_sensor_status)
 {
-    unsigned int i;
+    int i;
     for (i = 0; i < this_host->number_of_engines; i++)
     {
         if (!strcmp(engine_name, engine_get_name(this_host->engine_list[i])))

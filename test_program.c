@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "host.h"
+#include "team.h"
 #include "tokenise.h"
 
 #define BUF_SIZE 1024
@@ -24,24 +24,41 @@ int main()
         buffer[strlen(buffer) - 1] = 0;
 
         char **tokens = NULL;
-        int num_tokens;
+        size_t num_tokens;
         num_tokens = tokenise_string(buffer, '.', &tokens);
+        int i, j;
 
-        switch (num_tokens) {
-            case 3:
-                switch (tokens[0][0]) {
-                    case 'f':
-
-                    case 'x':
-
+        switch (tokens[0][0]) {
+            case 'f':
+                /*TODO create some fhosts.*/
+                for (i = 0; i < number_of_antennas; i++)
+                    printf("?sensor-sampling %s%02d.%s.%s auto\n", tokens[0], i, tokens[1], tokens[2]);
+                break;
+            case 'x':
+                switch (num_tokens) {
+                    case 3:
+                        /*TODO create some fhosts.*/
+                        for (i = 0; i < number_of_antennas; i++)
+                            printf("?sensor-sampling %s%02d.%s.%s auto\n", tokens[0], i, tokens[1], tokens[2]);
+                        break;
+                    case 4:
+                        /*TODO create some fhosts.*/
+                        for (i = 0; i < number_of_antennas; i++)
+                            for (j = 0; j < xengines_per_xhost; j++)
+                                printf("?sensor-sampling %s%02d.%s%02d.%s.%s auto\n", tokens[0], i, tokens[1], j, tokens[2], tokens[3]);
+                        break;
                     default:
-                        return -1;
+                        printf("got a number of tokens other than 3 or 4: %s\n", buffer);
                 }
-            case 4:
-
+                break;
             default:
-                return -1; /*for now*/
+                printf("got a host kind other than x or f: {%c} from %s\n", tokens[0][0], buffer);
+                printf("Tokens: ");
+                for (i = 0; i < num_tokens; i++)
+                    printf("%s ", tokens[i]);
+                printf("\n");
         }
+            
     } 
 
     return 0;

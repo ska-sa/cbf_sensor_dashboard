@@ -1,5 +1,5 @@
 CC = gcc 
-CFLAGS = -Wall
+CFLAGS = -Wall -Wconversion
 #CFLAGS += -O2
 CFLAGS += -ggdb
 #CFLAGS += -DDEBUG

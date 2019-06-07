@@ -42,7 +42,7 @@ int main()
                             printf("?sensor-sampling %s%02d.%s.%s auto\n", tokens[0], i, tokens[1], tokens[2]);
                         break;
                     case 4:
-                        /*TODO create some fhosts.*/
+                        /*TODO create some xhosts.*/
                         for (i = 0; i < number_of_antennas; i++)
                             for (j = 0; j < xengines_per_xhost; j++)
                                 printf("?sensor-sampling %s%02d.%s%02d.%s.%s auto\n", tokens[0], i, tokens[1], j, tokens[2], tokens[3]);

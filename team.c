@@ -91,3 +91,49 @@ char team_get_type(struct team *this_team)
         return -1;
 }
 
+
+int team_update_sensor(struct team *this_team, size_t host_number, char *device_name, char*sensor_name, char *new_sensor_value, char *new_sensor_status)
+{
+    if (this_team != NULL)
+    {
+        if (host_number >= this_team->number_of_antennas)
+            return -2;
+        return host_update_sensor(this_team->host_list[host_number], device_name, sensor_name, new_sensor_value, new_sensor_status);
+    }
+    return -1;
+}
+
+
+int team_update_engine_sensor(struct team *this_team, size_t host_number, char *engine_name, char *device_name, char *sensor_name, char *new_sensor_value, char *new_sensor_status)
+{
+    if (this_team != NULL)
+    {
+        if (host_number >= this_team->number_of_antennas)
+            return -2;
+        return host_update_engine_sensor(this_team->host_list[host_number], engine_name, device_name, sensor_name, new_sensor_value, new_sensor_status);
+    }
+    return -1; 
+}
+
+
+char *team_get_sensor_value(struct team *this_team, size_t host_number, char *device_name, char *sensor_name)
+{
+    if  (this_team != NULL)
+    {
+        if (host_number < this_team->number_of_antennas)
+            return host_get_sensor_value(this_team->host_list[host_number], device_name, sensor_name);
+    }
+    return NULL;
+}
+
+
+char *team_get_sensor_status(struct team *this_team, size_t host_number, char *device_name, char *sensor_name)
+{
+    if  (this_team != NULL)
+    {
+        if (host_number < this_team->number_of_antennas)
+            return host_get_sensor_status(this_team->host_list[host_number], device_name, sensor_name);
+    }
+    return NULL;
+
+}

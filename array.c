@@ -72,3 +72,34 @@ int array_add_team_host_engine_device_sensor(struct array *this_array, char team
     }
     return -1;
 }
+
+
+char *array_get_sensor_value(struct array *this_array, char team_type, size_t host_number, char *device_name, char *sensor_name)
+{
+    if (this_array != NULL)
+    {
+        size_t i;
+        for (i = 0; i < this_array->number_of_teams; i++)
+        {
+            if (team_type == team_get_type(this_array->team_list[i]))
+                return team_get_sensor_value(this_array->team_list[i], host_number, device_name, sensor_name);
+        }
+    }
+    return NULL;
+}
+
+
+char *array_get_sensor_status(struct array *this_array, char team_type, size_t host_number, char *device_name, char *sensor_name)
+{
+    if (this_array != NULL)
+    {
+        size_t i;
+        for (i = 0; i < this_array->number_of_teams; i++)
+        {
+            if (team_type == team_get_type(this_array->team_list[i]))
+                return team_get_sensor_status(this_array->team_list[i], host_number, device_name, sensor_name);
+        }
+    }
+    return NULL;
+
+}

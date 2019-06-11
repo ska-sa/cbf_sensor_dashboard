@@ -81,3 +81,13 @@ int team_add_engine_device_sensor(struct team *this_team, unsigned int host_numb
     }
     return -1;
 }
+
+
+char team_get_type(struct team *this_team)
+{
+    if (this_team != NULL)
+        return this_team->host_type;
+    else
+        return -1;
+}
+

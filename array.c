@@ -25,3 +25,50 @@ struct array *array_create(char *new_array_name, size_t number_of_antennas)
 }
 
 
+void array_destroy(struct array *this_array)
+{
+    if (this_array != NULL)
+    {
+        size_t i;
+        for (i = 0; i < this_array->number_of_teams; i++)
+        {
+            team_destroy(this_array->team_list[i]);
+        }
+        free(this_array);
+        this_array = NULL;
+    }
+}
+
+
+int array_add_team_host_device_sensor(struct array *this_array, char team_type, unsigned int host_number, char *device_name, char *sensor_name)
+{
+    if (this_array != NULL)
+    {
+       size_t i;
+       for (i = 0; i < this_array->number_of_teams; i++)
+       {
+          if (team_get_type(this_array->team_list[i]) == team_type)
+          {
+              return team_add_device_sensor(this_array->team_list[i], host_number, device_name, sensor_name);
+          }
+       }
+    }
+    return -1;
+}
+
+
+int array_add_team_host_engine_device_sensor(struct array *this_array, char team_type, unsigned int host_number, char *engine_name, char *device_name, char *sensor_name)
+{
+    if (this_array != NULL)
+    {
+        size_t i;
+        for (i = 0; i < this_array->number_of_teams; i++)
+        {
+            if (team_get_type(this_array->team_list[i]) == team_type)
+            {
+                return team_add_engine_device_sensor(this_array->team_list[i], host_number, engine_name, device_name, sensor_name);
+            }
+        }
+    }
+    return -1;
+}

@@ -52,6 +52,15 @@ int array_add_team_host_device_sensor(struct array *this_array, char team_type, 
               return team_add_device_sensor(this_array->team_list[i], host_number, device_name, sensor_name);
           }
        }
+       /*if we've gotten to this point, the team doesn't exist yet.*/
+       struct team **temp = realloc(this_array->team_list, sizeof(*(this_array->team_list))*(this_array->number_of_teams + 1));
+       if (temp != NULL)
+       {
+           this_array->team_list = temp;
+           this_array->team_list[this_array->number_of_teams] = team_create(team_type, this_array->number_of_antennas);
+           this_array->number_of_teams++;
+           return team_add_device_sensor(this_array->team_list[i], host_number, device_name, sensor_name);
+       }
     }
     return -1;
 }
@@ -68,6 +77,15 @@ int array_add_team_host_engine_device_sensor(struct array *this_array, char team
             {
                 return team_add_engine_device_sensor(this_array->team_list[i], host_number, engine_name, device_name, sensor_name);
             }
+        }
+        /*if we've gotten to this point, the team doesn't exist yet.*/
+        struct team **temp = realloc(this_array->team_list, sizeof(*(this_array->team_list))*(this_array->number_of_teams + 1));
+        if (temp != NULL)
+        {
+            this_array->team_list = temp;
+            this_array->team_list[this_array->number_of_teams] = team_create(team_type, this_array->number_of_antennas);
+            this_array->number_of_teams++;
+            return team_add_device_sensor(this_array->team_list[i], host_number, device_name, sensor_name);
         }
     }
     return -1;

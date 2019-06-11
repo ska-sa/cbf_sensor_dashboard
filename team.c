@@ -7,12 +7,12 @@
 
 struct team {
     char host_type;
-    unsigned int number_of_antennas;
+    size_t number_of_antennas;
     struct host **host_list;
 };
 
 
-struct team *team_create(char type, unsigned int number_of_antennas)
+struct team *team_create(char type, size_t number_of_antennas)
 {
     struct team *new_team = malloc(sizeof(*new_team));
     if (new_team != NULL)

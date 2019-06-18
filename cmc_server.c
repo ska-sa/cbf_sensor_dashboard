@@ -6,15 +6,8 @@
 #include <string.h>
 #include <stdint.h>
 
+#include "cmc_server.h"
 #include "utils.h"
-
-struct cmc_server {
-    uint16_t katcp_port;
-    char *address;
-    int katcp_socket_fd;
-    struct katcl_line *katcl_line;
-};
-
 
 struct cmc_server *cmc_server_create(char *address, uint16_t katcp_port)
 {
@@ -25,6 +18,7 @@ struct cmc_server *cmc_server_create(char *address, uint16_t katcp_port)
     new_cmc_server->katcl_line = create_katcl(new_cmc_server->katcp_socket_fd);
     return new_cmc_server;
 }
+
 
 void cmc_server_destroy(struct cmc_server *this_cmc_server)
 {

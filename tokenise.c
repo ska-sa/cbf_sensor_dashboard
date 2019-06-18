@@ -30,5 +30,8 @@ size_t tokenise_string(char* input_string, char delim, char ***tokens)
     strcpy((*tokens)[num_tokens], string + previous_delim_location);
     num_tokens++;
 
+    free(string);
+    string = NULL;
+
     return num_tokens;
 }

@@ -25,10 +25,10 @@ size_t tokenise_string(char* input_string, char delim, char ***tokens)
             previous_delim_location = i + 1;
         }
     }
-    (*tokens) = realloc((*tokens), sizeof(*(*tokens))*(num_tokens + 1));
+    /*(*tokens) = realloc((*tokens), sizeof(*(*tokens))*(num_tokens + 1));
     (*tokens)[num_tokens] = malloc(strlen(string + previous_delim_location) + 1);
     strcpy((*tokens)[num_tokens], string + previous_delim_location);
-    num_tokens++;
+    num_tokens++;*/
 
     free(string);
     string = NULL;

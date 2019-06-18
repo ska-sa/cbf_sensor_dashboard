@@ -34,7 +34,8 @@
 static volatile sig_atomic_t stop = 0;
 static void handler(int signo)
 {
-    if (signo == SIGINT || signo == SIGTERM)
+    //if (signo == SIGINT || signo == SIGTERM)
+    if (signo == SIGINT)
     {
         fprintf(stderr, "Exiting cleanly...\n");
         stop = 1;
@@ -60,15 +61,17 @@ int main()
         return -1;
     }
 
+    /*
     r = sigaction(SIGTERM, &act, 0);
     if (r)
     {
         perror("sigaction (sigterm)");
         return -1;
     }
+    */
 
     sigemptyset(&mask);
-    sigaddset(&mask, SIGTERM);
+    //sigaddset(&mask, SIGTERM);
     sigaddset(&mask, SIGINT);
 
     r = sigprocmask(SIG_BLOCK, &mask, &orig_mask);
@@ -140,7 +143,7 @@ int main()
 
     while (!stop)
     {
-        printf("new select() loop\n");
+        //printf("new select() loop\n");
         int nfds = 0;
         fd_set rd, wr;
 
@@ -150,6 +153,10 @@ int main()
         for (i = 0; i < num_cmcs; i++)
         {
             FD_SET(cmc_list[i]->katcp_socket_fd, &rd);
+            if (flushing_katcl(cmc_list[i]->katcl_line))
+            {
+                FD_SET(cmc_list[i]->katcp_socket_fd, &wr);
+            }
             nfds = max(nfds, cmc_list[i]->katcp_socket_fd);
         }
 
@@ -167,14 +174,25 @@ int main()
                 r = read_katcl(cmc_list[i]->katcl_line);
                 if (r)
                 {
-                    fprintf(stderr, "read from CMC%d failed\n", i);
+                    fprintf(stderr, "read from CMC%lu failed\n", i + 1);
                     perror("read_katcl()");
+                    /*TODO some kind of error checking, what to do if the CMC doesn't connect.*/
+                }
+            }
+
+            if (FD_ISSET(cmc_list[i]->katcp_socket_fd, &wr))
+            {
+                r = write_katcl(cmc_list[i]->katcl_line);
+                if (r < 0)
+                {
+                    perror("write_katcl");
+                    /*TODO some other kind of error checking.*/
                 }
             }
 
             while (have_katcl(cmc_list[i]->katcl_line) > 0)
             {
-                printf("From CMC%d: %s %s %s %s %s\n", i, \
+                printf("From CMC%lu: %s %s %s %s %s\n", i + 1, \
                         arg_string_katcl(cmc_list[i]->katcl_line, 0), \
                         arg_string_katcl(cmc_list[i]->katcl_line, 1), \
                         arg_string_katcl(cmc_list[i]->katcl_line, 2), \

@@ -15,6 +15,7 @@ struct queue *queue_create()
     if (new_queue != NULL)
     {
         new_queue->queue_length = 0;
+        new_queue->string_queue= NULL; /*otherwise the kraken comes...*/
     }
     return new_queue;
 }

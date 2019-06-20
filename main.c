@@ -8,6 +8,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <argp.h>
 #include <stdint.h>
 #include <sys/types.h>
 #include <sys/time.h>
@@ -24,6 +25,66 @@
 
 #include "cmc_server.h"
 #include "tokenise.h"
+#include "verbose.h"
+
+
+const char *argp_program_version =
+  "cbf-sensor-dashboard 0.2";
+const char *argp_program_bug_address =
+  "<jsmith@ska.ac.za>";
+/* TODO Program documentation. */
+static char doc[] =
+  "CBF Sensor Dashboard server";
+static char args_doc[] = "LISTEN_PORT";
+
+static struct argp_option options[] = {
+  {"verbose",  'v', "VERBOSITY_LEVEL",      0,  "Produce verbose output" },
+  { 0 }
+};
+
+struct arguments
+{
+  char *args[1];                /* only listen_port at the moment */
+  int verbose;
+};
+
+
+static error_t
+parse_opt (int key, char *arg, struct argp_state *state)
+{
+  /* Get the input argument from argp_parse, which we
+     know is a pointer to our arguments structure. */
+  struct arguments *arguments = state->input;
+
+  switch (key)
+    {
+    case 'v':
+      arguments->verbose = atoi(arg);
+      break;
+
+    case ARGP_KEY_ARG:
+      if (state->arg_num >= 1)
+        /* Too many arguments. */
+        argp_usage (state);
+
+      arguments->args[state->arg_num] = arg;
+
+      break;
+
+    case ARGP_KEY_END:
+      if (state->arg_num < 1)
+        /* Not enough arguments. */
+        argp_usage (state);
+      break;
+
+    default:
+      return ARGP_ERR_UNKNOWN;
+    }
+  return 0;
+}
+
+/* Our argp parser. */
+static struct argp argp = { options, parse_opt, args_doc, doc };
 
 #define BUF_SIZE 1024
 
@@ -43,7 +104,7 @@ static void handler(int signo)
 }
 
 
-int main()
+int main(int argc, char **argv)
 {
     int r;
     size_t i;
@@ -61,17 +122,15 @@ int main()
         return -1;
     }
 
-    /*
     r = sigaction(SIGTERM, &act, 0);
     if (r)
     {
         perror("sigaction (sigterm)");
         return -1;
     }
-    */
 
     sigemptyset(&mask);
-    //sigaddset(&mask, SIGTERM);
+    sigaddset(&mask, SIGTERM);
     sigaddset(&mask, SIGINT);
 
     r = sigprocmask(SIG_BLOCK, &mask, &orig_mask);
@@ -80,6 +139,11 @@ int main()
         perror("sigprocmask");
         return -1;
     }
+
+    struct arguments arguments;
+    arguments.verbose = 0; //default
+    argp_parse (&argp, argc, argv, 0, 0, &arguments);
+    set_verbosity(arguments.verbose);    
 
     /********   SECTION    ***********
      * read list of cmcs from the config file, populate array of structs, connect to them and retrieve array list
@@ -153,6 +217,10 @@ int main()
         for (i = 0; i < num_cmcs; i++)
         {
             FD_SET(cmc_list[i]->katcp_socket_fd, &rd);
+            if (cmc_server_queue_sizeof(cmc_list[i]))
+            {
+
+            }
             if (flushing_katcl(cmc_list[i]->katcl_line))
             {
                 FD_SET(cmc_list[i]->katcp_socket_fd, &wr);
@@ -161,43 +229,41 @@ int main()
         }
 
         r = pselect(nfds + 1, &rd, &wr, NULL, NULL, &orig_mask);
-        if (r < 0 && errno != EINTR)
+        if (r > 0)
         {
-            perror("select");
-            return -1;
-        }
 
-        for (i = 0; i < num_cmcs; i++)
-        {
-            if (FD_ISSET(cmc_list[i]->katcp_socket_fd, &rd))
+            for (i = 0; i < num_cmcs; i++)
             {
-                r = read_katcl(cmc_list[i]->katcl_line);
-                if (r)
+                if (FD_ISSET(cmc_list[i]->katcp_socket_fd, &rd))
                 {
-                    fprintf(stderr, "read from CMC%lu failed\n", i + 1);
-                    perror("read_katcl()");
-                    /*TODO some kind of error checking, what to do if the CMC doesn't connect.*/
+                    r = read_katcl(cmc_list[i]->katcl_line);
+                    if (r)
+                    {
+                        fprintf(stderr, "read from CMC%lu failed\n", i + 1);
+                        perror("read_katcl()");
+                        /*TODO some kind of error checking, what to do if the CMC doesn't connect.*/
+                    }
                 }
-            }
 
-            if (FD_ISSET(cmc_list[i]->katcp_socket_fd, &wr))
-            {
-                r = write_katcl(cmc_list[i]->katcl_line);
-                if (r < 0)
+                if (FD_ISSET(cmc_list[i]->katcp_socket_fd, &wr))
                 {
-                    perror("write_katcl");
-                    /*TODO some other kind of error checking.*/
+                    r = write_katcl(cmc_list[i]->katcl_line);
+                    if (r < 0)
+                    {
+                        perror("write_katcl");
+                        /*TODO some other kind of error checking.*/
+                    }
                 }
-            }
 
-            while (have_katcl(cmc_list[i]->katcl_line) > 0)
-            {
-                printf("From CMC%lu: %s %s %s %s %s\n", i + 1, \
-                        arg_string_katcl(cmc_list[i]->katcl_line, 0), \
-                        arg_string_katcl(cmc_list[i]->katcl_line, 1), \
-                        arg_string_katcl(cmc_list[i]->katcl_line, 2), \
-                        arg_string_katcl(cmc_list[i]->katcl_line, 3), \
-                        arg_string_katcl(cmc_list[i]->katcl_line, 4)); 
+                while (have_katcl(cmc_list[i]->katcl_line) > 0)
+                {
+                    printf("From CMC%lu: %s %s %s %s %s\n", i + 1, \
+                            arg_string_katcl(cmc_list[i]->katcl_line, 0), \
+                            arg_string_katcl(cmc_list[i]->katcl_line, 1), \
+                            arg_string_katcl(cmc_list[i]->katcl_line, 2), \
+                            arg_string_katcl(cmc_list[i]->katcl_line, 3), \
+                            arg_string_katcl(cmc_list[i]->katcl_line, 4)); 
+                }
             }
         }
     }

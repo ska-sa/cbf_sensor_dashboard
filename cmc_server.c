@@ -32,7 +32,7 @@ void cmc_server_destroy(struct cmc_server *this_cmc_server)
     {
         destroy_katcl(this_cmc_server->katcl_line, 1);
         close(this_cmc_server->katcp_socket_fd);
-        queue_destroy(this_cmc_server->outgoing_message_queue);
+        queue_destroy(this_cmc_server->outgoing_msg_queue);
         if (this_cmc_server->current_message != NULL)
         {
             free(this_cmc_server->current_message);

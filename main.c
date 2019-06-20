@@ -257,7 +257,7 @@ int main(int argc, char **argv)
 
                 while (have_katcl(cmc_list[i]->katcl_line) > 0)
                 {
-                    printf("From CMC%lu: %s %s %s %s %s\n", i + 1, \
+                    verbose_message(3, "From CMC%lu: %s %s %s %s %s\n", i + 1, \
                             arg_string_katcl(cmc_list[i]->katcl_line, 0), \
                             arg_string_katcl(cmc_list[i]->katcl_line, 1), \
                             arg_string_katcl(cmc_list[i]->katcl_line, 2), \

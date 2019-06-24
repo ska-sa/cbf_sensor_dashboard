@@ -24,6 +24,7 @@
 #include <netc.h>
 
 #include "cmc_server.h"
+#include "message.h"
 #include "tokenise.h"
 #include "verbose.h"
 
@@ -200,6 +201,7 @@ int main(int argc, char **argv)
         }
         free(tokens);
     }
+    fclose(cmc_config);
 
     /********   SECTION    ***********
      * select() loop
@@ -217,9 +219,43 @@ int main(int argc, char **argv)
         for (i = 0; i < num_cmcs; i++)
         {
             FD_SET(cmc_list[i]->katcp_socket_fd, &rd);
-            if (cmc_server_queue_sizeof(cmc_list[i]))
+            if (queue_sizeof(cmc_list[i]->outgoing_msg_queue))
             {
-
+                if (cmc_list[i]->state == CMC_SEND_FRONT_OF_QUEUE)
+                {
+                    struct message *current_message = cmc_server_queue_pop(cmc_list[i]);
+                    int n = message_get_number_of_words(current_message);
+                    if (n > 0)
+                    {
+                        char *first_word = malloc(strlen(message_see_word(current_message, 0)) + 2);
+                        sprintf(first_word, "%c%s", message_get_type(current_message), message_see_word(current_message, 0));
+                        if (message_get_number_of_words(current_message) == 1)
+                            append_string_katcl(cmc_list[i]->katcl_line, KATCP_FLAG_FIRST | KATCP_FLAG_LAST, first_word);
+                        else
+                        {
+                            append_string_katcl(cmc_list[i]->katcl_line, KATCP_FLAG_FIRST, first_word);
+                            size_t j;
+                            for (j = 1; j < n - 1; j++)
+                            {
+                                append_string_katcl(cmc_list[i]->katcl_line, 0, message_see_word(current_message, j));
+                            }
+                            append_string_katcl(cmc_list[i]->katcl_line, KATCP_FLAG_LAST, message_see_word(current_message, (size_t) n - 1));
+                        }
+                        char *composed_message = message_compose(current_message);
+                        verbose_message(DEBUG, "Sent KATCP message to CMC%u: %s\n", i, composed_message);
+                        free(composed_message);
+                        composed_message = NULL;
+                        free(first_word);
+                        first_word = NULL;
+                    }
+                    else
+                    {
+                        verbose_message(WARNING, "Message on CMC%u's queue had 0 words in it.\n", i);
+                    }
+                    cmc_list[i]->state = CMC_WAIT_RESPONSE;
+                    //free(current_message);
+                    current_message = NULL; // so that it doesn't point to the same thing anymore.
+                }
             }
             if (flushing_katcl(cmc_list[i]->katcl_line))
             {
@@ -257,7 +293,7 @@ int main(int argc, char **argv)
 
                 while (have_katcl(cmc_list[i]->katcl_line) > 0)
                 {
-                    verbose_message(3, "From CMC%lu: %s %s %s %s %s\n", i + 1, \
+                    verbose_message(DEBUG, "From CMC%lu: %s %s %s %s %s\n", i + 1, \
                             arg_string_katcl(cmc_list[i]->katcl_line, 0), \
                             arg_string_katcl(cmc_list[i]->katcl_line, 1), \
                             arg_string_katcl(cmc_list[i]->katcl_line, 2), \

@@ -1,10 +1,13 @@
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
+#include "message.h"
 #include "queue.h"
+#include "verbose.h"
 
 struct queue {
-    char **string_queue;
+    struct message **message_queue;
     size_t queue_length;
 };
 
@@ -15,7 +18,7 @@ struct queue *queue_create()
     if (new_queue != NULL)
     {
         new_queue->queue_length = 0;
-        new_queue->string_queue= NULL; /*otherwise the kraken comes...*/
+        new_queue->message_queue = NULL; /*otherwise the kraken comes...*/
     }
     return new_queue;
 }
@@ -28,43 +31,74 @@ void queue_destroy(struct queue *this_queue)
         size_t i;
         for (i = 0; i < this_queue->queue_length; i++)
         {
-            free(this_queue->string_queue[i]);
+            message_destroy(this_queue->message_queue[i]);
         }
         free(this_queue);
     }
 }
 
 
-int queue_push(struct queue *this_queue, char *new_string)
+int queue_push(struct queue *this_queue, struct message *new_message)
 {
     if (this_queue == NULL)
+    {
+        char *composed_message = message_compose(new_message);
+        verbose_message(ERROR, "Attempted to push %s onto a NULL queue.\n", composed_message);
+        free(composed_message);
         return -1;
-    if (new_string == NULL)
+    }
+    if (new_message == NULL)
+    {
+        verbose_message(ERROR, "Attempted to push NULL message onto a queue.\n");
         return -2;
-    char **temp = realloc(this_queue->string_queue, sizeof(*(this_queue->string_queue))*(this_queue->queue_length + 1));
+    }
+    struct message **temp = realloc(this_queue->message_queue, sizeof(*(this_queue->message_queue))*(this_queue->queue_length + 1));
     if (temp != NULL)
     {
-        temp[this_queue->queue_length] = strdup(new_string);
-        if (temp[this_queue->queue_length] == NULL)
-            return -3;
-        this_queue->string_queue = temp;
+        temp[this_queue->queue_length] = new_message;
+        this_queue->message_queue = temp;
         this_queue->queue_length++;
         return 0;
     }
     else
+    {
+        perror("realloc");
+        verbose_message(ERROR, "Couldn't reallocate message queue.\n");
         return -3;
+    }
 }
 
 
-char *queue_pop(struct queue *this_queue)
+struct message *queue_pop(struct queue *this_queue)
 {
-    if (this_queue == NULL || this_queue->queue_length == 0)
+    if (this_queue == NULL)
+    {
+        verbose_message(ERROR, "Attempted to pop NULL queue.\n");
         return NULL;
-    char *front_string = strdup(this_queue->string_queue[0]);
-    memmove(&this_queue->string_queue[0], &this_queue->string_queue[1], sizeof(*(this_queue->string_queue))*(this_queue->queue_length - 1));
-    this_queue->string_queue = realloc(this_queue->string_queue, sizeof(*(this_queue->string_queue))*(this_queue->queue_length - 1));
-    this_queue->queue_length--;
-    return front_string;
+    }
+    if (this_queue->queue_length == 0)
+    {
+        verbose_message(ERROR, "Attempted to pop zero-length queue.\n");
+        return NULL;
+    }
+
+    struct message *front_message = message_create(message_get_type(this_queue->message_queue[0]));
+    size_t i;
+    for (i = 0; i < message_get_number_of_words(this_queue->message_queue[0]); i++)
+    {
+        message_add_word(front_message, message_see_word(this_queue->message_queue[0], i));
+    }
+    message_destroy(this_queue->message_queue[0]);
+    memmove(&this_queue->message_queue[0],
+            &this_queue->message_queue[1],
+            sizeof(*(this_queue->message_queue))*(this_queue->queue_length - 1));
+    struct message **temp = realloc(this_queue->message_queue, sizeof(*(this_queue->message_queue))*(this_queue->queue_length - 1));
+    if (temp != NULL)
+    {
+        this_queue->message_queue = temp;
+        this_queue->queue_length--;
+    }
+    return front_message;
 }
 
 

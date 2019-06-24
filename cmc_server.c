@@ -8,7 +8,9 @@
 
 #include "cmc_server.h"
 #include "queue.h"
+#include "message.h"
 #include "utils.h"
+
 
 struct cmc_server *cmc_server_create(char *address, uint16_t katcp_port)
 {
@@ -18,10 +20,25 @@ struct cmc_server *cmc_server_create(char *address, uint16_t katcp_port)
     new_cmc_server->katcp_socket_fd = net_connect(address, katcp_port, NETC_VERBOSE_ERRORS | NETC_VERBOSE_STATS);
     new_cmc_server->katcl_line = create_katcl(new_cmc_server->katcp_socket_fd);
     new_cmc_server->outgoing_msg_queue = queue_create();
-    queue_push(new_cmc_server->outgoing_msg_queue, "?log-local off");
-    queue_push(new_cmc_server->outgoing_msg_queue, "?client-config info-all");
-    queue_push(new_cmc_server->outgoing_msg_queue, "?array-list");
+
+    /*This bit is hardcoded for the time being. Perhaps a better way would be to include it in a config
+     * file like the sensors to which we'll be subscribing. */
+    struct message *new_message = message_create('?');
+    message_add_word(new_message, "log-local");
+    message_add_word(new_message, "off");
+    queue_push(new_cmc_server->outgoing_msg_queue, new_message);
+
+    new_message = message_create('?');
+    message_add_word(new_message, "client-config");
+    message_add_word(new_message, "info-all");
+    queue_push(new_cmc_server->outgoing_msg_queue, new_message);
+
+    new_message = message_create('?');
+    message_add_word(new_message, "array-list");
+    queue_push(new_cmc_server->outgoing_msg_queue, new_message);
+
     new_cmc_server->current_message = NULL;
+    new_cmc_server->state = CMC_SEND_FRONT_OF_QUEUE;
     return new_cmc_server;
 }
 
@@ -33,30 +50,19 @@ void cmc_server_destroy(struct cmc_server *this_cmc_server)
         destroy_katcl(this_cmc_server->katcl_line, 1);
         close(this_cmc_server->katcp_socket_fd);
         queue_destroy(this_cmc_server->outgoing_msg_queue);
-        if (this_cmc_server->current_message != NULL)
-        {
-            free(this_cmc_server->current_message);
-        }
+        message_destroy(this_cmc_server->current_message);
         free(this_cmc_server->address);
         free(this_cmc_server);
     }
 }
 
 
-size_t cmc_server_queue_sizeof(struct cmc_server *this_cmc_server)
-{
-    return queue_sizeof(this_cmc_server->outgoing_msg_queue);
-}
-
-
-char *cmc_server_queue_pop(struct cmc_server *this_cmc_server)
+struct message *cmc_server_queue_pop(struct cmc_server *this_cmc_server)
 {
     if (this_cmc_server->current_message != NULL)
     {
-        free(this_cmc_server->current_message);
-        this_cmc_server->current_message = NULL;
+        message_destroy(this_cmc_server->current_message);
     }
     this_cmc_server->current_message = queue_pop(this_cmc_server->outgoing_msg_queue);
     return this_cmc_server->current_message;
 }
-

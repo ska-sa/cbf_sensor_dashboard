@@ -33,7 +33,10 @@ void queue_destroy(struct queue *this_queue)
         {
             message_destroy(this_queue->message_queue[i]);
         }
+        free(this_queue->message_queue);
+        this_queue->message_queue = NULL;
         free(this_queue);
+        this_queue = NULL;
     }
 }
 

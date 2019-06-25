@@ -101,6 +101,18 @@ struct message *queue_pop(struct queue *this_queue)
         this_queue->message_queue = temp;
         this_queue->queue_length--;
     }
+    else
+    {
+        if (this_queue->queue_length == 1)
+        {
+            verbose_message(INFO, "Queue length for queue 0x%08x now zero.\n", this_queue);
+            this_queue->queue_length = 0;
+        }
+        else
+        {
+            verbose_message(ERROR, "Unable to realloc() memory for newly-shortened queue!\n");
+        }
+    }
     return front_message;
 }
 

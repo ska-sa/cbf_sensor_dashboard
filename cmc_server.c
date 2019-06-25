@@ -38,6 +38,7 @@ struct cmc_server *cmc_server_create(char *address, uint16_t katcp_port)
     queue_push(new_cmc_server->outgoing_msg_queue, new_message);
 
     new_cmc_server->current_message = NULL;
+    cmc_server_queue_pop(new_cmc_server);
     new_cmc_server->state = CMC_SEND_FRONT_OF_QUEUE;
     return new_cmc_server;
 }

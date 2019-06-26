@@ -1,5 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.t>
+#include <netc.h>
 
 #include "array.h"
 #include "team.h"
@@ -9,16 +11,21 @@ struct array {
    struct team **team_list;
    size_t number_of_teams;
    size_t number_of_antennas;
+   uint16_t monitor_port;
+   char *cmc_address;
+   int monitor_fd;
 };
 
 
-struct array *array_create(char *new_array_name, size_t number_of_antennas)
+struct array *array_create(char *new_array_name, char *cmc_address, uint16_t monitor_port, size_t number_of_antennas)
 {
    struct array *new_array = malloc(sizeof(*new_array));
    if (new_array != NULL)
    {
         new_array->name = strdup(new_array_name);
         new_array->number_of_antennas = number_of_antennas;
+        new_array->cmc_address = strdup(cmc_address);
+        new_array->monitor_port = monitor_port;
         new_array->team_list = NULL; /*Make it explicit, will fill this later from a config file.*/
    }
    return new_array;
@@ -29,6 +36,8 @@ void array_destroy(struct array *this_array)
 {
     if (this_array != NULL)
     {
+        free(this_array->cmc_address);
+        free(this_array->name);
         size_t i;
         for (i = 0; i < this_array->number_of_teams; i++)
         {

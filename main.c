@@ -335,6 +335,9 @@ int main(int argc, char **argv)
                             break;
                         case '#': // it's a katcp inform
                             /*TODO handle the array-list stuff. code should be easy enough to copy from previous attempt.*/
+                            if (!strcmp(arg_string_katcl(cmc_list[i]->katcl_line, 0) + 1, "array-list"))
+                            {
+                            }
                             break;
                         default:
                             verbose_message(WARNING, "Unexpected KATCP message received, starting with %c\n", received_message_type);

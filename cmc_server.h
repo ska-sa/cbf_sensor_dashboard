@@ -5,6 +5,7 @@
 
 #include "message.h"
 #include "queue.h"
+#include "array.h"
 
 enum cmc_state {
     CMC_SEND_FRONT_OF_QUEUE,

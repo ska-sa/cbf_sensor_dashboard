@@ -1,6 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
-#include <stdint.t>
+#include <stdint.h>
 #include <netc.h>
 
 #include "array.h"

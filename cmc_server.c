@@ -11,6 +11,8 @@
 #include "message.h"
 #include "utils.h"
 
+#undef max
+#define max(x,y) ((x) > (y) ? (x) : (y))
 
 struct cmc_server *cmc_server_create(char *address, uint16_t katcp_port)
 {
@@ -66,4 +68,15 @@ struct message *cmc_server_queue_pop(struct cmc_server *this_cmc_server)
     }
     this_cmc_server->current_message = queue_pop(this_cmc_server->outgoing_msg_queue);
     return this_cmc_server->current_message;
+}
+
+
+void cmc_server_set_fds(struct cmc_server *this_cmc_server, fd_set *rd, fd_set *wr, int *nfds)
+{
+    FD_SET(this_cmc_server->katcp_socket_fd, rd);
+    if (flushing_katcl(this_cmc_server->katcl_line))
+    {
+        FD_SET(this_cmc_server->katcp_socket_fd, wr);
+    }
+    *nfds = max(*nfds, this_cmc_server->katcp_socket_fd);
 }

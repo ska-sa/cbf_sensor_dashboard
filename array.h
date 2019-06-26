@@ -3,7 +3,7 @@
 
 struct array;
 
-struct array *array_create(char *new_array_name, size_t number_of_antennas);
+struct array *array_create(char *new_array_name, char *cmc_address, uint16_t monitor_port, size_t number_of_antennas);
 void array_destroy(struct array *this_array);
 
 int array_add_team_host_device_sensor(struct array *this_array, char team_type, unsigned int host_number, char *device_name, char *sensor_name);

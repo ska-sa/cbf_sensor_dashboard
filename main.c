@@ -218,7 +218,7 @@ int main(int argc, char **argv)
 
         for (i = 0; i < num_cmcs; i++)
         {
-            FD_SET(cmc_list[i]->katcp_socket_fd, &rd);
+            cmc_server_set_fds(cmc_list[i], &rd, &wr, &nfds);
             if (cmc_list[i]->current_message)
             {
                 if (cmc_list[i]->state == CMC_SEND_FRONT_OF_QUEUE)
@@ -254,15 +254,8 @@ int main(int argc, char **argv)
                         verbose_message(WARNING, "Message on CMC%u's queue had 0 words in it.\n", i+1);
                     }
                     cmc_list[i]->state = CMC_WAIT_RESPONSE;
-                    //free(current_message);
-                    //current_message = NULL; // so that it doesn't point to the same thing anymore.
                 }
             }
-            if (flushing_katcl(cmc_list[i]->katcl_line))
-            {
-                FD_SET(cmc_list[i]->katcp_socket_fd, &wr);
-            }
-            nfds = max(nfds, cmc_list[i]->katcp_socket_fd);
         }
 
         r = pselect(nfds + 1, &rd, &wr, NULL, NULL, &orig_mask);

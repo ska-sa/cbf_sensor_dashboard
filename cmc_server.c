@@ -1,10 +1,13 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include <unistd.h>
 #include <katcp.h>
 #include <katcl.h>
 #include <netc.h>
 #include <string.h>
 #include <stdint.h>
+
+#include "verbose.h"
 
 #include "cmc_server.h"
 #include "queue.h"
@@ -79,4 +82,45 @@ void cmc_server_set_fds(struct cmc_server *this_cmc_server, fd_set *rd, fd_set *
         FD_SET(this_cmc_server->katcp_socket_fd, wr);
     }
     *nfds = max(*nfds, this_cmc_server->katcp_socket_fd);
+}
+
+
+void cmc_server_setup_katcp_writes(struct cmc_server *this_cmc_server)
+{
+    if (this_cmc_server->current_message)
+    {
+        if (this_cmc_server->state == CMC_SEND_FRONT_OF_QUEUE)
+        {
+            int n = message_get_number_of_words(this_cmc_server->current_message);
+            if (n > 0)
+            {
+                char *composed_message = message_compose(this_cmc_server->current_message);
+                verbose_message(DEBUG, "Sending KATCP message \"%s\" to %s:%hu\n", composed_message, this_cmc_server->address, this_cmc_server->katcp_port);
+                free(composed_message);
+                composed_message = NULL;
+
+                char *first_word = malloc(strlen(message_see_word(this_cmc_server->current_message, 0)) + 2);
+                sprintf(first_word, "%c%s", message_get_type(this_cmc_server->current_message), message_see_word(this_cmc_server->current_message, 0));
+                if (message_get_number_of_words(this_cmc_server->current_message) == 1)
+                    append_string_katcl(this_cmc_server->katcl_line, KATCP_FLAG_FIRST | KATCP_FLAG_LAST, first_word);
+                else
+                {
+                    append_string_katcl(this_cmc_server->katcl_line, KATCP_FLAG_FIRST, first_word);
+                    size_t j;
+                    for (j = 1; j < n - 1; j++)
+                    {
+                        append_string_katcl(this_cmc_server->katcl_line, 0, message_see_word(this_cmc_server->current_message, j));
+                    }
+                    append_string_katcl(this_cmc_server->katcl_line, KATCP_FLAG_LAST, message_see_word(this_cmc_server->current_message, (size_t) n - 1));
+                }
+                free(first_word);
+                first_word = NULL;
+            }
+            else
+            {
+                verbose_message(WARNING, "Message on %s:%hu's queue had 0 words in it.\n", this_cmc_server->address, this_cmc_server->katcp_port);
+            }
+            this_cmc_server->state = CMC_WAIT_RESPONSE;
+        }
+    }
 }

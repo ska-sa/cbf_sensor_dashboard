@@ -219,43 +219,7 @@ int main(int argc, char **argv)
         for (i = 0; i < num_cmcs; i++)
         {
             cmc_server_set_fds(cmc_list[i], &rd, &wr, &nfds);
-            if (cmc_list[i]->current_message)
-            {
-                if (cmc_list[i]->state == CMC_SEND_FRONT_OF_QUEUE)
-                {
-                    int n = message_get_number_of_words(cmc_list[i]->current_message);
-                    if (n > 0)
-                    {
-                        char *composed_message = message_compose(cmc_list[i]->current_message);
-                        verbose_message(DEBUG, "Sending KATCP message to CMC%u: %s\n", i+1, composed_message);
-                        free(composed_message);
-                        composed_message = NULL;
-
-                        char *first_word = malloc(strlen(message_see_word(cmc_list[i]->current_message, 0)) + 2);
-                        sprintf(first_word, "%c%s", message_get_type(cmc_list[i]->current_message), message_see_word(cmc_list[i]->current_message, 0));
-                        if (message_get_number_of_words(cmc_list[i]->current_message) == 1)
-                            append_string_katcl(cmc_list[i]->katcl_line, KATCP_FLAG_FIRST | KATCP_FLAG_LAST, first_word);
-                        else
-                        {
-                            append_string_katcl(cmc_list[i]->katcl_line, KATCP_FLAG_FIRST, first_word);
-                            size_t j;
-                            for (j = 1; j < n - 1; j++)
-                            {
-                                append_string_katcl(cmc_list[i]->katcl_line, 0, message_see_word(cmc_list[i]->current_message, j));
-                            }
-                            append_string_katcl(cmc_list[i]->katcl_line, KATCP_FLAG_LAST, message_see_word(cmc_list[i]->current_message, (size_t) n - 1));
-                        }
-                        verbose_message(DEBUG, "Message sent to CMC%u\n", i+1);
-                        free(first_word);
-                        first_word = NULL;
-                    }
-                    else
-                    {
-                        verbose_message(WARNING, "Message on CMC%u's queue had 0 words in it.\n", i+1);
-                    }
-                    cmc_list[i]->state = CMC_WAIT_RESPONSE;
-                }
-            }
+            cmc_server_setup_katcp_writes(cmc_list[i]);
         }
 
         r = pselect(nfds + 1, &rd, &wr, NULL, NULL, &orig_mask);

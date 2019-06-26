@@ -228,58 +228,8 @@ int main(int argc, char **argv)
 
             for (i = 0; i < num_cmcs; i++)
             {
-                
                 cmc_server_socket_read_write(cmc_list[i], &rd, &wr);
-
-                while (have_katcl(cmc_list[i]->katcl_line) > 0)
-                {
-                    verbose_message(DEBUG, "From CMC%lu: %s %s %s %s %s\n", i + 1, \
-                            arg_string_katcl(cmc_list[i]->katcl_line, 0), \
-                            arg_string_katcl(cmc_list[i]->katcl_line, 1), \
-                            arg_string_katcl(cmc_list[i]->katcl_line, 2), \
-                            arg_string_katcl(cmc_list[i]->katcl_line, 3), \
-                            arg_string_katcl(cmc_list[i]->katcl_line, 4)); 
-                    char received_message_type = arg_string_katcl(cmc_list[i]->katcl_line, 0)[0];
-                    switch (received_message_type) {
-                        case '!': // it's a katcp response
-                            if (!strcmp(arg_string_katcl(cmc_list[i]->katcl_line, 0) + 1, message_see_word(cmc_list[i]->current_message, 0)))
-                            {
-                                if (!strcmp(arg_string_katcl(cmc_list[i]->katcl_line, 1), "ok"))
-                                {
-                                    verbose_message(DEBUG, "CMC%u received %s ok!\n", i+1, message_see_word(cmc_list[i]->current_message, 0));
-                                    cmc_list[i]->state = CMC_SEND_FRONT_OF_QUEUE;
-                                    verbose_message(DEBUG, "CMC%u still has %u message(s) in its queue...\n", i+1, queue_sizeof(cmc_list[i]->outgoing_msg_queue));
-                                    if (queue_sizeof(cmc_list[i]->outgoing_msg_queue))
-                                    {
-                                        verbose_message(DEBUG, "CMC%u popping queue...\n", i+1);
-                                        cmc_server_queue_pop(cmc_list[i]);
-                                    }
-                                    else
-                                    {
-                                        verbose_message(DEBUG, "CMC%u going into monitoring state.\n", i+1);
-                                        message_destroy(cmc_list[i]->current_message);
-                                        cmc_list[i]->current_message = NULL; //doesn't do this in the above function. C problem.
-                                        cmc_list[i]->state = CMC_MONITOR;
-                                    }
-                                }
-                                else 
-                                {
-                                    verbose_message(WARNING, "Received %s %s. Retrying the request...", message_see_word(cmc_list[i]->current_message, 0), arg_string_katcl(cmc_list[i]->katcl_line, 1));
-                                    cmc_list[i]->state = CMC_SEND_FRONT_OF_QUEUE;
-                                }
-
-                            }
-                            break;
-                        case '#': // it's a katcp inform
-                            /*TODO handle the array-list stuff. code should be easy enough to copy from previous attempt.*/
-                            if (!strcmp(arg_string_katcl(cmc_list[i]->katcl_line, 0) + 1, "array-list"))
-                            {
-                            }
-                            break;
-                        default:
-                            verbose_message(WARNING, "Unexpected KATCP message received, starting with %c\n", received_message_type);
-                    }
-                }
+                cmc_server_handle_received_katcl_lines(cmc_list[i]);
             }
         }
     }
@@ -298,4 +248,3 @@ int main(int argc, char **argv)
 
     return 0;
 }
-

@@ -13,9 +13,30 @@
 #include "queue.h"
 #include "message.h"
 #include "utils.h"
+#include "array.h"
 
 #undef max
 #define max(x,y) ((x) > (y) ? (x) : (y))
+
+enum cmc_state {
+    CMC_SEND_FRONT_OF_QUEUE,
+    CMC_WAIT_RESPONSE,
+    CMC_MONITOR,
+};
+
+
+struct cmc_server {
+    uint16_t katcp_port;
+    char *address;
+    int katcp_socket_fd;
+    struct katcl_line *katcl_line;
+    enum cmc_state state;
+    struct queue *outgoing_msg_queue;
+    struct message *current_message;
+    struct array **array_list;
+    size_t no_of_arrays;
+};
+
 
 struct cmc_server *cmc_server_create(char *address, uint16_t katcp_port)
 {
@@ -25,6 +46,9 @@ struct cmc_server *cmc_server_create(char *address, uint16_t katcp_port)
     new_cmc_server->katcp_socket_fd = net_connect(address, katcp_port, NETC_VERBOSE_ERRORS | NETC_VERBOSE_STATS);
     new_cmc_server->katcl_line = create_katcl(new_cmc_server->katcp_socket_fd);
     new_cmc_server->outgoing_msg_queue = queue_create();
+
+    new_cmc_server->array_list = NULL;
+    new_cmc_server->no_of_arrays = 0;
 
     /*This bit is hardcoded for the time being. Perhaps a better way would be to include it in a config
      * file like the sensors to which we'll be subscribing. */
@@ -149,6 +173,105 @@ void cmc_server_socket_read_write(struct cmc_server *this_cmc_server, fd_set *rd
         {
             perror("write_katcl");
             /*TODO some other kind of error checking.*/
+        }
+    }
+}
+
+
+static int cmc_server_add_array(struct cmc_server *this_cmc_server, char *array_name, uint16_t monitor_port, size_t number_of_antennas)
+{
+    /* TODO Check if the array name already exists.*/
+
+    /* If not, allocate space for it on the end. */
+    struct array **temp = realloc(this_cmc_server->array_list, sizeof(*(this_cmc_server->array_list))*(this_cmc_server->no_of_arrays + 1));
+    if (temp == NULL)
+    {
+        return -1;
+    }
+    return 0;
+}
+
+
+void cmc_server_handle_received_katcl_lines(struct cmc_server *this_cmc_server)
+{
+    while (have_katcl(this_cmc_server->katcl_line) > 0)
+    {
+        verbose_message(BORING, "From %s:%hu: %s %s %s %s %s\n", this_cmc_server->address, this_cmc_server->katcp_port, \
+                arg_string_katcl(this_cmc_server->katcl_line, 0), \
+                arg_string_katcl(this_cmc_server->katcl_line, 1), \
+                arg_string_katcl(this_cmc_server->katcl_line, 2), \
+                arg_string_katcl(this_cmc_server->katcl_line, 3), \
+                arg_string_katcl(this_cmc_server->katcl_line, 4)); 
+        char received_message_type = arg_string_katcl(this_cmc_server->katcl_line, 0)[0];
+        switch (received_message_type) {
+            case '!': // it's a katcp response
+                if (!strcmp(arg_string_katcl(this_cmc_server->katcl_line, 0) + 1, message_see_word(this_cmc_server->current_message, 0)))
+                {
+                    if (!strcmp(arg_string_katcl(this_cmc_server->katcl_line, 1), "ok"))
+                    {
+                        verbose_message(INFO, "%s:%hu received %s ok!\n", this_cmc_server->address, this_cmc_server->katcp_port, message_see_word(this_cmc_server->current_message, 0));
+                        this_cmc_server->state = CMC_SEND_FRONT_OF_QUEUE;
+                        verbose_message(DEBUG, "%s:%hu still has %u message(s) in its queue...\n", this_cmc_server->address, this_cmc_server->katcp_port, queue_sizeof(this_cmc_server->outgoing_msg_queue));
+                        if (queue_sizeof(this_cmc_server->outgoing_msg_queue))
+                        {
+                            verbose_message(BORING, "%s:%hu  popping queue...\n", this_cmc_server->address, this_cmc_server->katcp_port);
+                            cmc_server_queue_pop(this_cmc_server);
+                        }
+                        else
+                        {
+                            verbose_message(INFO, "%s:%hu going into monitoring state.\n", this_cmc_server->address, this_cmc_server->katcp_port);
+                            message_destroy(this_cmc_server->current_message);
+                            this_cmc_server->current_message = NULL; //doesn't do this in the above function. C problem.
+                            this_cmc_server->state = CMC_MONITOR;
+                        }
+                    }
+                    else 
+                    {
+                        verbose_message(WARNING, "Received %s %s. Retrying the request...", message_see_word(this_cmc_server->current_message, 0), arg_string_katcl(this_cmc_server->katcl_line, 1));
+                        this_cmc_server->state = CMC_SEND_FRONT_OF_QUEUE;
+                    }
+
+                }
+                break;
+            case '#': // it's a katcp inform
+                /*TODO handle the array-list stuff. code should be easy enough to copy from previous attempt.*/
+                if (!strcmp(arg_string_katcl(this_cmc_server->katcl_line, 0) + 1, "array-list"))
+                {
+                    char* array_name = arg_string_katcl(this_cmc_server->katcl_line, 1);
+                    strtok(arg_string_katcl(this_cmc_server->katcl_line, 2), ","); /* don't need the first bit, that's the control port */
+                    uint16_t monitor_port = (uint16_t) atoi(strtok(NULL, ","));
+                    /* will leave this here while I can't think of anything to do with the multicast groups.
+                    int j = 3;
+                    char *multicast_groups = malloc(1);
+                    multicast_groups[0] = '\0';
+                    char *buffer;
+                    do {
+                        buffer = arg_string_katcl(this_cmc_server->katcl_line, j);
+                        if (buffer)
+                        {
+                            multicast_groups = realloc(multicast_groups, strlen(multicast_groups) + strlen(buffer) + 2);
+                            strcat(multicast_groups, " ");
+                            strcat(multicast_groups, buffer);
+                        }
+                        j++;
+                    } while (buffer);
+                    free(multicast_groups);
+                    multicast_groups = NULL; */
+
+                    //count the number of multicast groups, number of antennas is this /2.
+                    size_t j = 3;
+                    char * buffer;
+                    do {
+                        buffer = arg_string_katcl(this_cmc_server->katcl_line, (uint32_t) j);
+                        j++;
+                    } while (buffer);
+                    size_t number_of_antennas = j - 4; //to take into account the ++ which will have followed the null buffer
+
+                    cmc_server_add_array(this_cmc_server, array_name, monitor_port, number_of_antennas);
+                }
+                break;
+            default:
+                verbose_message(WARNING, "Unexpected KATCP message received, starting with %c\n", received_message_type);
         }
     }
 }

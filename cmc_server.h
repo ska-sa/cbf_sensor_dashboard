@@ -29,6 +29,7 @@ void cmc_server_destroy(struct cmc_server *this_cmc_server);
 
 void cmc_server_set_fds(struct cmc_server *this_cmc_server, fd_set *rd, fd_set *wr, int *nfds);
 void cmc_server_setup_katcp_writes(struct cmc_server *this_cmc_server);
+void cmc_server_socket_read_write(struct cmc_server *this_cmc_server, fd_set *rd, fd_set *wr);
 
 struct message *cmc_server_queue_pop(struct cmc_server *this_cmc_server);
 

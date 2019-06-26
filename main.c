@@ -228,28 +228,8 @@ int main(int argc, char **argv)
 
             for (i = 0; i < num_cmcs; i++)
             {
-                if (FD_ISSET(cmc_list[i]->katcp_socket_fd, &rd))
-                {
-                    verbose_message(BORING, "Reading katcl_line from CMC%u.\n", i+1);
-                    r = read_katcl(cmc_list[i]->katcl_line);
-                    if (r)
-                    {
-                        fprintf(stderr, "read from CMC%lu failed\n", i + 1);
-                        perror("read_katcl()");
-                        /*TODO some kind of error checking, what to do if the CMC doesn't connect.*/
-                    }
-                }
-
-                if (FD_ISSET(cmc_list[i]->katcp_socket_fd, &wr))
-                {
-                    verbose_message(BORING, "Writing katcl_line to CMC%u.\n", i+1);
-                    r = write_katcl(cmc_list[i]->katcl_line);
-                    if (r < 0)
-                    {
-                        perror("write_katcl");
-                        /*TODO some other kind of error checking.*/
-                    }
-                }
+                
+                cmc_server_socket_read_write(cmc_list[i], &rd, &wr);
 
                 while (have_katcl(cmc_list[i]->katcl_line) > 0)
                 {

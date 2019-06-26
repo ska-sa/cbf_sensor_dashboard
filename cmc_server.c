@@ -124,3 +124,31 @@ void cmc_server_setup_katcp_writes(struct cmc_server *this_cmc_server)
         }
     }
 }
+
+
+void cmc_server_socket_read_write(struct cmc_server *this_cmc_server, fd_set *rd, fd_set *wr)
+{
+    int r;
+    if (FD_ISSET(this_cmc_server->katcp_socket_fd, rd))
+    {
+        verbose_message(BORING, "Reading katcl_line from %s:%hu.\n", this_cmc_server->address, this_cmc_server->katcp_port);
+        r = read_katcl(this_cmc_server->katcl_line);
+        if (r)
+        {
+            fprintf(stderr, "read from %s:%hu failed\n", this_cmc_server->address, this_cmc_server->katcp_port);
+            perror("read_katcl()");
+            /*TODO some kind of error checking, what to do if the CMC doesn't connect.*/
+        }
+    }
+
+    if (FD_ISSET(this_cmc_server->katcp_socket_fd, wr))
+    {
+        verbose_message(BORING, "Writing katcl_line to %s:%hu.\n", this_cmc_server->address, this_cmc_server->katcp_port);
+        r = write_katcl(this_cmc_server->katcl_line);
+        if (r < 0)
+        {
+            perror("write_katcl");
+            /*TODO some other kind of error checking.*/
+        }
+    }
+}

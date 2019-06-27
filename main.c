@@ -27,8 +27,19 @@
 #include "message.h"
 #include "tokenise.h"
 #include "verbose.h"
+#include "utils.h"
+#include "web.h"
+
+#define BUF_SIZE 1024
+
+/* This is handy for keeping track of the number of file descriptors. */
+#undef max
+#define max(x,y) ((x) > (y) ? (x) : (y))
 
 
+/********   SECTION    ***********
+ * set up command line options and arguments
+ *********************************/
 const char *argp_program_version =
   "cbf-sensor-dashboard 0.2";
 const char *argp_program_bug_address =
@@ -49,9 +60,7 @@ struct arguments
   int verbose;
 };
 
-
-static error_t
-parse_opt (int key, char *arg, struct argp_state *state)
+static error_t parse_opt (int key, char *arg, struct argp_state *state)
 {
   /* Get the input argument from argp_parse, which we
      know is a pointer to our arguments structure. */
@@ -87,11 +96,10 @@ parse_opt (int key, char *arg, struct argp_state *state)
 /* Our argp parser. */
 static struct argp argp = { options, parse_opt, args_doc, doc };
 
-#define BUF_SIZE 1024
 
-/* This is handy for keeping track of the number of file descriptors. */
-#undef max
-#define max(x,y) ((x) > (y) ? (x) : (y))
+/********   SECTION    ***********
+ * Signal handler to handle sane exiting of the program.
+ *********************************/
 
 static volatile sig_atomic_t stop = 0;
 static void handler(int signo)
@@ -99,11 +107,15 @@ static void handler(int signo)
     //if (signo == SIGINT || signo == SIGTERM)
     if (signo == SIGINT)
     {
-        fprintf(stderr, "Exiting cleanly...\n");
+        verbose_message(INFO, "Exiting cleanly...\n");
         stop = 1;
     }
 }
 
+
+/********   SECTION    ***********
+ * main()
+ *********************************/
 
 int main(int argc, char **argv)
 {
@@ -147,7 +159,7 @@ int main(int argc, char **argv)
     set_verbosity(arguments.verbose);    
 
     /********   SECTION    ***********
-     * read list of cmcs from the config file, populate array of structs, connect to them and retrieve array list
+     * read list of cmcs from the config file, populate array of structs
      *********************************/
 
     FILE *cmc_config = fopen("cmc_list.conf", "r");
@@ -204,6 +216,18 @@ int main(int argc, char **argv)
     fclose(cmc_config);
 
     /********   SECTION    ***********
+     * setup listening on websocket
+     *********************************/
+
+    uint16_t listening_port = (uint16_t) atoi(arguments.args[0]);
+    int server_fd = listen_on_socket(listening_port);
+    if (server_fd == -1)
+    {
+        verbose_message(ERROR, "Unable to create socket on port %u!\n", listening_port);
+        return -1;
+    }
+
+    /********   SECTION    ***********
      * select() loop
      *********************************/
 
@@ -216,6 +240,9 @@ int main(int argc, char **argv)
         FD_ZERO(&rd);
         FD_ZERO(&wr);
 
+        FD_SET(server_fd, &rd);
+        nfds = max(nfds, server_fd);
+
         for (i = 0; i < num_cmcs; i++)
         {
             cmc_server_set_fds(cmc_list[i], &rd, &wr, &nfds);
@@ -223,8 +250,21 @@ int main(int argc, char **argv)
         }
 
         r = pselect(nfds + 1, &rd, &wr, NULL, NULL, &orig_mask);
-        if (r > 0)
+        if (r > 0) //==0 means timeout, <0 means error. TODO Could possibly be interrupt, which can just be ignored.
         {
+            if (FD_ISSET(server_fd, &rd))
+            {
+                unsigned int len;
+                struct sockaddr_in client_address;
+                memset(&client_address, 0, len = sizeof(client_address));
+                r = accept(server_fd, (struct sockaddr *) &client_address, &len);
+                if (r == -1)
+                {
+                    perror("accept()");
+                }
+                verbose_message(INFO, "FD %d connection from %s:%u\n", r, inet_ntoa(client_address.sin_addr), client_address.sin_port);
+                close(r);
+            }
 
             for (i = 0; i < num_cmcs; i++)
             {
@@ -234,7 +274,7 @@ int main(int argc, char **argv)
         }
     }
 
-    printf("exited the loop.\n");
+    verbose_message(INFO, "exited the loop.\n");
     /********   SECTION    ***********
      * cleanup
      *********************************/
@@ -244,7 +284,7 @@ int main(int argc, char **argv)
     }
     free(cmc_list);
     cmc_list = NULL;
-    printf("cleanup complete.\n");
+    verbose_message(INFO, "cleanup complete.\n");
 
     return 0;
 }

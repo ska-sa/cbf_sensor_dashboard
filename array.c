@@ -49,6 +49,12 @@ void array_destroy(struct array *this_array)
 }
 
 
+char *array_get_name(struct array *this_array)
+{
+    return this_array->name;
+}
+
+
 int array_add_team_host_device_sensor(struct array *this_array, char team_type, unsigned int host_number, char *device_name, char *sensor_name)
 {
     if (this_array != NULL)

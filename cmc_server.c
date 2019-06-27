@@ -181,13 +181,32 @@ void cmc_server_socket_read_write(struct cmc_server *this_cmc_server, fd_set *rd
 static int cmc_server_add_array(struct cmc_server *this_cmc_server, char *array_name, uint16_t monitor_port, size_t number_of_antennas)
 {
     /* TODO Check if the array name already exists.*/
+    size_t i;
+    for (i = 0; i < this_cmc_server->no_of_arrays; i++)
+    {
+        if (!strcmp(array_name, array_get_name(this_cmc_server->array_list[i])))
+        {
+            verbose_message(WARNING, "Attempting to add array \"%s\" to %s:%hu while an array of this name already exists.\n", array_name, this_cmc_server->address, this_cmc_server->katcp_port);
+            return (int) i;
+        }
+    }
 
     /* If not, allocate space for it on the end. */
     struct array **temp = realloc(this_cmc_server->array_list, sizeof(*(this_cmc_server->array_list))*(this_cmc_server->no_of_arrays + 1));
     if (temp == NULL)
     {
+        verbose_message(ERROR, "Unable to realloc memory to add array \"%s\" to %s:%hu.\n", array_name, this_cmc_server->address, this_cmc_server->katcp_port);
         return -1;
     }
+    this_cmc_server->array_list = temp;
+    this_cmc_server->array_list[this_cmc_server->no_of_arrays] = array_create(array_name, this_cmc_server->address, monitor_port, number_of_antennas);
+    if (this_cmc_server->array_list[this_cmc_server->no_of_arrays] == NULL)
+    {
+        verbose_message(ERROR, "Unable to create array \"%s\" on %s:%hu.\n", array_name, this_cmc_server->address, this_cmc_server->katcp_port);
+        return -1;
+    }
+    verbose_message(INFO, "Added array \"%s\" to %s:%hu.\n", array_name, this_cmc_server->address, this_cmc_server->katcp_port);
+    this_cmc_server->no_of_arrays++;
     return 0;
 }
 

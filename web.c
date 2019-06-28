@@ -7,9 +7,10 @@
 #include <arpa/inet.h>
 
 #include "web.h"
+#include "verbose.h"
 
 #define BUF_SIZE 1024
-
+#define max(x,y) ((x) > (y) ? (x) : (y))
 
 struct web_client {
     char *buffer;
@@ -33,6 +34,18 @@ struct web_client *web_client_create(int fd)
 
 void web_client_destroy(struct web_client *client)
 {
+    int r;
+    r = shutdown(client->fd, SHUT_RDWR);
+    if (r < 0)
+    {
+        perror("shutdown");
+    }
+    r = close(client->fd);
+    if (r < 0)
+    {
+        perror("close"); // for completeness, one really should be more rigorous about this...
+    }
+
     free(client->buffer);
     free(client);
 }
@@ -96,7 +109,7 @@ int web_client_buffer_write(struct web_client *client)
 }
 
 
-int web_client_have_buffer(struct web_client *client)
+static int web_client_have_buffer(struct web_client *client)
 {
     if (client->bytes_available > client->bytes_written)
         return 1;
@@ -105,4 +118,46 @@ int web_client_have_buffer(struct web_client *client)
 }
 
 
+void web_client_set_fds(struct web_client *client, fd_set *rd, fd_set *wr, int *nfds)
+{
+    FD_SET(client->fd, rd);
+    if (web_client_have_buffer(client))
+    {
+        FD_SET(client->fd, wr);
+    }
+    *nfds = max(*nfds, client->fd);
+}
 
+
+int web_client_socket_read(struct web_client *client, fd_set *rd)
+{
+    ssize_t r = 0;
+    char buffer[BUF_SIZE];
+
+    if (FD_ISSET(client->fd, rd))
+    {
+        r = read(client->fd, buffer, BUF_SIZE - 1);
+        if (r < 0)
+        {
+            //client disconnected, should actually be destroyed.
+            return -1;
+        }
+        if (r > 0)
+        {
+            buffer[r] = '\0'; //just for good safety.
+            verbose_message(BORING, "Received '%s' on fd %d.\n", buffer, client->fd);
+        }
+    }
+    return r;
+}
+
+int web_client_socket_write(struct web_client *client, fd_set *wr)
+{
+    int r = 0;
+
+    if (FD_ISSET(client->fd, wr))
+    {
+       //TODO 
+    }
+    return 0;
+}

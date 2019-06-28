@@ -228,6 +228,13 @@ int main(int argc, char **argv)
     }
 
     /********   SECTION    ***********
+     * setup web client management
+     *********************************/
+
+    struct web_client **client_list = NULL;
+    size_t num_web_clients = 0;
+
+    /********   SECTION    ***********
      * select() loop
      *********************************/
 
@@ -249,9 +256,22 @@ int main(int argc, char **argv)
             cmc_server_setup_katcp_writes(cmc_list[i]);
         }
 
+        for (i = 0; i < num_web_clients; i++)
+        {
+            web_client_set_fds(client_list[i], &rd, &wr, &nfds);
+        }
+
         r = pselect(nfds + 1, &rd, &wr, NULL, NULL, &orig_mask);
         if (r > 0) //==0 means timeout, <0 means error. TODO Could possibly be interrupt, which can just be ignored.
         {
+            //handle reads and writes from the CMC servers, to let them update anything that they need to.
+            for (i = 0; i < num_cmcs; i++)
+            {
+                cmc_server_socket_read_write(cmc_list[i], &rd, &wr);
+                cmc_server_handle_received_katcl_lines(cmc_list[i]);
+            }
+            
+            //Check with the web server to see if a new client wants to connect.
             if (FD_ISSET(server_fd, &rd))
             {
                 unsigned int len;
@@ -262,14 +282,55 @@ int main(int argc, char **argv)
                 {
                     perror("accept()");
                 }
-                verbose_message(INFO, "FD %d connection from %s:%u\n", r, inet_ntoa(client_address.sin_addr), client_address.sin_port);
-                close(r);
+                else
+                {
+                    verbose_message(INFO, "Connection from %s:%u (FD %d)\n", inet_ntoa(client_address.sin_addr), client_address.sin_port, r);
+                    struct web_client **temp = realloc(client_list, sizeof(*client_list)*(num_web_clients + 1));
+                    if (temp)
+                    {
+                        client_list = temp;
+                        client_list[num_web_clients] = web_client_create(r);
+                        num_web_clients++;
+                    }
+                    else
+                    {
+                        shutdown(r, SHUT_RDWR);
+                        close(r);
+                        perror("realloc");
+                        verbose_message(ERROR, "Unable to allocate memory for another web client.\n");
+                    }
+                }
             }
 
-            for (i = 0; i < num_cmcs; i++)
+            for (i = 0; i < num_web_clients; i++)
             {
-                cmc_server_socket_read_write(cmc_list[i], &rd, &wr);
-                cmc_server_handle_received_katcl_lines(cmc_list[i]);
+                r = web_client_socket_read(client_list[i], &rd);
+                if (r < 0)
+                {
+                    web_client_destroy(client_list[i]);
+                    if (num_web_clients == 1)
+                    {
+                        free(client_list);
+                        client_list = NULL;
+                        num_web_clients = 0;
+                    }
+                    else
+                    {
+                        memmove(&client_list[i], &client_list[i+1], sizeof(*client_list)*(num_web_clients - i - 1));
+                        struct web_client **temp = realloc(client_list, sizeof(*client_list)*(num_web_clients - 1));
+                        if (temp)
+                        {
+                            client_list = temp;
+                            num_web_clients--;
+                            i--;
+                        }
+                    }
+                }
+
+                r = web_client_socket_write(client_list[i], &wr);
+                if (r < 0)
+                {
+                }
             }
         }
     }

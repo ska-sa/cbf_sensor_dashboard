@@ -327,11 +327,18 @@ int main(int argc, char **argv)
                     }
                 }
 
-                r = web_client_socket_write(client_list[i], &wr);
+           }
+
+           //Doing this a second time because number may have changed. Prevents segfaults.
+           for (i = 0; i < num_web_clients; i++)
+           {
+               r = web_client_socket_write(client_list[i], &wr);
+
                 if (r < 0)
                 {
                 }
-            }
+           }
+ 
         }
     }
 

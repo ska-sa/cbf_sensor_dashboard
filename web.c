@@ -137,23 +137,15 @@ int web_client_socket_read(struct web_client *client, fd_set *rd)
     if (FD_ISSET(client->fd, rd))
     {
         r = read(client->fd, buffer, BUF_SIZE - 1);
-        if (r < 0)
-        {
-            //client disconnected, should actually be destroyed.
-            return -1;
-        }
-        if (r > 0)
-        {
-            buffer[r] = '\0'; //just for good safety.
-            verbose_message(BORING, "Received '%s' on fd %d.\n", buffer, client->fd);
-        }
+        buffer[r] = '\0'; //just for good safety.
+        verbose_message(BORING, "Received '%s' on fd %d.\n", buffer, client->fd);
     }
-    return r;
+    return (int) r;
 }
 
 int web_client_socket_write(struct web_client *client, fd_set *wr)
 {
-    int r = 0;
+    //int r = 0;
 
     if (FD_ISSET(client->fd, wr))
     {

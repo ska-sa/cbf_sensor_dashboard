@@ -260,8 +260,9 @@ int main(int argc, char **argv)
         {
             web_client_set_fds(client_list[i], &rd, &wr, &nfds);
         }
-
+        
         r = pselect(nfds + 1, &rd, &wr, NULL, NULL, &orig_mask);
+
         if (r > 0) //==0 means timeout, <0 means error. TODO Could possibly be interrupt, which can just be ignored.
         {
             //handle reads and writes from the CMC servers, to let them update anything that they need to.
@@ -305,6 +306,7 @@ int main(int argc, char **argv)
             for (i = 0; i < num_web_clients; i++)
             {
                 r = web_client_socket_read(client_list[i], &rd);
+                
                 if (r < 0)
                 {
                     web_client_destroy(client_list[i]);

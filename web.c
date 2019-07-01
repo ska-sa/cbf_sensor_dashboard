@@ -22,6 +22,8 @@ struct web_client {
 
 struct web_client *web_client_create(int fd)
 {
+    verbose_message(BORING, "Creating web client with FD %d\n", fd);
+
     struct web_client *new_client = malloc(sizeof(*new_client));
     new_client->buffer = malloc(1);
     new_client->buffer[0] = '\0';
@@ -34,6 +36,8 @@ struct web_client *web_client_create(int fd)
 
 void web_client_destroy(struct web_client *client)
 {
+    verbose_message(BORING, "Destroyong web client with FD %d\n", client->fd);
+
     int r;
     r = shutdown(client->fd, SHUT_RDWR);
     if (r < 0)
@@ -136,12 +140,26 @@ int web_client_socket_read(struct web_client *client, fd_set *rd)
 
     if (FD_ISSET(client->fd, rd))
     {
+        //verbose_message(BORING, "FD %d indicated it has something for us to read.\n", client->fd);
         r = read(client->fd, buffer, BUF_SIZE - 1);
+        if (r<0)
+        {
+            perror("read");
+            return -1;
+        }
+        if (r==0)
+        {
+            verbose_message(BORING, "FD %d read zero bytes, closing.\n", client->fd);
+            return -1;//this just means that r has nothing left to say. No error.
+        }
+
         buffer[r] = '\0'; //just for good safety.
-        verbose_message(BORING, "Received '%s' on fd %d.\n", buffer, client->fd);
+        verbose_message(BORING, "Received %ld bytes: '%s' on fd %d.\n", r, buffer, client->fd);
+        return 1;
     }
-    return (int) r;
+    return 0; //not marked for read.
 }
+
 
 int web_client_socket_write(struct web_client *client, fd_set *wr)
 {
@@ -151,5 +169,5 @@ int web_client_socket_write(struct web_client *client, fd_set *wr)
     {
        //TODO 
     }
-    return 0;
+    return 0; //no read
 }

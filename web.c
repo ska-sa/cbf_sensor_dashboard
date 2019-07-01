@@ -73,7 +73,7 @@ int web_client_buffer_add(struct web_client *client, char *html_text)
 }
 
 
-int web_client_buffer_write(struct web_client *client)
+static int web_client_buffer_write(struct web_client *client)
 {
     ssize_t r;
     size_t bytes_ready = client->bytes_available - client->bytes_written;
@@ -88,6 +88,7 @@ int web_client_buffer_write(struct web_client *client)
         char *http_ok_message = malloc((size_t) needed); // int guaranteed non-negative so can safely cast.
         sprintf(http_ok_message, format, client->bytes_available);
         r = write(client->fd, http_ok_message, strlen(http_ok_message));
+        bytes_to_write -= r; //just to be consistent.
         free(http_ok_message);
     }
 
@@ -155,6 +156,7 @@ int web_client_socket_read(struct web_client *client, fd_set *rd)
 
         buffer[r] = '\0'; //just for good safety.
         verbose_message(BORING, "Received %ld bytes: '%s' on fd %d.\n", r, buffer, client->fd);
+        //TODO take some decision on what to do with the information read.
         return 1;
     }
     return 0; //not marked for read.
@@ -163,11 +165,11 @@ int web_client_socket_read(struct web_client *client, fd_set *rd)
 
 int web_client_socket_write(struct web_client *client, fd_set *wr)
 {
-    //int r = 0;
+    int r = 0;
 
     if (FD_ISSET(client->fd, wr))
     {
-       //TODO 
+        r = web_client_buffer_write(client);
     }
-    return 0; //no read
+    return r; //no read
 }

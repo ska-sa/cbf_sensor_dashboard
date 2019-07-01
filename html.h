@@ -3,7 +3,7 @@
 
 struct webpage_client;
 
-int send_html_header(struct webpage_client *client);
+int html_send_header(struct webpage_client *client);
 int send_html_body_open(struct webpage_client *client);
 int send_html_body_close(struct webpage_client *client);
 

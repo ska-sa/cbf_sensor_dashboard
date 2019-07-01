@@ -2,12 +2,12 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "array_handling.h"
-#include "http_handling.h"
+#include "web.h"
+#include "http.h"
 
 #define BUF_SIZE 1024
 
-int send_html_header(struct webpage_client *client)
+int html_send_header(struct web_client *client)
 {
     FILE *html_header_file;
     html_header_file = fopen("head.html", "r");
@@ -45,7 +45,7 @@ int send_html_header(struct webpage_client *client)
     return 0;
 }
 
-int send_html_body_open(struct webpage_client *client)
+int send_html_body_open(struct web_client *client)
 {
     int r;
     char html_body_open[] = "<body onload=\"JavaScript:timedRefresh(5000);\">\n";
@@ -54,7 +54,7 @@ int send_html_body_open(struct webpage_client *client)
     return r;
 }
 
-int send_html_body_close(struct webpage_client *client)
+int send_html_body_close(struct web_client *client)
 {
     int r;
     char html_body_close[] = "</body>\n</html>\n";
@@ -62,7 +62,7 @@ int send_html_body_close(struct webpage_client *client)
     return r;
 }
 
-int send_html_section_start(struct webpage_client *client)
+int send_html_section_start(struct web_client *client)
 {
     int r;
     char html_section_start[] = "<section>\n";
@@ -71,7 +71,7 @@ int send_html_section_start(struct webpage_client *client)
 }
 
 
-int send_html_section_end(struct webpage_client *client)
+int send_html_section_end(struct web_client *client)
 {
     int r;
     char html_section_end[] = "</section>\n";
@@ -79,7 +79,7 @@ int send_html_section_end(struct webpage_client *client)
     return r;
 }
 
-int send_html_paragraph(struct webpage_client *client, char *line)
+int send_html_paragraph(struct web_client *client, char *line)
 {
     int r;
     char *paragraph;
@@ -92,7 +92,7 @@ int send_html_paragraph(struct webpage_client *client, char *line)
     return r;
 }
 
-int send_html_table_start(struct webpage_client *client)
+int send_html_table_start(struct web_client *client)
 {
     int r;
     char html_table_start[] = "<table>\n";
@@ -101,7 +101,7 @@ int send_html_table_start(struct webpage_client *client)
 }
 
 
-int send_html_table_end(struct webpage_client *client)
+int send_html_table_end(struct web_client *client)
 {
     int r;
     char html_table_end[] = "</table>\n";
@@ -109,7 +109,7 @@ int send_html_table_end(struct webpage_client *client)
     return r;
 }
 
-int send_html_table_arraylist_header(struct webpage_client *client)
+int send_html_table_arraylist_header(struct web_client *client)
 {
     int r;
     char html_table_header[] = "<tr>\n<th>Array Name</th><th>Monitor port</th><th>Multicast groups</th>\n</tr>";
@@ -117,7 +117,7 @@ int send_html_table_arraylist_header(struct webpage_client *client)
     return r;
 }
 
-int send_html_table_arraylist_row(struct webpage_client *client, struct cmc_array *array)
+int send_html_table_arraylist_row(struct web_client *client, struct cmc_array *array)
 {
     int r;
     char *html_table_row;
@@ -130,7 +130,7 @@ int send_html_table_arraylist_row(struct webpage_client *client, struct cmc_arra
     return r;
 }
 
-int send_html_table_sensor_row(struct webpage_client *client, struct fhost *fhost, struct xhost *xhost)
+int send_html_table_sensor_row(struct web_client *client, struct fhost *fhost, struct xhost *xhost)
 {
     if (client == NULL || fhost == NULL || xhost == NULL)
     {
@@ -209,7 +209,7 @@ int send_html_table_sensor_row(struct webpage_client *client, struct fhost *fhos
     return r;
 }
 
-int send_quad(struct webpage_client *client)
+int send_quad(struct web_client *client)
 {
     int r;
     char quadrow[] = "<tr><td><iframe src=\"array_0.i0\"></iframe></td><td><iframe src=\"array_1.i0\"></iframe></td></tr>\n<tr><td><iframe src=\"array_2.i0\"></iframe></td><td><iframe src=\"array_3.i0\"></iframe></td></tr>\n";

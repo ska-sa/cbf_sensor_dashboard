@@ -331,16 +331,34 @@ int main(int argc, char **argv)
 
            }
 
-           //Doing this a second time because number may have changed. Prevents segfaults.
+           //Doing this a second time because number may have changed, some of them may have disconnected.
+           //Prevents segfaults.
            for (i = 0; i < num_web_clients; i++)
            {
                r = web_client_socket_write(client_list[i], &wr);
 
                 if (r < 0)
                 {
+                    web_client_destroy(client_list[i]);
+                    if (num_web_clients == 1)
+                    {
+                        free(client_list);
+                        client_list = NULL;
+                        num_web_clients = 0;
+                    }
+                    else
+                    {
+                        memmove(&client_list[i], &client_list[i+1], sizeof(*client_list)*(num_web_clients - i - 1));
+                        struct web_client **temp = realloc(client_list, sizeof(*client_list)*(num_web_clients - 1));
+                        if (temp)
+                        {
+                            client_list = temp;
+                            num_web_clients--;
+                            i--;
+                        }
+                    }
                 }
-           }
- 
+            }
         }
     }
 

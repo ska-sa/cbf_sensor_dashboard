@@ -294,3 +294,18 @@ void cmc_server_handle_received_katcl_lines(struct cmc_server *this_cmc_server)
         }
     }
 }
+
+
+/* CMC server will be represented as an H1 with a table of the arrays beneath it.
+ * for the time being, just its name.
+ */
+char *cmc_server_html_representation(struct cmc_server *this_cmc_server)
+{
+    char *html_rep;
+    char format[] = "<h1>%s</h1>\n";
+    size_t needed = (size_t) snprintf(NULL, 0, format, this_cmc_server->address) + 1;
+    html_rep= malloc(needed);
+    sprintf(html_rep, format, this_cmc_server->address);
+
+    return html_rep;
+}

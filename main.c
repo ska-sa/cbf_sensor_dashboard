@@ -328,7 +328,10 @@ int main(int argc, char **argv)
                         }
                     }
                 }
-
+                else
+                {
+                    //TODO handle requests.
+                }
            }
 
            //Doing this a second time because number may have changed, some of them may have disconnected.

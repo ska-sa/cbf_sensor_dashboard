@@ -17,6 +17,8 @@ struct web_client {
     size_t bytes_available;
     size_t bytes_written;
     int fd;
+    int get_received;
+    char *requested_resource;
 };
 
 
@@ -30,6 +32,10 @@ struct web_client *web_client_create(int fd)
     new_client->bytes_available = 0;
     new_client->bytes_written = 0;
     new_client->fd = fd;
+
+    new_client->get_received = 0;
+    new_client->requested_resource = NULL;
+
     return new_client;
 }
 
@@ -88,7 +94,13 @@ static int web_client_buffer_write(struct web_client *client)
         char *http_ok_message = malloc((size_t) needed); // int guaranteed non-negative so can safely cast.
         sprintf(http_ok_message, format, client->bytes_available);
         r = write(client->fd, http_ok_message, strlen(http_ok_message));
-        bytes_to_write -= r; //just to be consistent.
+        if (r<0)
+        {
+            perror("write()");
+            return -1;
+        }
+        bytes_to_write -= (size_t) r; // so we don't send more than one buffer size this round, to take
+                                      // into account http ok message. cast is fine because we tested <0 previously.
         free(http_ok_message);
     }
 
@@ -155,9 +167,18 @@ int web_client_socket_read(struct web_client *client, fd_set *rd)
         }
 
         buffer[r] = '\0'; //just for good safety.
-        verbose_message(BORING, "Received %ld bytes: '%s' on fd %d.\n", r, buffer, client->fd);
+        //verbose_message(BORING, "Received %ld bytes: '%s' on fd %d.\n", r, buffer, client->fd);
         //TODO take some decision on what to do with the information read.
-        return 1;
+        char first_word[BUF_SIZE];
+        sprintf(first_word, "%s", strtok(buffer, " "));
+        if (!strcmp(first_word, "GET"))
+        {
+            client->get_received = 1;
+            client->requested_resource = strdup(strtok(NULL, " "));
+            verbose_message(BORING, "Client on FD %d requested %s.\n", client->fd, client->requested_resource);
+            return 1;
+        }
+        //We're basically ignoring everything except GET requests. We don't even really care about the other stuff.
     }
     return 0; //not marked for read.
 }

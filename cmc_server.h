@@ -19,4 +19,6 @@ void cmc_server_handle_received_katcl_lines(struct cmc_server *this_cmc_server);
 
 struct message *cmc_server_queue_pop(struct cmc_server *this_cmc_server);
 
+char *cmc_server_html_representation(struct cmc_server *this_cmc_server);
+
 #endif

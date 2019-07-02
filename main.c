@@ -331,6 +331,7 @@ int main(int argc, char **argv)
                 else
                 {
                     //TODO handle requests.
+                    web_client_handle_requests(client_list[i], cmc_list, num_cmcs);
                 }
            }
 

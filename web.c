@@ -66,6 +66,7 @@ int web_client_buffer_add(struct web_client *client, char *html_text)
     /* checks because they seem to be needed */
     if (client->buffer == NULL || html_text == NULL)
         return -1;
+    verbose_message(BORING, "Adding '%s' to buffer of client on FD %d.\n", html_text, client->fd);
     size_t needed = strlen(client->buffer) + strlen(html_text) + 1;
     char *temp = realloc(client->buffer, needed);
     if (temp)
@@ -73,6 +74,7 @@ int web_client_buffer_add(struct web_client *client, char *html_text)
         client->buffer = temp;
         strcat(client->buffer, html_text);
         client->bytes_available += strlen(html_text);
+        verbose_message(BORING, "New buffer: %s\n", client->buffer);
         return 0;
     }
     return -1;
@@ -90,7 +92,10 @@ static int web_client_buffer_write(struct web_client *client)
         char format[] = "HTTP/1.1 200 OK\nContent-Length: %ld\nConnection: close\n\n";
         int needed = snprintf(NULL, 0, format, client->bytes_available) + 1; // snprintf can return a negative value on failure.
         if (needed < 1) //this means there was a problem somehow.
+        {
+            perror("snprintf");
             return -1;
+        }
         char *http_ok_message = malloc((size_t) needed); // int guaranteed non-negative so can safely cast.
         sprintf(http_ok_message, format, client->bytes_available);
         r = write(client->fd, http_ok_message, strlen(http_ok_message));
@@ -106,7 +111,10 @@ static int web_client_buffer_write(struct web_client *client)
 
     r = write(client->fd, client->buffer + client->bytes_written, bytes_to_write);
     if (r < 0)
+    {
+        perror("write()");
         return -1; /* minus one means an error */
+    }
     client->bytes_written += (unsigned long) r; //we previously made certain it's not negative.
     if (client->bytes_written == client->bytes_available)
     {
@@ -190,7 +198,29 @@ int web_client_socket_write(struct web_client *client, fd_set *wr)
 
     if (FD_ISSET(client->fd, wr))
     {
+        verbose_message(BORING, "FD %d marked for write.\n", client->fd);
         r = web_client_buffer_write(client);
     }
     return r; //no read
+}
+
+
+int web_client_handle_requests(struct web_client *client, struct cmc_server **cmc_list, size_t num_cmcs)
+{
+    if (client->get_received == 1)
+    {
+        if (!strcmp(client->requested_resource, "/"))
+        {
+            web_client_buffer_add(client, "Got a request for /.\n");
+        }
+        else
+        {
+            web_client_buffer_add(client, "Got a request for something else.\n");
+        }
+        client->get_received = 0;
+        free(client->requested_resource);
+        client->requested_resource = NULL;
+    }
+    //otherwise ignore
+    return 0;
 }

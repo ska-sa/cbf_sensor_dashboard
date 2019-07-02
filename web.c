@@ -225,7 +225,18 @@ int web_client_handle_requests(struct web_client *client, struct cmc_server **cm
             web_client_buffer_add(client, html_head_close());
 
             web_client_buffer_add(client, html_body_open());
-            web_client_buffer_add(client, "Got a request for /.\n");
+            if (!num_cmcs)
+            {
+                web_client_buffer_add(client, "<p>It appears that no CMCs are online at this time.</p>\n");
+            }
+            else
+            {
+                size_t i;
+                for (i = 0; i < num_cmcs; i++)
+                {
+                    web_client_buffer_add(client, cmc_server_html_representation(cmc_list[i]));
+                }
+            }
             web_client_buffer_add(client, html_body_close());
         }
         else
@@ -236,7 +247,7 @@ int web_client_handle_requests(struct web_client *client, struct cmc_server **cm
             web_client_buffer_add(client, html_head_close());
 
             web_client_buffer_add(client, html_body_open());
-            web_client_buffer_add(client, "Got a request for something else.\n");
+            web_client_buffer_add(client, "Got a request for something else.\n"); //TODO This is what needs to be generated.
             web_client_buffer_add(client, html_body_close());
         }
         

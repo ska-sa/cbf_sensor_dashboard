@@ -33,7 +33,8 @@ void queue_destroy(struct queue *this_queue)
         {
             message_destroy(this_queue->message_queue[i]);
         }
-        free(this_queue->message_queue);
+        if (this_queue->message_queue != NULL)
+            free(this_queue->message_queue);
         this_queue->message_queue = NULL;
         free(this_queue);
         this_queue = NULL;
@@ -85,6 +86,7 @@ struct message *queue_pop(struct queue *this_queue)
         return NULL;
     }
 
+    //copy first word in queue over.
     struct message *front_message = message_create(message_get_type(this_queue->message_queue[0]));
     size_t i;
     for (i = 0; i < message_get_number_of_words(this_queue->message_queue[0]); i++)
@@ -105,7 +107,8 @@ struct message *queue_pop(struct queue *this_queue)
     {
         if (this_queue->queue_length == 1)
         {
-            verbose_message(INFO, "Queue length for queue 0x%08x now zero.\n", this_queue);
+            verbose_message(BORING, "Queue length for queue 0x%08x now zero.\n", this_queue);
+            this_queue->message_queue = NULL;
             this_queue->queue_length = 0;
         }
         else

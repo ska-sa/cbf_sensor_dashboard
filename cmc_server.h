@@ -3,6 +3,7 @@
 
 #include <sys/select.h>
 #include <katcl.h>
+#include <stdint.h>
 
 #include "message.h"
 #include "array.h"

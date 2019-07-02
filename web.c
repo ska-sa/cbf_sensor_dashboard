@@ -8,6 +8,7 @@
 
 #include "web.h"
 #include "verbose.h"
+#include "html.h"
 
 #define BUF_SIZE 1024
 #define max(x,y) ((x) > (y) ? (x) : (y))
@@ -104,11 +105,14 @@ static int web_client_buffer_write(struct web_client *client)
             perror("write()");
             return -1;
         }
-        bytes_to_write -= (size_t) r; // so we don't send more than one buffer size this round, to take
-                                      // into account http ok message. cast is fine because we tested <0 previously.
+        if ((ssize_t) bytes_to_write + r > BUF_SIZE)
+            bytes_to_write -= (size_t) r; // so we don't send more than one buffer size this round, to take
+                                          // into account http ok message. cast is fine because we tested <0 previously.
         free(http_ok_message);
     }
 
+    verbose_message(DEBUG, "About to write, fd=%d, buffer=0x%lx, byes_written=%d, bytes_to_write=%d\n", \
+            client->fd, client->buffer, client->bytes_written, bytes_to_write);
     r = write(client->fd, client->buffer + client->bytes_written, bytes_to_write);
     if (r < 0)
     {
@@ -209,14 +213,35 @@ int web_client_handle_requests(struct web_client *client, struct cmc_server **cm
 {
     if (client->get_received == 1)
     {
+        web_client_buffer_add(client, html_doctype());
+        web_client_buffer_add(client, html_open());
+        web_client_buffer_add(client, html_head_open());
+
         if (!strcmp(client->requested_resource, "/"))
         {
+            char *title = html_title("CBF Sensor Dashboard");
+            web_client_buffer_add(client, title);
+            free(title);
+            web_client_buffer_add(client, html_head_close());
+
+            web_client_buffer_add(client, html_body_open());
             web_client_buffer_add(client, "Got a request for /.\n");
+            web_client_buffer_add(client, html_body_close());
         }
         else
         {
+            char *title = html_title("CBF Sensor Dashboard, other resource requested");
+            web_client_buffer_add(client, title);
+            free(title);
+            web_client_buffer_add(client, html_head_close());
+
+            web_client_buffer_add(client, html_body_open());
             web_client_buffer_add(client, "Got a request for something else.\n");
+            web_client_buffer_add(client, html_body_close());
         }
+        
+        web_client_buffer_add(client, html_close());
+
         client->get_received = 0;
         free(client->requested_resource);
         client->requested_resource = NULL;

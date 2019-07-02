@@ -14,7 +14,7 @@ LDFLAGS =
 RM = rm -f 
 
 #SRC = small_server.c array_handling.c html_handling.c http_handling.c sensor_parsing.c
-SRC = main.c sensor.c device.c engine.c vdevice.c host.c team.c array.c tokenise.c queue.c utils.c cmc_server.c verbose.c message.c web.c
+SRC = main.c sensor.c device.c engine.c vdevice.c host.c team.c array.c tokenise.c queue.c utils.c cmc_server.c verbose.c message.c web.c html.c
 EXE = cbf_sensor_dashboard
 OBJ = $(patsubst %.c,%.o,$(SRC))
 

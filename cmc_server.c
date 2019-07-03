@@ -81,6 +81,12 @@ void cmc_server_destroy(struct cmc_server *this_cmc_server)
         close(this_cmc_server->katcp_socket_fd);
         queue_destroy(this_cmc_server->outgoing_msg_queue);
         message_destroy(this_cmc_server->current_message);
+        size_t i;
+        for (i = 0; i < this_cmc_server->no_of_arrays; i++)
+        {
+            array_destroy(this_cmc_server->array_list[i]);
+        }
+        free(this_cmc_server->array_list);
         free(this_cmc_server->address);
         free(this_cmc_server);
     }
@@ -312,6 +318,7 @@ void cmc_server_handle_received_katcl_lines(struct cmc_server *this_cmc_server)
                             cmc_server_queue_pop(this_cmc_server);
                         this_cmc_server->state = CMC_SEND_FRONT_OF_QUEUE;
                     }
+                    free(new_array_name);
                 }
                 else if (!strcmp(arg_string_katcl(this_cmc_server->katcl_line, 0) + 1, "group-destroyed"))
                 {

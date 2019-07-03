@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
@@ -142,7 +143,8 @@ char *array_html_summary(struct array *this_array)
 {
     char *format = "<tr><td>%s</td><td>%hu</td><td>%lu</td>";
     ssize_t needed = snprintf(NULL, 0, format, this_array->name, this_array->monitor_port, this_array->number_of_antennas) + 1;
-    char *html_summary = malloc(needed);
+    //TODO checks
+    char *html_summary = malloc((size_t) needed);
     sprintf(html_summary, format, this_array->name, this_array->monitor_port, this_array->number_of_antennas);
     return html_summary;
 }

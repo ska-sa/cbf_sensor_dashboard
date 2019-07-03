@@ -119,7 +119,7 @@ void cmc_server_setup_katcp_writes(struct cmc_server *this_cmc_server)
             if (n > 0)
             {
                 char *composed_message = message_compose(this_cmc_server->current_message);
-                verbose_message(DEBUG, "Sending KATCP message \"%s\" to %s:%hu\n", composed_message, this_cmc_server->address, this_cmc_server->katcp_port);
+                verbose_message(BORING, "Sending KATCP message \"%s\" to %s:%hu\n", composed_message, this_cmc_server->address, this_cmc_server->katcp_port);
                 free(composed_message);
                 composed_message = NULL;
 
@@ -142,7 +142,7 @@ void cmc_server_setup_katcp_writes(struct cmc_server *this_cmc_server)
             }
             else
             {
-                verbose_message(WARNING, "Message on %s:%hu's queue had 0 words in it.\n", this_cmc_server->address, this_cmc_server->katcp_port);
+                verbose_message(WARNING, "A message on %s:%hu's queue had 0 words in it. Cannot send.\n", this_cmc_server->address, this_cmc_server->katcp_port);
             }
             this_cmc_server->state = CMC_WAIT_RESPONSE;
         }
@@ -180,13 +180,14 @@ void cmc_server_socket_read_write(struct cmc_server *this_cmc_server, fd_set *rd
 
 static int cmc_server_add_array(struct cmc_server *this_cmc_server, char *array_name, uint16_t monitor_port, size_t number_of_antennas)
 {
-    /* TODO Check if the array name already exists.*/
     size_t i;
     for (i = 0; i < this_cmc_server->no_of_arrays; i++)
     {
         if (!strcmp(array_name, array_get_name(this_cmc_server->array_list[i])))
         {
-            verbose_message(WARNING, "Attempting to add array \"%s\" to %s:%hu while an array of this name already exists.\n", array_name, this_cmc_server->address, this_cmc_server->katcp_port);
+            //Might want to think about comparing the other stuff as well, just in case for some reason the
+            //original array got destroyed and another different one but called the same name snuck in.
+            verbose_message(INFO, "Attempting to add array \"%s\" to %s:%hu while an array of this name already exists.\n", array_name, this_cmc_server->address, this_cmc_server->katcp_port);
             return (int) i;
         }
     }
@@ -228,9 +229,9 @@ void cmc_server_handle_received_katcl_lines(struct cmc_server *this_cmc_server)
                 {
                     if (!strcmp(arg_string_katcl(this_cmc_server->katcl_line, 1), "ok"))
                     {
-                        verbose_message(INFO, "%s:%hu received %s ok!\n", this_cmc_server->address, this_cmc_server->katcp_port, message_see_word(this_cmc_server->current_message, 0));
+                        verbose_message(DEBUG, "%s:%hu received %s ok!\n", this_cmc_server->address, this_cmc_server->katcp_port, message_see_word(this_cmc_server->current_message, 0));
                         this_cmc_server->state = CMC_SEND_FRONT_OF_QUEUE;
-                        verbose_message(DEBUG, "%s:%hu still has %u message(s) in its queue...\n", this_cmc_server->address, this_cmc_server->katcp_port, queue_sizeof(this_cmc_server->outgoing_msg_queue));
+                        verbose_message(BORING, "%s:%hu still has %u message(s) in its queue...\n", this_cmc_server->address, this_cmc_server->katcp_port, queue_sizeof(this_cmc_server->outgoing_msg_queue));
                         if (queue_sizeof(this_cmc_server->outgoing_msg_queue))
                         {
                             verbose_message(BORING, "%s:%hu  popping queue...\n", this_cmc_server->address, this_cmc_server->katcp_port);
@@ -284,9 +285,57 @@ void cmc_server_handle_received_katcl_lines(struct cmc_server *this_cmc_server)
                         buffer = arg_string_katcl(this_cmc_server->katcl_line, (uint32_t) j);
                         j++;
                     } while (buffer);
-                    size_t number_of_antennas = j - 4; //to take into account the ++ which will have followed the null buffer
+                    size_t number_of_antennas = (j - 4)/2; //to take into account the ++ which will have followed the null buffer
 
                     cmc_server_add_array(this_cmc_server, array_name, monitor_port, number_of_antennas);
+                    //TODO check if return is proper.
+                }
+                else if (!strcmp(arg_string_katcl(this_cmc_server->katcl_line, 0) + 1, "group-created"))
+                {
+                    char *temp = arg_string_katcl(this_cmc_server->katcl_line, 1);
+                    char *new_array_name = malloc(strlen(temp)); //This is bigger than it strictly needs to be, but I'm lazy at the moment.
+                    sprintf(new_array_name, "%s", strtok(temp, "."));
+                    temp = strtok(NULL, ".");
+                    if (!strcmp(temp, "monitor")) //i.e. ignore otherwise. Not interested in the "control" group.
+                    {
+                        verbose_message(INFO, "Noticed new array: %s\n", new_array_name);
+                        //The #group-created message doesn't tell us the port that the new array is on,
+                        //or the number of antennas. So we'll request the array-list again. Exisitng arrays
+                        //will not be modified (checks for them by name as in above function) but the new one
+                        //will be added to the end of the list.
+                        struct message *new_message = message_create('?');
+                        message_add_word(new_message, "array-list");
+                        int r = queue_push(this_cmc_server->outgoing_msg_queue, new_message);
+                        if (r<0)
+                            verbose_message(ERROR, "Couldn't push message onto the queue.\n");
+                        this_cmc_server->state = CMC_SEND_FRONT_OF_QUEUE;
+                    }
+                }
+                else if (!strcmp(arg_string_katcl(this_cmc_server->katcl_line, 0) + 1, "group-destroyed"))
+                {
+                    char *name_of_removed_array = strtok(arg_string_katcl(this_cmc_server->katcl_line, 1), ".");
+                    if (!strcmp(strtok(NULL, "."), "monitor")) //again, not concerned about the control one.
+                    {
+                        size_t j;
+                        for (j = 0; j < this_cmc_server->no_of_arrays; j++)
+                        {
+                            if (!strcmp(name_of_removed_array, array_get_name(this_cmc_server->array_list[j])))
+                                break;
+                        }
+                        if (j == this_cmc_server->no_of_arrays)
+                        {
+                            verbose_message(WARNING, "%s:%hu has indicated that array %s is being destroyed, but we weren't aware of it.\n", this_cmc_server->address, this_cmc_server->katcp_port, name_of_removed_array);
+                        }
+                        else
+                        {
+                            verbose_message(INFO, "%s:%hu destroying array %s.\n", this_cmc_server->address, this_cmc_server->katcp_port, name_of_removed_array);
+                            array_destroy(this_cmc_server->array_list[j]);
+                            memmove(&this_cmc_server->array_list[j], &this_cmc_server->array_list[j+1], sizeof(*(this_cmc_server->array_list))*(this_cmc_server->no_of_arrays - j - 1));
+                            this_cmc_server->array_list = realloc(this_cmc_server->array_list, sizeof(*(this_cmc_server->array_list))*(this_cmc_server->no_of_arrays - 1));
+                            //TODO should probably do the sanitary thing here and use a temp variable. Lazy right now.
+                            this_cmc_server->no_of_arrays--;
+                        }
+                    }
                 }
                 break;
             default:

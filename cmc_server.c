@@ -308,6 +308,8 @@ void cmc_server_handle_received_katcl_lines(struct cmc_server *this_cmc_server)
                         int r = queue_push(this_cmc_server->outgoing_msg_queue, new_message);
                         if (r<0)
                             verbose_message(ERROR, "Couldn't push message onto the queue.\n");
+                        if (!this_cmc_server->current_message)
+                            cmc_server_queue_pop(this_cmc_server);
                         this_cmc_server->state = CMC_SEND_FRONT_OF_QUEUE;
                     }
                 }

@@ -27,6 +27,7 @@ struct array *array_create(char *new_array_name, char *cmc_address, uint16_t mon
         new_array->number_of_antennas = number_of_antennas;
         new_array->cmc_address = strdup(cmc_address);
         new_array->monitor_port = monitor_port;
+        new_array->number_of_teams = 0;
         new_array->team_list = NULL; /*Make it explicit, will fill this later from a config file.*/
    }
    return new_array;

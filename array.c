@@ -140,12 +140,12 @@ char *array_get_sensor_status(struct array *this_array, char team_type, size_t h
 }
 
 
-char *array_html_summary(struct array *this_array)
+char *array_html_summary(struct array *this_array, char *cmc_name)
 {
-    char *format = "<tr><td>%s</td><td>%hu</td><td>%lu</td>";
-    ssize_t needed = snprintf(NULL, 0, format, this_array->name, this_array->monitor_port, this_array->number_of_antennas) + 1;
+    char *format = "<tr><td><a href=\"%s/%s\">%s</a></td><td>%hu</td><td>%lu</td>";
+    ssize_t needed = snprintf(NULL, 0, format, cmc_name, this_array->name, this_array->name, this_array->monitor_port, this_array->number_of_antennas) + 1;
     //TODO checks
     char *html_summary = malloc((size_t) needed);
-    sprintf(html_summary, format, this_array->name, this_array->monitor_port, this_array->number_of_antennas);
+    sprintf(html_summary, format, cmc_name, this_array->name, this_array->name, this_array->monitor_port, this_array->number_of_antennas);
     return html_summary;
 }

@@ -382,7 +382,7 @@ char *cmc_server_html_representation(struct cmc_server *this_cmc_server)
     for (i = 0; i < this_cmc_server->no_of_arrays; i++)
     {
         char format[] = "%s%s\n";
-        char *array_html_rep = array_html_summary(this_cmc_server->array_list[i]);
+        char *array_html_rep = array_html_summary(this_cmc_server->array_list[i], this_cmc_server->address);
         ssize_t needed = snprintf(NULL, 0, format, cmc_html_rep, array_html_rep) + 1;
         //TODO checks
         cmc_html_rep = realloc(cmc_html_rep, (size_t) needed); //naughty naughty, no temp variable.

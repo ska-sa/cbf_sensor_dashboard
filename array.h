@@ -14,6 +14,6 @@ int array_add_team_host_engine_device_sensor(struct array *this_array, char team
 char *array_get_sensor_value(struct array *this_array, char team_type, size_t host_number, char *device_name, char *sensor_name);
 char *array_get_sensor_status(struct array *this_array, char team_type, size_t host_number, char *device_name, char *sensor_name);
 
-char *array_html_summary(struct array *this_array);
+char *array_html_summary(struct array *this_array, char *cmc_name);
 
 #endif

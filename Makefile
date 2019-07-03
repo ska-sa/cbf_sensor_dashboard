@@ -5,6 +5,9 @@ CFLAGS += -ggdb
 #CFLAGS += -DDEBUG
 
 KATCPDIR=../katcp_devel/katcp
+PROJDIR = $(realpath $(CURDIR))
+SOURCEDIR = $(PROJDIR)/src
+BUILDDIR = $(PROJDIR)/bin
 
 LIBS = -L $(KATCPDIR) -lkatcp 
 INC = -I $(KATCPDIR)
@@ -26,5 +29,6 @@ all: $(EXE)
 $(EXE): $(OBJ)
 	$(CC) $(LDFLAGS) $^ -o $@ $(LIBS)
 
+.PHONY: clean
 clean: 
 	$(RM) core $(EXE) $(OBJ)

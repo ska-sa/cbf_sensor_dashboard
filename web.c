@@ -234,7 +234,9 @@ int web_client_handle_requests(struct web_client *client, struct cmc_server **cm
                 size_t i;
                 for (i = 0; i < num_cmcs; i++)
                 {
-                    web_client_buffer_add(client, cmc_server_html_representation(cmc_list[i]));
+                    char *cmc_server_html_rep = cmc_server_html_representation(cmc_list[i]);
+                    web_client_buffer_add(client, cmc_server_html_rep);
+                    free(cmc_server_html_rep);
                 }
             }
             web_client_buffer_add(client, html_body_close());

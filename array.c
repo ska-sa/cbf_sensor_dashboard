@@ -136,3 +136,13 @@ char *array_get_sensor_status(struct array *this_array, char team_type, size_t h
     return NULL;
 
 }
+
+
+char *array_html_summary(struct array *this_array)
+{
+    char *format = "<tr><td>%s</td><td>%hu</td><td>%lu</td>";
+    ssize_t needed = snprintf(NULL, 0, format, this_array->name, this_array->monitor_port, this_array->number_of_antennas) + 1;
+    char *html_summary = malloc(needed);
+    sprintf(html_summary, format, this_array->name, this_array->monitor_port, this_array->number_of_antennas);
+    return html_summary;
+}

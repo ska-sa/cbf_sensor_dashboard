@@ -301,11 +301,44 @@ void cmc_server_handle_received_katcl_lines(struct cmc_server *this_cmc_server)
  */
 char *cmc_server_html_representation(struct cmc_server *this_cmc_server)
 {
-    char *html_rep;
-    char format[] = "<h1>%s</h1>\n";
-    size_t needed = (size_t) snprintf(NULL, 0, format, this_cmc_server->address) + 1;
-    html_rep= malloc(needed);
-    sprintf(html_rep, format, this_cmc_server->address);
+    char *cmc_html_rep;
+    if (this_cmc_server->no_of_arrays < 1)
+    {
+        char format[] = "<h1>%s</h1>\n<p>No arrays currently running.</p>\n";
+        ssize_t needed = snprintf(NULL, 0, format, this_cmc_server->address) + 1;
+        cmc_html_rep = malloc((size_t) needed);
+        sprintf(cmc_html_rep, format, this_cmc_server->address);
+        return cmc_html_rep;
+    }
 
-    return html_rep;
+    {   //putting this in its own block so that I can reuse the names "format" and "needed" later.
+        //might not be ready since this is followed by a for-loop, but anyway.
+        char format[] = "<h1>%s</h1>\n<table>\n";
+        ssize_t needed = snprintf(NULL, 0, format, this_cmc_server->address) + 1;
+        //TODO checks
+        cmc_html_rep = malloc((size_t) needed);
+        sprintf(cmc_html_rep, format, this_cmc_server->address);
+    }
+    
+    size_t i;
+    for (i = 0; i < this_cmc_server->no_of_arrays; i++)
+    {
+        char format[] = "%s%s\n";
+        char *array_html_rep = array_html_summary(this_cmc_server->array_list[i]);
+        ssize_t needed = snprintf(NULL, 0, format, cmc_html_rep, array_html_rep) + 1;
+        //TODO checks
+        cmc_html_rep = realloc(cmc_html_rep, (size_t) needed); //naughty naughty, no temp variable.
+        sprintf(cmc_html_rep, format, cmc_html_rep, array_html_rep);
+        free(array_html_rep);
+    }
+
+    {
+        char *format = "%s</table>\n";
+        ssize_t needed = snprintf(NULL, 0, format, cmc_html_rep) + 1;
+        //TODO checks
+        cmc_html_rep = realloc(cmc_html_rep, (size_t) needed);
+        sprintf(cmc_html_rep, format, cmc_html_rep);
+    }
+
+    return cmc_html_rep;
 }

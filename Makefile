@@ -29,23 +29,21 @@ SOURCES     := $(shell find $(SRCDIR) -type f -name *.$(SRCEXT))
 OBJECTS     := $(patsubst $(SRCDIR)/%,$(BUILDDIR)/%,$(SOURCES:.$(SRCEXT)=.$(OBJEXT)))
 
 #Defauilt Make
-all: resources $(TARGET)
+all: directories $(TARGET)
 
 #Remake
-remake: cleaner all
+remake: clean all
 
 #Make the Directories
 directories:
 	@mkdir -p $(TARGETDIR)
 	@mkdir -p $(BUILDDIR)
 
-#Clean only Objecst
-clean:
-	@$(RM) -rf $(BUILDDIR)
-
 #Full Clean, Objects and Binaries
-cleaner: clean
-	@$(RM) -rf $(TARGETDIR)
+clean:
+	$(RM) -rf $(BUILDDIR)
+	$(RM) -rf $(TARGETDIR)
+	$(RM) $(TARGET)
 
 #Pull in dependency info for *existing* .o files
 -include $(OBJECTS:.$(OBJEXT)=.$(DEPEXT))

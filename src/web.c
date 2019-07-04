@@ -211,6 +211,8 @@ int web_client_socket_write(struct web_client *client, fd_set *wr)
 
 int web_client_handle_requests(struct web_client *client, struct cmc_server **cmc_list, size_t num_cmcs)
 {
+    //TODO: check requested resource before sending anything. Probably the correct thing to do is to
+    //send a 404 in that case.
     if (client->get_received == 1)
     {
         web_client_buffer_add(client, html_doctype());
@@ -239,20 +241,68 @@ int web_client_handle_requests(struct web_client *client, struct cmc_server **cm
                     free(cmc_server_html_rep);
                 }
             }
-            web_client_buffer_add(client, html_body_close());
         }
         else
         {
-            char *title = html_title("CBF Sensor Dashboard, other resource requested");
-            web_client_buffer_add(client, title);
-            free(title);
-            web_client_buffer_add(client, html_head_close());
+            char *requested_cmc = strdup(strtok(client->requested_resource + 1, "/")); //+1 because we aren't interested in the leading /
+            char *requested_array = strdup(strtok(NULL, "/")); 
+            if (strtok(NULL, ""))
+            {
+                verbose_message(WARNING, "URL too long. Expect <cmc>/<array_name> only.\n");
+            }
+
+            {
+                char format[] = "CBF Sensor Dashboard: %s/%s";
+                ssize_t needed = snprintf(NULL, 0, format, requested_cmc, requested_array) + 1;
+                char *title_string = malloc((size_t) needed);
+                sprintf(title_string, format, requested_cmc, requested_array);
+                char *title = html_title(title_string);
+                web_client_buffer_add(client, title);
+                free(title_string);
+                free(title);
+                web_client_buffer_add(client, html_head_close());
+            }
 
             web_client_buffer_add(client, html_body_open());
-            web_client_buffer_add(client, "Got a request for something else.\n"); //TODO This is what needs to be generated.
-            web_client_buffer_add(client, html_body_close());
+
+            size_t i;
+            for (i = 0; i < num_cmcs; i++)
+            {
+                if (!strcmp(requested_cmc, cmc_server_get_name(cmc_list[i])))
+                    break;
+            }
+            if (i == num_cmcs)
+            {
+                char format[] = "<p>No cmc named %s.</p>";
+                ssize_t needed = snprintf(NULL, 0, format, requested_cmc) + 1;
+                char *message = malloc((size_t) needed);
+                sprintf(message, format, requested_cmc);
+                web_client_buffer_add(client, message);
+                free(message);
+            }
+            else
+            {
+                int r = cmc_server_check_for_array(cmc_list[i], requested_array);
+                if (r >= 0)
+                {
+                    web_client_buffer_add(client, array_html_summary(cmc_server_get_array(cmc_list[i], (size_t) r), requested_cmc));
+                }
+                else
+                {
+                    char format[] = "<p>%s does not have an array named %s.</p>";
+                    ssize_t needed = snprintf(NULL, 0, format, requested_cmc, requested_array) + 1;
+                    char *message = malloc((size_t) needed);
+                    sprintf(message, format, requested_cmc, requested_array);
+                    web_client_buffer_add(client, message);
+                    free(message);
+                }
+            }
+
+            free(requested_cmc);
+            free(requested_array);
         }
         
+        web_client_buffer_add(client, html_body_close());
         web_client_buffer_add(client, html_close());
 
         client->get_received = 0;

@@ -104,6 +104,12 @@ struct message *cmc_server_queue_pop(struct cmc_server *this_cmc_server)
 }
 
 
+char *cmc_server_get_name(struct cmc_server *this_cmc_server)
+{
+    return this_cmc_server->address;
+}
+
+
 void cmc_server_set_fds(struct cmc_server *this_cmc_server, fd_set *rd, fd_set *wr, int *nfds)
 {
     FD_SET(this_cmc_server->katcp_socket_fd, rd);
@@ -399,4 +405,27 @@ char *cmc_server_html_representation(struct cmc_server *this_cmc_server)
     }
 
     return cmc_html_rep;
+}
+
+
+int cmc_server_check_for_array(struct cmc_server *this_cmc_server, char *array_name)
+{
+    size_t i;
+    for (i = 0; i < this_cmc_server->no_of_arrays; i++)
+    {
+        if (!strcmp(array_name, array_get_name(this_cmc_server->array_list[i])))
+        {
+            return (int) i;
+        }
+    }
+    return -1;
+}
+
+
+struct array *cmc_server_get_array(struct cmc_server *this_cmc_server, size_t array_number)
+{
+    if (array_number < this_cmc_server->no_of_arrays)
+        return this_cmc_server->array_list[array_number];
+    else
+        return NULL;
 }

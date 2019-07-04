@@ -16,7 +16,7 @@ DEPEXT      := d
 OBJEXT      := o
 
 #Flags, Libraries and Includes
-CFLAGS      := -Wall -Wconversion
+CFLAGS      := -Wall -Wconversion -ggdb
 KATCPDIR    := ../katcp_devel/katcp
 LIB         := -L $(KATCPDIR) -lkatcp
 INC         := -I$(INCDIR) -I/usr/local/include -I $(KATCPDIR)

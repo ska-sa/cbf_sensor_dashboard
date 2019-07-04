@@ -1,2 +1,5 @@
 *.o
 *.swp
+scratchpad/**
+conf/**
+obj/**

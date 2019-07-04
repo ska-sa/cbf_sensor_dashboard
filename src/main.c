@@ -162,7 +162,7 @@ int main(int argc, char **argv)
      * read list of cmcs from the config file, populate array of structs
      *********************************/
 
-    FILE *cmc_config = fopen("cmc_list.conf", "r");
+    FILE *cmc_config = fopen("conf/cmc_list.conf", "r");
     if (cmc_config == NULL)
     {
         perror("Error (cmc_list.conf)");

@@ -1,34 +1,69 @@
-CC = gcc 
-CFLAGS = -Wall -Wconversion
-#CFLAGS += -O2
-CFLAGS += -ggdb
-#CFLAGS += -DDEBUG
+#https://stackoverflow.com/questions/5178125/how-to-place-object-files-in-separate-subdirectory
 
-KATCPDIR=../katcp_devel/katcp
-PROJDIR = $(realpath $(CURDIR))
-SOURCEDIR = $(PROJDIR)/src
-BUILDDIR = $(PROJDIR)/bin
+#Compiler and Linker
+CC          := gcc
 
-LIBS = -L $(KATCPDIR) -lkatcp 
-INC = -I $(KATCPDIR)
+#The Target Binary Program
+TARGET      := cbf_sensor_dashboard
 
-LDFLAGS = 
+#The Directories, Source, Includes, Objects, Binary and Resources
+SRCDIR      := src
+INCDIR      := inc
+BUILDDIR    := obj
+TARGETDIR   := bin
+SRCEXT      := c
+DEPEXT      := d
+OBJEXT      := o
 
-RM = rm -f 
+#Flags, Libraries and Includes
+CFLAGS      := -Wall -Wconversion
+KATCPDIR    := ../katcp_devel/katcp
+LIB         := -L $(KATCPDIR) -lkatcp
+INC         := -I$(INCDIR) -I/usr/local/include -I $(KATCPDIR)
+INCDEP      := -I$(INCDIR) -I../katcp_devel/katcp
 
-#SRC = small_server.c array_handling.c html_handling.c http_handling.c sensor_parsing.c
-SRC = main.c sensor.c device.c engine.c vdevice.c host.c team.c array.c tokenise.c queue.c utils.c cmc_server.c verbose.c message.c web.c html.c
-EXE = cbf_sensor_dashboard
-OBJ = $(patsubst %.c,%.o,$(SRC))
+#---------------------------------------------------------------------------------
+#DO NOT EDIT BELOW THIS LINE
+#---------------------------------------------------------------------------------
+SOURCES     := $(shell find $(SRCDIR) -type f -name *.$(SRCEXT))
+OBJECTS     := $(patsubst $(SRCDIR)/%,$(BUILDDIR)/%,$(SOURCES:.$(SRCEXT)=.$(OBJEXT)))
 
-all: $(EXE)
+#Defauilt Make
+all: resources $(TARGET)
 
-%.o: %.c $(wildcard *.h)
-	$(CC) $(CFLAGS) -c $< -o $@ $(INC)
+#Remake
+remake: cleaner all
 
-$(EXE): $(OBJ)
-	$(CC) $(LDFLAGS) $^ -o $@ $(LIBS)
+#Make the Directories
+directories:
+	@mkdir -p $(TARGETDIR)
+	@mkdir -p $(BUILDDIR)
 
-.PHONY: clean
-clean: 
-	$(RM) core $(EXE) $(OBJ)
+#Clean only Objecst
+clean:
+	@$(RM) -rf $(BUILDDIR)
+
+#Full Clean, Objects and Binaries
+cleaner: clean
+	@$(RM) -rf $(TARGETDIR)
+
+#Pull in dependency info for *existing* .o files
+-include $(OBJECTS:.$(OBJEXT)=.$(DEPEXT))
+
+#Link
+$(TARGET): $(OBJECTS)
+	$(CC) -o $(TARGETDIR)/$(TARGET) $^ $(LIB)
+	mv $(TARGETDIR)/$(TARGET) .
+
+#Compile
+$(BUILDDIR)/%.$(OBJEXT): $(SRCDIR)/%.$(SRCEXT)
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INC) -c -o $@ $<
+	@$(CC) $(CFLAGS) $(INCDEP) -MM $(SRCDIR)/$*.$(SRCEXT) > $(BUILDDIR)/$*.$(DEPEXT)
+	@cp -f $(BUILDDIR)/$*.$(DEPEXT) $(BUILDDIR)/$*.$(DEPEXT).tmp
+	@sed -e 's|.*:|$(BUILDDIR)/$*.$(OBJEXT):|' < $(BUILDDIR)/$*.$(DEPEXT).tmp > $(BUILDDIR)/$*.$(DEPEXT)
+	@sed -e 's/.*://' -e 's/\\$$//' < $(BUILDDIR)/$*.$(DEPEXT).tmp | fmt -1 | sed -e 's/^ *//' -e 's/$$/:/' >> $(BUILDDIR)/$*.$(DEPEXT)
+	@rm -f $(BUILDDIR)/$*.$(DEPEXT).tmp
+
+#Non-File Targets
+.PHONY: all remake clean cleaner resources

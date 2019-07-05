@@ -285,7 +285,8 @@ int web_client_handle_requests(struct web_client *client, struct cmc_server **cm
                 int r = cmc_server_check_for_array(cmc_list[i], requested_array);
                 if (r >= 0)
                 {
-                    web_client_buffer_add(client, array_html_summary(cmc_server_get_array(cmc_list[i], (size_t) r), requested_cmc));
+                    web_client_buffer_add(client, array_html_detail(cmc_server_get_array(cmc_list[i], (size_t) r)));
+                    //TODO this is where the array detail needs to come in.
                 }
                 else
                 {

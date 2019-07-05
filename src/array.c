@@ -46,8 +46,10 @@ struct array *array_create(char *new_array_name, char *cmc_address, uint16_t mon
         new_array->number_of_antennas = number_of_antennas;
         new_array->cmc_address = strdup(cmc_address);
         new_array->monitor_port = monitor_port;
-        new_array->number_of_teams = 0;
-        new_array->team_list = NULL; /*Make it explicit, will fill this later from a config file.*/
+        new_array->number_of_teams = 2;
+        new_array->team_list = malloc(sizeof(new_team->team_list)*(new_team->number_of_teams)); 
+        new_array->team_list[0] = team_create('f', new_array->number_of_antennas);
+        new_array->team_list[1] = team_create('x', new_array->number_of_antennas);
    }
    return new_array;
 }

@@ -137,3 +137,10 @@ char *team_get_sensor_status(struct team *this_team, size_t host_number, char *d
     return NULL;
 
 }
+
+
+char *team_get_host_html_detail(struct team *this_team, size_t this_host)
+{
+    //TODO checks to see whether host is in range.
+    return host_html_detail(this_team->host_list[this_host];
+}

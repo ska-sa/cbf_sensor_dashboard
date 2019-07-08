@@ -316,8 +316,21 @@ char *array_html_summary(struct array *this_array, char *cmc_name)
 
 char *array_html_detail(struct array *this_array)
 {
-    //TODO this is where the fun stuff is going to be.
-    return NULL;
+    char *array_html_detaili = strdup(""); //must free() later.
+    size_t i, j;
+    for (i = 0; i < this_array->number_of_antennas; i++)
+    {
+        for (j = 0; j < this_array->number_of_teams; j++)
+        {
+            char *format = "%s%s";
+            ssize_t needed = snprintf(NULL, 0, format, array_html_detail, team_get_host_html_detail(this_array->team_list[j], i)) + 1;
+            array_html_detail = realloc(array_html_detail, (size_t) needed);
+            sprintf(array_html_detail, format, array_html_detail, team_get_host_html_detail(this_array->team_list[j], i));
+        }
+        array_html_detail = realloc(array_html_detail, strlen(array_html_detail) + 2);
+        sprintf(array_html_detail, "%s\n", array_html_detail);
+    }
+    return array_html_detail;
 }
 
 

@@ -12,6 +12,8 @@ char *device_get_sensor_value(struct device *this_device, char *sensor_name);
 char *device_get_sensor_status(struct device *this_device, char *sensor_name);
 int device_update_sensor(struct device *this_device, char *sensor_name, char *new_sensor_value, char *new_sensor_status);
 
+char *device_html_summary(struct device *this_device);
+
 /* functions for debugging, for removal later. */
 void device_print_sensors(struct device *this_device);
 

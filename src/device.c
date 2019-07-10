@@ -119,6 +119,16 @@ int device_update_sensor(struct device *this_device, char *sensor_name, char *ne
 }
 
 
+char *device_html_summary(struct device *this_device)
+{
+    char format[] = "<td><button class=\"%s\">%s</button></td>";
+    ssize_t needed = snprintf(NULL, 0, format, device_get_sensor_status(this_device, "device-status"), this_device->name) + 1;
+    char *html_summary = malloc((size_t) needed);
+    sprintf(html_summary, format, device_get_sensor_status(this_device, "device-status"), this_device->name);
+    return html_summary;
+}
+
+
 void device_print_sensors(struct device *this_device)
 {
     printf("Device name: %s\n", this_device->name);

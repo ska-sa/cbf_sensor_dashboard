@@ -47,7 +47,7 @@ struct array *array_create(char *new_array_name, char *cmc_address, uint16_t mon
         new_array->cmc_address = strdup(cmc_address);
         new_array->monitor_port = monitor_port;
         new_array->number_of_teams = 2;
-        new_array->team_list = malloc(sizeof(new_team->team_list)*(new_team->number_of_teams)); 
+        new_array->team_list = malloc(sizeof(new_array->team_list)*(new_array->number_of_teams)); 
         new_array->team_list[0] = team_create('f', new_array->number_of_antennas);
         new_array->team_list[1] = team_create('x', new_array->number_of_antennas);
    }
@@ -305,7 +305,7 @@ void array_handle_received_katcl_lines(struct array *this_array)
 
 char *array_html_summary(struct array *this_array, char *cmc_name)
 {
-    char *format = "<tr><td><a href=\"%s/%s\">%s</a></td><td>%hu</td><td>%lu</td>";
+    char format[] = "<tr><td><a href=\"%s/%s\">%s</a></td><td>%hu</td><td>%lu</td>";
     ssize_t needed = snprintf(NULL, 0, format, cmc_name, this_array->name, this_array->name, this_array->monitor_port, this_array->number_of_antennas) + 1;
     //TODO checks
     char *html_summary = malloc((size_t) needed);
@@ -316,19 +316,21 @@ char *array_html_summary(struct array *this_array, char *cmc_name)
 
 char *array_html_detail(struct array *this_array)
 {
-    char *array_html_detaili = strdup(""); //must free() later.
+    char *array_html_detail = strdup(""); //must free() later.
     size_t i, j;
     for (i = 0; i < this_array->number_of_antennas; i++)
     {
         for (j = 0; j < this_array->number_of_teams; j++)
         {
-            char *format = "%s%s";
+            char format[] = "%s%s";
             ssize_t needed = snprintf(NULL, 0, format, array_html_detail, team_get_host_html_detail(this_array->team_list[j], i)) + 1;
             array_html_detail = realloc(array_html_detail, (size_t) needed);
             sprintf(array_html_detail, format, array_html_detail, team_get_host_html_detail(this_array->team_list[j], i));
         }
-        array_html_detail = realloc(array_html_detail, strlen(array_html_detail) + 2);
-        sprintf(array_html_detail, "%s\n", array_html_detail);
+        char format[] = "<tr>%s</tr>\n";
+        ssize_t needed = snprintf(NULL, 0, format, array_html_detail) + 1;
+        array_html_detail = realloc(array_html_detail, (size_t) needed); //TODO checks
+        sprintf(array_html_detail, format, array_html_detail);
     }
     return array_html_detail;
 }

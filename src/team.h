@@ -16,4 +16,6 @@ int team_update_engine_sensor(struct team *this_team, size_t host_number, char *
 
 char *team_get_sensor_value(struct team *this_team, size_t host_number, char *device_name, char *sensor_name);
 char *team_get_sensor_status(struct team *this_team, size_t host_number, char *device_name, char *sensor_name);
+
+char *team_get_host_html_detail(struct team *this_team, size_t host_number);
 #endif

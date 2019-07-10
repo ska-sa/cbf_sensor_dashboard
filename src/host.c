@@ -207,3 +207,25 @@ int host_update_engine_sensor(struct host *this_host, char *engine_name, char *d
     }
     return -1;
 }
+
+
+char *host_html_detail(struct host *this_host)
+{
+    size_t i;
+    char *host_detail = strdup(""); //need it to be zero length but don't want it to be null
+    for (i = 0; i < this_host->number_of_devices; i++)
+    {
+        char format[] = "%s%s";
+        ssize_t needed = snprintf(NULL, 0, format, host_detail, device_html_summary(this_host->device_list[i])) + 1;
+        host_detail = realloc(host_detail, (size_t) needed); //TODO checks for errors.
+        sprintf(host_detail, format, host_detail, device_html_summary(this_host->device_list[i]));
+    }
+    for (i = 0; i < this_host->number_of_vdevices; i++)
+    {
+        char format[] = "%s%s";
+        ssize_t needed = snprintf(NULL, 0, format, host_detail, vdevice_html_summary(this_host->vdevice_list[i])) + 1;
+        host_detail = realloc(host_detail, (size_t) needed); //TODO checks for errors.
+        sprintf(host_detail, format, host_detail, vdevice_html_summary(this_host->vdevice_list[i]));
+    }
+    return host_detail;
+}

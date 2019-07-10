@@ -11,4 +11,5 @@ void vdevice_destroy(struct vdevice *this_vdevice);
 char *vdevice_get_name(struct vdevice *this_vdevice);
 char *vdevice_get_status(struct vdevice *this_vdevice);
 
+char *vdevice_html_summary(struct vdevice *this_vdevice);
 #endif

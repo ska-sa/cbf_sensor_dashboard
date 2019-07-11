@@ -166,12 +166,19 @@ void cmc_server_setup_katcp_writes(struct cmc_server *this_cmc_server)
             this_cmc_server->state = CMC_WAIT_RESPONSE;
         }
     }
+
+    size_t i;
+    for (i=0; i < this_cmc_server->no_of_arrays; i++)
+    {
+        array_setup_katcp_writes(this_cmc_server->array_list[i]);
+    }
 }
 
 
 void cmc_server_socket_read_write(struct cmc_server *this_cmc_server, fd_set *rd, fd_set *wr)
 {
     int r;
+    size_t i;
     if (FD_ISSET(this_cmc_server->katcp_socket_fd, rd))
     {
         verbose_message(BORING, "Reading katcl_line from %s:%hu.\n", this_cmc_server->address, this_cmc_server->katcp_port);
@@ -179,20 +186,25 @@ void cmc_server_socket_read_write(struct cmc_server *this_cmc_server, fd_set *rd
         if (r)
         {
             fprintf(stderr, "read from %s:%hu failed\n", this_cmc_server->address, this_cmc_server->katcp_port);
-            perror("read_katcl()");
+            perror("cmc_server read_katcl()");
             /*TODO some kind of error checking, what to do if the CMC doesn't connect.*/
         }
     }
-
+    
     if (FD_ISSET(this_cmc_server->katcp_socket_fd, wr))
     {
         verbose_message(BORING, "Writing katcl_line to %s:%hu.\n", this_cmc_server->address, this_cmc_server->katcp_port);
         r = write_katcl(this_cmc_server->katcl_line);
         if (r < 0)
         {
-            perror("write_katcl");
+            perror("cmc_server write_katcl()");
             /*TODO some other kind of error checking.*/
         }
+    }
+
+    for (i=0; i < this_cmc_server->no_of_arrays; i++)
+    {
+        array_socket_read_write(this_cmc_server->array_list[i], rd, wr);
     }
 }
 
@@ -233,6 +245,12 @@ static int cmc_server_add_array(struct cmc_server *this_cmc_server, char *array_
 
 void cmc_server_handle_received_katcl_lines(struct cmc_server *this_cmc_server)
 {
+    //let's try doing the array stuff before the cmc stuff
+    size_t i;
+    for (i=0; i < this_cmc_server->no_of_arrays; i++)
+    {
+        array_handle_received_katcl_lines(this_cmc_server->array_list[i]);
+    }
     while (have_katcl(this_cmc_server->katcl_line) > 0)
     {
         verbose_message(BORING, "From %s:%hu: %s %s %s %s %s\n", this_cmc_server->address, this_cmc_server->katcp_port, \
@@ -248,9 +266,11 @@ void cmc_server_handle_received_katcl_lines(struct cmc_server *this_cmc_server)
                 {
                     if (!strcmp(arg_string_katcl(this_cmc_server->katcl_line, 1), "ok"))
                     {
-                        verbose_message(DEBUG, "%s:%hu received %s ok!\n", this_cmc_server->address, this_cmc_server->katcp_port, message_see_word(this_cmc_server->current_message, 0));
+                        verbose_message(DEBUG, "%s:%hu received %s ok!\n",\
+                                this_cmc_server->address, this_cmc_server->katcp_port, message_see_word(this_cmc_server->current_message, 0));
                         this_cmc_server->state = CMC_SEND_FRONT_OF_QUEUE;
-                        verbose_message(BORING, "%s:%hu still has %u message(s) in its queue...\n", this_cmc_server->address, this_cmc_server->katcp_port, queue_sizeof(this_cmc_server->outgoing_msg_queue));
+                        verbose_message(BORING, "%s:%hu still has %u message(s) in its queue...\n",\
+                                this_cmc_server->address, this_cmc_server->katcp_port, queue_sizeof(this_cmc_server->outgoing_msg_queue));
                         if (queue_sizeof(this_cmc_server->outgoing_msg_queue))
                         {
                             verbose_message(BORING, "%s:%hu  popping queue...\n", this_cmc_server->address, this_cmc_server->katcp_port);
@@ -266,7 +286,8 @@ void cmc_server_handle_received_katcl_lines(struct cmc_server *this_cmc_server)
                     }
                     else 
                     {
-                        verbose_message(WARNING, "Received %s %s. Retrying the request...", message_see_word(this_cmc_server->current_message, 0), arg_string_katcl(this_cmc_server->katcl_line, 1));
+                        verbose_message(WARNING, "Received %s %s. Retrying the request...",\
+                                message_see_word(this_cmc_server->current_message, 0), arg_string_katcl(this_cmc_server->katcl_line, 1));
                         this_cmc_server->state = CMC_SEND_FRONT_OF_QUEUE;
                     }
 

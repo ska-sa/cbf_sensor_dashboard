@@ -246,6 +246,7 @@ int web_client_handle_requests(struct web_client *client, struct cmc_server **cm
         {
             char *requested_cmc = strdup(strtok(client->requested_resource + 1, "/")); //+1 because we aren't interested in the leading /
             char *requested_array = strdup(strtok(NULL, "/")); 
+            //TODO need to think about accessing the individual devices in the arrays here.
             if (strtok(NULL, ""))
             {
                 verbose_message(WARNING, "URL too long. Expect <cmc>/<array_name> only.\n");

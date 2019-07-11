@@ -223,7 +223,7 @@ void array_socket_read_write(struct array *this_array, fd_set *rd, fd_set *wr)
         if (r)
         {
             fprintf(stderr, "read from %s:%hu failed\n", this_array->cmc_address, this_array->monitor_port);
-            perror("read_katcl()");
+            perror("array read_katcl()");
             /*TODO some kind of error checking, what to do if the CMC doesn't connect.*/
         }
     }
@@ -234,7 +234,7 @@ void array_socket_read_write(struct array *this_array, fd_set *rd, fd_set *wr)
         r = write_katcl(this_array->katcl_line);
         if (r < 0)
         {
-            perror("write_katcl");
+            perror("array write_katcl()");
             /*TODO some other kind of error checking.*/
         }
     }

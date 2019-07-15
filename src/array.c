@@ -256,42 +256,47 @@ void array_handle_received_katcl_lines(struct array *this_array)
             case '!': // it's a katcp response
                 if (!strcmp(arg_string_katcl(this_array->katcl_line, 0) + 1, message_see_word(this_array->current_message, 0)))
                 {
+                    verbose_message(DEBUG, "%s:%hu received %s %s\n", this_array->cmc_address, this_array->monitor_port, \
+                            message_see_word(this_array->current_message, 0), arg_string_katcl(this_array->katcl_line, 1));
+
                     if (!strcmp(arg_string_katcl(this_array->katcl_line, 1), "ok"))
                     {
-                        verbose_message(DEBUG, "%s:%hu received %s ok!\n", this_array->cmc_address, this_array->monitor_port, message_see_word(this_array->current_message, 0));
-                        this_array->state = ARRAY_SEND_FRONT_OF_QUEUE;
-                        verbose_message(BORING, "%s:%hu still has %u message(s) in its queue...\n", this_array->cmc_address, this_array->monitor_port, queue_sizeof(this_array->outgoing_msg_queue));
-                        if (queue_sizeof(this_array->outgoing_msg_queue))
-                        {
-                            verbose_message(BORING, "%s:%hu  popping queue...\n", this_array->cmc_address, this_array->monitor_port);
-                            array_queue_pop(this_array);
-                        }
-                        else
-                        {
-                            verbose_message(INFO, "%s:%hu going into monitoring state.\n", this_array->cmc_address, this_array->monitor_port);
-                            message_destroy(this_array->current_message);
-                            this_array->current_message = NULL; //doesn't do this in the above function. C problem.
-                            this_array->state = ARRAY_MONITOR;
-                        }
+                        //Don't actually need to do anything here, the inform processing code should handle.
                     }
                     else 
                     {
-                        verbose_message(WARNING, "Received %s %s. Retrying the request...", message_see_word(this_array->current_message, 0), arg_string_katcl(this_array->katcl_line, 1));
-                        this_array->state = ARRAY_SEND_FRONT_OF_QUEUE;
+                        //sensor obviously doesn't exist.
+                        sensor_mark_absent(); // somehow. How will this propagate down?
                     }
 
+                    this_array->state = ARRAY_SEND_FRONT_OF_QUEUE;
+                    verbose_message(BORING, "%s:%hu still has %u message(s) in its queue...\n", this_array->cmc_address, \
+                            this_array->monitor_port, queue_sizeof(this_array->outgoing_msg_queue));
+
+                    if (queue_sizeof(this_array->outgoing_msg_queue))
+                    {
+                        verbose_message(BORING, "%s:%hu  popping queue...\n", this_array->cmc_address, this_array->monitor_port);
+                        array_queue_pop(this_array);
+                    }
+                    else
+                    {
+                        verbose_message(INFO, "%s:%hu going into monitoring state.\n", this_array->cmc_address, this_array->monitor_port);
+                        message_destroy(this_array->current_message);
+                        this_array->current_message = NULL; //doesn't do this in the above function. C problem.
+                        this_array->state = ARRAY_MONITOR;
+                    }
                 }
                 break;
             case '#': // it's a katcp inform
-                if (!strcmp(arg_string_katcl(this_array->katcl_line, 0) + 1, "array-list"))
+                if (!strcmp(arg_string_katcl(this_array->katcl_line, 0) + 1, "sensor-status"))
                 {
 
                 }
-                else if (!strcmp(arg_string_katcl(this_array->katcl_line, 0) + 1, "group-created"))
+                else if (!strcmp(arg_string_katcl(this_array->katcl_line, 0) + 1, "sensor-value"))
                 {
 
                 }
-                else if (!strcmp(arg_string_katcl(this_array->katcl_line, 0) + 1, "group-destroyed"))
+                else if (!strcmp(arg_string_katcl(this_array->katcl_line, 0) + 1, "sensor-list"))
                 {
                     
                 }

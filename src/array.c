@@ -26,7 +26,7 @@ struct array {
     char *name;
     struct team **team_list;
     size_t number_of_teams;
-    size_t number_of_antennas;
+    size_t n_antennas;
     uint16_t monitor_port;
     char *cmc_address;
     int monitor_fd;
@@ -37,19 +37,19 @@ struct array {
 };
 
 
-struct array *array_create(char *new_array_name, char *cmc_address, uint16_t monitor_port, size_t number_of_antennas)
+struct array *array_create(char *new_array_name, char *cmc_address, uint16_t monitor_port, size_t n_antennas)
 {
    struct array *new_array = malloc(sizeof(*new_array));
    if (new_array != NULL)
    {
         new_array->name = strdup(new_array_name);
-        new_array->number_of_antennas = number_of_antennas;
+        new_array->n_antennas = n_antennas;
         new_array->cmc_address = strdup(cmc_address);
         new_array->monitor_port = monitor_port;
         new_array->number_of_teams = 2;
-        new_array->team_list = malloc(sizeof(new_array->team_list)*(new_array->number_of_teams)); 
-        new_array->team_list[0] = team_create('f', new_array->number_of_antennas);
-        new_array->team_list[1] = team_create('x', new_array->number_of_antennas);
+        new_array->team_list = malloc(sizeof(new_array->team_list)*(new_array->number_of_teams));
+        new_array->team_list[0] = team_create('f', new_array->n_antennas);
+        new_array->team_list[1] = team_create('x', new_array->n_antennas);
    }
    return new_array;
 }
@@ -95,7 +95,7 @@ int array_add_team_host_device_sensor(struct array *this_array, char team_type, 
        if (temp != NULL)
        {
            this_array->team_list = temp;
-           this_array->team_list[this_array->number_of_teams] = team_create(team_type, this_array->number_of_antennas);
+           this_array->team_list[this_array->number_of_teams] = team_create(team_type, this_array->n_antennas);
            this_array->number_of_teams++;
            return team_add_device_sensor(this_array->team_list[i], host_number, device_name, sensor_name);
        }
@@ -121,7 +121,7 @@ int array_add_team_host_engine_device_sensor(struct array *this_array, char team
         if (temp != NULL)
         {
             this_array->team_list = temp;
-            this_array->team_list[this_array->number_of_teams] = team_create(team_type, this_array->number_of_antennas);
+            this_array->team_list[this_array->number_of_teams] = team_create(team_type, this_array->n_antennas);
             this_array->number_of_teams++;
             return team_add_device_sensor(this_array->team_list[i], host_number, device_name, sensor_name);
         }
@@ -250,7 +250,7 @@ void array_handle_received_katcl_lines(struct array *this_array)
                 arg_string_katcl(this_array->katcl_line, 1), \
                 arg_string_katcl(this_array->katcl_line, 2), \
                 arg_string_katcl(this_array->katcl_line, 3), \
-                arg_string_katcl(this_array->katcl_line, 4)); 
+                arg_string_katcl(this_array->katcl_line, 4));
         char received_message_type = arg_string_katcl(this_array->katcl_line, 0)[0];
         switch (received_message_type) {
             case '!': // it's a katcp response
@@ -263,10 +263,10 @@ void array_handle_received_katcl_lines(struct array *this_array)
                     {
                         //Don't actually need to do anything here, the inform processing code should handle.
                     }
-                    else 
+                    else
                     {
                         //sensor obviously doesn't exist.
-                        sensor_mark_absent(); // somehow. How will this propagate down?
+                        //sensor_mark_absent(); // somehow. How will this propagate down?
                     }
 
                     this_array->state = ARRAY_SEND_FRONT_OF_QUEUE;
@@ -298,7 +298,7 @@ void array_handle_received_katcl_lines(struct array *this_array)
                 }
                 else if (!strcmp(arg_string_katcl(this_array->katcl_line, 0) + 1, "sensor-list"))
                 {
-                    
+
                 }
                 break;
             default:
@@ -311,10 +311,10 @@ void array_handle_received_katcl_lines(struct array *this_array)
 char *array_html_summary(struct array *this_array, char *cmc_name)
 {
     char format[] = "<tr><td><a href=\"%s/%s\">%s</a></td><td>%hu</td><td>%lu</td>";
-    ssize_t needed = snprintf(NULL, 0, format, cmc_name, this_array->name, this_array->name, this_array->monitor_port, this_array->number_of_antennas) + 1;
+    ssize_t needed = snprintf(NULL, 0, format, cmc_name, this_array->name, this_array->name, this_array->monitor_port, this_array->n_antennas) + 1;
     //TODO checks
     char *html_summary = malloc((size_t) needed);
-    sprintf(html_summary, format, cmc_name, this_array->name, this_array->name, this_array->monitor_port, this_array->number_of_antennas);
+    sprintf(html_summary, format, cmc_name, this_array->name, this_array->name, this_array->monitor_port, this_array->n_antennas);
     return html_summary;
 }
 
@@ -323,7 +323,7 @@ char *array_html_detail(struct array *this_array)
 {
     char *array_html_detail = strdup(""); //must free() later.
     size_t i, j;
-    for (i = 0; i < this_array->number_of_antennas; i++)
+    for (i = 0; i < this_array->n_antennas; i++)
     {
         for (j = 0; j < this_array->number_of_teams; j++)
         {

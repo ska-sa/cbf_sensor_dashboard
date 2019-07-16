@@ -5,7 +5,7 @@
 
 struct array;
 
-struct array *array_create(char *new_array_name, char *cmc_address, uint16_t monitor_port, size_t number_of_antennas);
+struct array *array_create(char *new_array_name, char *cmc_address, uint16_t monitor_port, size_t n_antennas);
 void array_destroy(struct array *this_array);
 
 char *array_get_name(struct array *this_array);

@@ -5,6 +5,7 @@ char *html_doctype();
 char *html_open();
 char *html_head_open();
 char *html_title(char *title);
+char *html_script();
 char *html_head_close();
 
 char *html_body_open();

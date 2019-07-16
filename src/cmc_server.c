@@ -120,6 +120,7 @@ void cmc_server_set_fds(struct cmc_server *this_cmc_server, fd_set *rd, fd_set *
     *nfds = max(*nfds, this_cmc_server->katcp_socket_fd);
     
     //now for the individual arrays.
+    verbose_message(BORING, "Setting up fds on %ld arrays on %s:%hu.\n", this_cmc_server->no_of_arrays, this_cmc_server->address, this_cmc_server->katcp_port);
     size_t i;
     for (i = 0; i < this_cmc_server->no_of_arrays; i++)
     {
@@ -170,7 +171,7 @@ void cmc_server_setup_katcp_writes(struct cmc_server *this_cmc_server)
     size_t i;
     for (i=0; i < this_cmc_server->no_of_arrays; i++)
     {
-        array_setup_katcp_writes(this_cmc_server->array_list[i]);
+        //array_setup_katcp_writes(this_cmc_server->array_list[i]);
     }
 }
 

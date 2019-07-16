@@ -37,6 +37,12 @@ char *html_title(char *title)
 }
 
 
+char *html_script()
+{
+    return "<script>\nfunction timedRefresh(timeoutPeriod) { setTimeout(\"location.reload(true);\", timeoutPeriod); }\n</script>";
+}
+
+
 char *html_head_close()
 {
     return "</head>\n";

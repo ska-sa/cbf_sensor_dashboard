@@ -224,6 +224,7 @@ int web_client_handle_requests(struct web_client *client, struct cmc_server **cm
             char *title = html_title("CBF Sensor Dashboard");
             web_client_buffer_add(client, title);
             free(title);
+            web_client_buffer_add(client, html_script());
             web_client_buffer_add(client, html_head_close());
 
             web_client_buffer_add(client, html_body_open());
@@ -244,8 +245,9 @@ int web_client_handle_requests(struct web_client *client, struct cmc_server **cm
         }
         else
         {
-            char *requested_cmc = strdup(strtok(client->requested_resource + 1, "/")); //+1 because we aren't interested in the leading /
-            char *requested_array = strdup(strtok(NULL, "/")); 
+            char *requested_cmc = strtok(client->requested_resource + 1, "/"); 
+            //+1 because we aren't interested in the leading /
+            char *requested_array = strtok(NULL, "/");
             //TODO need to think about accessing the individual devices in the arrays here.
             if (strtok(NULL, ""))
             {
@@ -261,6 +263,7 @@ int web_client_handle_requests(struct web_client *client, struct cmc_server **cm
                 web_client_buffer_add(client, title);
                 free(title_string);
                 free(title);
+                web_client_buffer_add(client, html_script());
                 web_client_buffer_add(client, html_head_close());
             }
 
@@ -299,11 +302,8 @@ int web_client_handle_requests(struct web_client *client, struct cmc_server **cm
                     free(message);
                 }
             }
-
-            free(requested_cmc);
-            free(requested_array);
         }
-        
+
         web_client_buffer_add(client, html_body_close());
         web_client_buffer_add(client, html_close());
 

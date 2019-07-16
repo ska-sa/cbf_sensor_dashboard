@@ -50,6 +50,9 @@ struct array *array_create(char *new_array_name, char *cmc_address, uint16_t mon
         new_array->team_list = malloc(sizeof(new_array->team_list)*(new_array->number_of_teams));
         new_array->team_list[0] = team_create('f', new_array->n_antennas);
         new_array->team_list[1] = team_create('x', new_array->n_antennas);
+
+        new_array->monitor_fd = net_connect(cmc_address, monitor_port, NETC_VERBOSE_ERRORS | NETC_VERBOSE_STATS);
+        new_array->katcl_line = create_katcl(new_array->monitor_fd);
    }
    return new_array;
 }

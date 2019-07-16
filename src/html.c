@@ -39,7 +39,7 @@ char *html_title(char *title)
 
 char *html_script()
 {
-    return "<script>\nfunction timedRefresh(timeoutPeriod) { setTimeout(\"location.reload(true);\", timeoutPeriod); }\n</script>";
+    return "<script>\nfunction timedRefresh(timeoutPeriod) { setTimeout(\"location.reload(true);\", timeoutPeriod); }\n</script>\n";
 }
 
 
@@ -51,7 +51,7 @@ char *html_head_close()
 
 char *html_body_open()
 {
-    return "<body>\n";
+    return "<body onload=\"JavaScript:timedRefresh(5000)\">\n";
 }
 
 

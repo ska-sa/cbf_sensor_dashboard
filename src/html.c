@@ -43,6 +43,29 @@ char *html_script()
 }
 
 
+char *html_style()
+{
+    FILE *style_file = fopen("html/styles.css", "r");
+    if (style_file == NULL)
+    {
+        perror("fopen(html/styles.css)");
+        return NULL;
+    }
+
+    char buffer[BUF_SIZE];
+    char *result;
+    char *return_value = strdup("<style>\n");
+    for (result = fgets(buffer, BUF_SIZE, style_file); result != NULL; result = fgets(buffer, BUF_SIZE, style_file))
+    {
+        return_value = realloc(return_value, strlen(return_value) + strlen(buffer) + 1);
+        strcat(return_value, buffer);
+    }
+    return_value = realloc(return_value, strlen(return_value) + strlen("</style>\n") + 1);
+    strcat(return_value, "</style>\n");
+    return return_value;
+}
+
+
 char *html_head_close()
 {
     return "</head>\n";

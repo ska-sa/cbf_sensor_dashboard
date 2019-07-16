@@ -225,6 +225,11 @@ int web_client_handle_requests(struct web_client *client, struct cmc_server **cm
             web_client_buffer_add(client, title);
             free(title);
             web_client_buffer_add(client, html_script());
+
+            char *styles = html_style();
+            web_client_buffer_add(client, styles);
+            free(styles);
+
             web_client_buffer_add(client, html_head_close());
 
             web_client_buffer_add(client, html_body_open());

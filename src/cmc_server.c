@@ -210,7 +210,7 @@ void cmc_server_socket_read_write(struct cmc_server *this_cmc_server, fd_set *rd
 }
 
 
-static int cmc_server_add_array(struct cmc_server *this_cmc_server, char *array_name, uint16_t monitor_port, size_t number_of_antennas)
+static int cmc_server_add_array(struct cmc_server *this_cmc_server, char *array_name, uint16_t control_port, uint16_t monitor_port, size_t number_of_antennas)
 {
     size_t i;
     for (i = 0; i < this_cmc_server->no_of_arrays; i++)
@@ -232,7 +232,7 @@ static int cmc_server_add_array(struct cmc_server *this_cmc_server, char *array_
         return -1;
     }
     this_cmc_server->array_list = temp;
-    this_cmc_server->array_list[this_cmc_server->no_of_arrays] = array_create(array_name, this_cmc_server->address, monitor_port, number_of_antennas);
+    this_cmc_server->array_list[this_cmc_server->no_of_arrays] = array_create(array_name, this_cmc_server->address, control_port, monitor_port, number_of_antennas);
     if (this_cmc_server->array_list[this_cmc_server->no_of_arrays] == NULL)
     {
         verbose_message(ERROR, "Unable to create array \"%s\" on %s:%hu.\n", array_name, this_cmc_server->address, this_cmc_server->katcp_port);
@@ -299,7 +299,7 @@ void cmc_server_handle_received_katcl_lines(struct cmc_server *this_cmc_server)
                 if (!strcmp(arg_string_katcl(this_cmc_server->katcl_line, 0) + 1, "array-list"))
                 {
                     char* array_name = arg_string_katcl(this_cmc_server->katcl_line, 1);
-                    strtok(arg_string_katcl(this_cmc_server->katcl_line, 2), ","); /* don't need the first bit, that's the control port */
+                    uint16_t control_port = (uint16_t) atoi(strtok(arg_string_katcl(this_cmc_server->katcl_line, 2), ",")); 
                     uint16_t monitor_port = (uint16_t) atoi(strtok(NULL, ","));
                     /* will leave this here while I can't think of anything to do with the multicast groups.
                     int j = 3;
@@ -328,7 +328,7 @@ void cmc_server_handle_received_katcl_lines(struct cmc_server *this_cmc_server)
                     } while (buffer);
                     size_t number_of_antennas = (j - 4)/2; //to take into account the ++ which will have followed the null buffer
 
-                    cmc_server_add_array(this_cmc_server, array_name, monitor_port, number_of_antennas);
+                    cmc_server_add_array(this_cmc_server, array_name, control_port, monitor_port, number_of_antennas);
                     //TODO check if return is proper.
                 }
                 else if (!strcmp(arg_string_katcl(this_cmc_server->katcl_line, 0) + 1, "group-created"))
@@ -406,7 +406,7 @@ char *cmc_server_html_representation(struct cmc_server *this_cmc_server)
 
     {   //putting this in its own block so that I can reuse the names "format" and "needed" later.
         //might not be ready since this is followed by a for-loop, but anyway.
-        char format[] = "<h1>%s</h1>\n<table>\n";
+        char format[] = "<h1>%s</h1>\n<table class=\"cmctable\">\n<tr><th>Array Name</th><th>Control Port</th><th>Monitor Port</th><th>N_Antennas</th></tr>";
         ssize_t needed = snprintf(NULL, 0, format, this_cmc_server->address) + 1;
         //TODO checks
         cmc_html_rep = malloc((size_t) needed);

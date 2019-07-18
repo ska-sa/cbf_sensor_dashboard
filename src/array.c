@@ -27,17 +27,18 @@ struct array {
     struct team **team_list;
     size_t number_of_teams;
     size_t n_antennas;
+    uint16_t control_port;
     uint16_t monitor_port;
     char *cmc_address;
     int monitor_fd;
-    struct katcl_line *katcl_line;
+    struct katcl_line *monitor_katcl_line;
     enum array_state state;
     struct queue *outgoing_msg_queue;
     struct message *current_message;
 };
 
 
-struct array *array_create(char *new_array_name, char *cmc_address, uint16_t monitor_port, size_t n_antennas)
+struct array *array_create(char *new_array_name, char *cmc_address, uint16_t control_port, uint16_t monitor_port, size_t n_antennas)
 {
    struct array *new_array = malloc(sizeof(*new_array));
    if (new_array != NULL)
@@ -45,6 +46,7 @@ struct array *array_create(char *new_array_name, char *cmc_address, uint16_t mon
         new_array->name = strdup(new_array_name);
         new_array->n_antennas = n_antennas;
         new_array->cmc_address = strdup(cmc_address);
+        new_array->control_port = control_port;
         new_array->monitor_port = monitor_port;
         new_array->number_of_teams = 2;
         new_array->team_list = malloc(sizeof(new_array->team_list)*(new_array->number_of_teams));
@@ -52,7 +54,7 @@ struct array *array_create(char *new_array_name, char *cmc_address, uint16_t mon
         new_array->team_list[1] = team_create('x', new_array->n_antennas);
 
         new_array->monitor_fd = net_connect(cmc_address, monitor_port, NETC_VERBOSE_ERRORS | NETC_VERBOSE_STATS);
-        new_array->katcl_line = create_katcl(new_array->monitor_fd);
+        new_array->monitor_katcl_line = create_katcl(new_array->monitor_fd);
    }
    return new_array;
 }
@@ -167,7 +169,7 @@ char *array_get_sensor_status(struct array *this_array, char team_type, size_t h
 void array_set_fds(struct array *this_array, fd_set *rd, fd_set *wr, int *nfds)
 {
     FD_SET(this_array->monitor_fd, rd);
-    if (flushing_katcl(this_array->katcl_line))
+    if (flushing_katcl(this_array->monitor_katcl_line))
     {
         FD_SET(this_array->monitor_fd, wr);
     }
@@ -192,16 +194,16 @@ void array_setup_katcp_writes(struct array *this_array)
                 char *first_word = malloc(strlen(message_see_word(this_array->current_message, 0)) + 2);
                 sprintf(first_word, "%c%s", message_get_type(this_array->current_message), message_see_word(this_array->current_message, 0));
                 if (message_get_number_of_words(this_array->current_message) == 1)
-                    append_string_katcl(this_array->katcl_line, KATCP_FLAG_FIRST | KATCP_FLAG_LAST, first_word);
+                    append_string_katcl(this_array->monitor_katcl_line, KATCP_FLAG_FIRST | KATCP_FLAG_LAST, first_word);
                 else
                 {
-                    append_string_katcl(this_array->katcl_line, KATCP_FLAG_FIRST, first_word);
+                    append_string_katcl(this_array->monitor_katcl_line, KATCP_FLAG_FIRST, first_word);
                     size_t j;
                     for (j = 1; j < n - 1; j++)
                     {
-                        append_string_katcl(this_array->katcl_line, 0, message_see_word(this_array->current_message, j));
+                        append_string_katcl(this_array->monitor_katcl_line, 0, message_see_word(this_array->current_message, j));
                     }
-                    append_string_katcl(this_array->katcl_line, KATCP_FLAG_LAST, message_see_word(this_array->current_message, (size_t) n - 1));
+                    append_string_katcl(this_array->monitor_katcl_line, KATCP_FLAG_LAST, message_see_word(this_array->current_message, (size_t) n - 1));
                 }
                 free(first_word);
                 first_word = NULL;
@@ -222,7 +224,7 @@ void array_socket_read_write(struct array *this_array, fd_set *rd, fd_set *wr)
     if (FD_ISSET(this_array->monitor_fd, rd))
     {
         verbose_message(BORING, "Reading katcl_line from %s:%hu.\n", this_array->cmc_address, this_array->monitor_port);
-        r = read_katcl(this_array->katcl_line);
+        r = read_katcl(this_array->monitor_katcl_line);
         if (r)
         {
             fprintf(stderr, "read from %s:%hu failed\n", this_array->cmc_address, this_array->monitor_port);
@@ -234,7 +236,7 @@ void array_socket_read_write(struct array *this_array, fd_set *rd, fd_set *wr)
     if (FD_ISSET(this_array->monitor_fd, wr))
     {
         verbose_message(BORING, "Writing katcl_line to %s:%hu.\n", this_array->cmc_address, this_array->monitor_port);
-        r = write_katcl(this_array->katcl_line);
+        r = write_katcl(this_array->monitor_katcl_line);
         if (r < 0)
         {
             perror("array write_katcl()");
@@ -246,23 +248,23 @@ void array_socket_read_write(struct array *this_array, fd_set *rd, fd_set *wr)
 
 void array_handle_received_katcl_lines(struct array *this_array)
 {
-    while (have_katcl(this_array->katcl_line) > 0)
+    while (have_katcl(this_array->monitor_katcl_line) > 0)
     {
         verbose_message(BORING, "From %s:%hu: %s %s %s %s %s\n", this_array->cmc_address, this_array->monitor_port, \
-                arg_string_katcl(this_array->katcl_line, 0), \
-                arg_string_katcl(this_array->katcl_line, 1), \
-                arg_string_katcl(this_array->katcl_line, 2), \
-                arg_string_katcl(this_array->katcl_line, 3), \
-                arg_string_katcl(this_array->katcl_line, 4));
-        char received_message_type = arg_string_katcl(this_array->katcl_line, 0)[0];
+                arg_string_katcl(this_array->monitor_katcl_line, 0), \
+                arg_string_katcl(this_array->monitor_katcl_line, 1), \
+                arg_string_katcl(this_array->monitor_katcl_line, 2), \
+                arg_string_katcl(this_array->monitor_katcl_line, 3), \
+                arg_string_katcl(this_array->monitor_katcl_line, 4));
+        char received_message_type = arg_string_katcl(this_array->monitor_katcl_line, 0)[0];
         switch (received_message_type) {
             case '!': // it's a katcp response
-                if (!strcmp(arg_string_katcl(this_array->katcl_line, 0) + 1, message_see_word(this_array->current_message, 0)))
+                if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 0) + 1, message_see_word(this_array->current_message, 0)))
                 {
                     verbose_message(DEBUG, "%s:%hu received %s %s\n", this_array->cmc_address, this_array->monitor_port, \
-                            message_see_word(this_array->current_message, 0), arg_string_katcl(this_array->katcl_line, 1));
+                            message_see_word(this_array->current_message, 0), arg_string_katcl(this_array->monitor_katcl_line, 1));
 
-                    if (!strcmp(arg_string_katcl(this_array->katcl_line, 1), "ok"))
+                    if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 1), "ok"))
                     {
                         //Don't actually need to do anything here, the inform processing code should handle.
                     }
@@ -291,15 +293,15 @@ void array_handle_received_katcl_lines(struct array *this_array)
                 }
                 break;
             case '#': // it's a katcp inform
-                if (!strcmp(arg_string_katcl(this_array->katcl_line, 0) + 1, "sensor-status"))
+                if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 0) + 1, "sensor-status"))
                 {
 
                 }
-                else if (!strcmp(arg_string_katcl(this_array->katcl_line, 0) + 1, "sensor-value"))
+                else if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 0) + 1, "sensor-value"))
                 {
 
                 }
-                else if (!strcmp(arg_string_katcl(this_array->katcl_line, 0) + 1, "sensor-list"))
+                else if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 0) + 1, "sensor-list"))
                 {
 
                 }
@@ -313,11 +315,11 @@ void array_handle_received_katcl_lines(struct array *this_array)
 
 char *array_html_summary(struct array *this_array, char *cmc_name)
 {
-    char format[] = "<tr><td><a href=\"%s/%s\">%s</a></td><td>%hu</td><td>%lu</td>";
-    ssize_t needed = snprintf(NULL, 0, format, cmc_name, this_array->name, this_array->name, this_array->monitor_port, this_array->n_antennas) + 1;
+    char format[] = "<tr><td><a href=\"%s/%s\">%s</a></td><td>%hu</td><td>%hu</td><td>%lu</td>";
+    ssize_t needed = snprintf(NULL, 0, format, cmc_name, this_array->name, this_array->name, this_array->control_port, this_array->monitor_port, this_array->n_antennas) + 1;
     //TODO checks
     char *html_summary = malloc((size_t) needed);
-    sprintf(html_summary, format, cmc_name, this_array->name, this_array->name, this_array->monitor_port, this_array->n_antennas);
+    sprintf(html_summary, format, cmc_name, this_array->name, this_array->name, this_array->control_port, this_array->monitor_port, this_array->n_antennas);
     return html_summary;
 }
 

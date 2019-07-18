@@ -60,6 +60,7 @@ char *html_style()
         return_value = realloc(return_value, strlen(return_value) + strlen(buffer) + 1);
         strcat(return_value, buffer);
     }
+    fclose(style_file);
     return_value = realloc(return_value, strlen(return_value) + strlen("</style>\n") + 1);
     strcat(return_value, "</style>\n");
     return return_value;

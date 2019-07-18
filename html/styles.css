@@ -53,8 +53,25 @@ h1 {
     font-size: 50px;
 }
 
-@media screen and (min-width: 1500px) {
+table, th, td {
+    border: 1px solid black;
+    border-collapse: collapse;
+    font-size: 25px;
+}
+
+td {
+    text-align: center;
+}
+
+
+@media screen and (min-width: 2500px) {
     h1 {
         font-size: 100px;
     }
+
+    table, th, td {
+        font-size: 50px;
+    }
 }
+
+

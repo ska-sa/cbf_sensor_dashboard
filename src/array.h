@@ -20,7 +20,8 @@ void array_setup_katcp_writes(struct array *this_array);
 void array_socket_read_write(struct array *this_array, fd_set *rd, fd_set *wr);
 void array_handle_received_katcl_lines(struct array *this_array);
 
-struct message *array_queue_pop(struct array *this_array);
+struct message *array_control_queue_pop(struct array *this_array);
+struct message *array_monitor_queue_pop(struct array *this_array);
 
 char *array_html_summary(struct array *this_array, char *cmc_name);
 char *array_html_detail(struct array *this_array);

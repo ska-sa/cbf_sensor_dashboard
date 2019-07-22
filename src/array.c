@@ -33,8 +33,8 @@ struct array {
     int monitor_fd;
     struct katcl_line *monitor_katcl_line;
     enum array_state state;
-    struct queue *outgoing_msg_queue;
-    struct message *current_message;
+    struct queue *outgoing_monitor_msg_queue;
+    struct message *current_monitor_message;
 };
 
 
@@ -179,21 +179,21 @@ void array_set_fds(struct array *this_array, fd_set *rd, fd_set *wr, int *nfds)
 
 void array_setup_katcp_writes(struct array *this_array)
 {
-    if (this_array->current_message)
+    if (this_array->current_monitor_message)
     {
         if (this_array->state == ARRAY_SEND_FRONT_OF_QUEUE)
         {
-            int n = message_get_number_of_words(this_array->current_message);
+            int n = message_get_number_of_words(this_array->current_monitor_message);
             if (n > 0)
             {
-                char *composed_message = message_compose(this_array->current_message);
+                char *composed_message = message_compose(this_array->current_monitor_message);
                 verbose_message(BORING, "Sending KATCP message \"%s\" to %s:%hu\n", composed_message, this_array->cmc_address, this_array->monitor_port);
                 free(composed_message);
                 composed_message = NULL;
 
-                char *first_word = malloc(strlen(message_see_word(this_array->current_message, 0)) + 2);
-                sprintf(first_word, "%c%s", message_get_type(this_array->current_message), message_see_word(this_array->current_message, 0));
-                if (message_get_number_of_words(this_array->current_message) == 1)
+                char *first_word = malloc(strlen(message_see_word(this_array->current_monitor_message, 0)) + 2);
+                sprintf(first_word, "%c%s", message_get_type(this_array->current_monitor_message), message_see_word(this_array->current_monitor_message, 0));
+                if (message_get_number_of_words(this_array->current_monitor_message) == 1)
                     append_string_katcl(this_array->monitor_katcl_line, KATCP_FLAG_FIRST | KATCP_FLAG_LAST, first_word);
                 else
                 {
@@ -201,9 +201,9 @@ void array_setup_katcp_writes(struct array *this_array)
                     size_t j;
                     for (j = 1; j < n - 1; j++)
                     {
-                        append_string_katcl(this_array->monitor_katcl_line, 0, message_see_word(this_array->current_message, j));
+                        append_string_katcl(this_array->monitor_katcl_line, 0, message_see_word(this_array->current_monitor_message, j));
                     }
-                    append_string_katcl(this_array->monitor_katcl_line, KATCP_FLAG_LAST, message_see_word(this_array->current_message, (size_t) n - 1));
+                    append_string_katcl(this_array->monitor_katcl_line, KATCP_FLAG_LAST, message_see_word(this_array->current_monitor_message, (size_t) n - 1));
                 }
                 free(first_word);
                 first_word = NULL;
@@ -259,10 +259,10 @@ void array_handle_received_katcl_lines(struct array *this_array)
         char received_message_type = arg_string_katcl(this_array->monitor_katcl_line, 0)[0];
         switch (received_message_type) {
             case '!': // it's a katcp response
-                if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 0) + 1, message_see_word(this_array->current_message, 0)))
+                if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 0) + 1, message_see_word(this_array->current_monitor_message, 0)))
                 {
                     verbose_message(DEBUG, "%s:%hu received %s %s\n", this_array->cmc_address, this_array->monitor_port, \
-                            message_see_word(this_array->current_message, 0), arg_string_katcl(this_array->monitor_katcl_line, 1));
+                            message_see_word(this_array->current_monitor_message, 0), arg_string_katcl(this_array->monitor_katcl_line, 1));
 
                     if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 1), "ok"))
                     {
@@ -276,18 +276,18 @@ void array_handle_received_katcl_lines(struct array *this_array)
 
                     this_array->state = ARRAY_SEND_FRONT_OF_QUEUE;
                     verbose_message(BORING, "%s:%hu still has %u message(s) in its queue...\n", this_array->cmc_address, \
-                            this_array->monitor_port, queue_sizeof(this_array->outgoing_msg_queue));
+                            this_array->monitor_port, queue_sizeof(this_array->outgoing_monitor_msg_queue));
 
-                    if (queue_sizeof(this_array->outgoing_msg_queue))
+                    if (queue_sizeof(this_array->outgoing_monitor_msg_queue))
                     {
                         verbose_message(BORING, "%s:%hu  popping queue...\n", this_array->cmc_address, this_array->monitor_port);
-                        array_queue_pop(this_array);
+                        array_monitor_queue_pop(this_array);
                     }
                     else
                     {
                         verbose_message(INFO, "%s:%hu going into monitoring state.\n", this_array->cmc_address, this_array->monitor_port);
-                        message_destroy(this_array->current_message);
-                        this_array->current_message = NULL; //doesn't do this in the above function. C problem.
+                        message_destroy(this_array->current_monitor_message);
+                        this_array->current_monitor_message = NULL; //doesn't do this in the above function. C problem.
                         this_array->state = ARRAY_MONITOR;
                     }
                 }
@@ -346,12 +346,12 @@ char *array_html_detail(struct array *this_array)
 }
 
 
-struct message *array_queue_pop(struct array *this_array)
+struct message *array_monitor_queue_pop(struct array *this_array)
 {
-    if (this_array->current_message != NULL)
+    if (this_array->current_monitor_message != NULL)
     {
-        message_destroy(this_array->current_message);
+        message_destroy(this_array->current_monitor_message);
     }
-    this_array->current_message = queue_pop(this_array->outgoing_msg_queue);
-    return this_array->current_message;
+    this_array->current_monitor_message = queue_pop(this_array->outgoing_monitor_msg_queue);
+    return this_array->current_monitor_message;
 }

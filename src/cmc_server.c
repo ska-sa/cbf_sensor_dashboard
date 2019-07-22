@@ -177,7 +177,7 @@ void cmc_server_setup_katcp_writes(struct cmc_server *this_cmc_server)
     size_t i;
     for (i=0; i < this_cmc_server->no_of_arrays; i++)
     {
-        //array_setup_katcp_writes(this_cmc_server->array_list[i]);
+        array_setup_katcp_writes(this_cmc_server->array_list[i]);
     }
 }
 

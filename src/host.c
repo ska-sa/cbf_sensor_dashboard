@@ -37,6 +37,7 @@ void host_destroy(struct host *this_host)
 {
     if (this_host != NULL)
     {
+        free(this_host->hostname);
         unsigned int i;
         for (i = 0; i < this_host->number_of_vdevices; i++)
             vdevice_destroy(this_host->vdevice_list[i]);

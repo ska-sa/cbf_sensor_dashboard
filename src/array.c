@@ -76,18 +76,21 @@ struct array *array_create(char *new_array_name, char *cmc_address, uint16_t con
         queue_push(new_array->outgoing_control_msg_queue, new_message);
         new_array->instrument_state = strdup("-");
         new_array->config_file = strdup("-");
+        new_array->current_control_message = NULL;
+        array_control_queue_pop(new_array);
         new_array->control_state = ARRAY_SEND_FRONT_OF_QUEUE;
 
         new_array->monitor_port = monitor_port;
         new_array->monitor_fd = net_connect(cmc_address, monitor_port, NETC_VERBOSE_ERRORS | NETC_VERBOSE_STATS);
         new_array->monitor_katcl_line = create_katcl(new_array->monitor_fd);
-        queue_push(new_array->outgoing_control_msg_queue, new_message);
+        new_array->outgoing_monitor_msg_queue = queue_create();
 
         new_message = message_create('?');
         message_add_word(new_message, "log-local");
         message_add_word(new_message, "off");
         queue_push(new_array->outgoing_monitor_msg_queue, new_message);
-
+        new_array->current_monitor_message = NULL;
+        array_monitor_queue_pop(new_array);
         new_array->monitor_state = ARRAY_SEND_FRONT_OF_QUEUE;
 
         new_array->number_of_teams = 2;
@@ -111,6 +114,7 @@ void array_destroy(struct array *this_array)
         {
             team_destroy(this_array->team_list[i]);
         }
+        free(this_array->team_list);
 
         destroy_katcl(this_array->control_katcl_line, 1);
         close(this_array->control_fd);

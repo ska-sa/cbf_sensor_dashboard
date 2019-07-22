@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <string.h>
 #include <stdint.h>
 #include <netc.h>
@@ -27,12 +28,20 @@ struct array {
     struct team **team_list;
     size_t number_of_teams;
     size_t n_antennas;
-    uint16_t control_port;
-    uint16_t monitor_port;
+
     char *cmc_address;
+
+    uint16_t control_port;
+    int control_fd;
+    struct katcl_line *control_katcl_line;
+    enum array_state control_state;
+    struct queue *outgoing_control_msg_queue;
+    struct message *current_control_message;
+
+    uint16_t monitor_port;
     int monitor_fd;
     struct katcl_line *monitor_katcl_line;
-    enum array_state state;
+    enum array_state monitor_state;
     struct queue *outgoing_monitor_msg_queue;
     struct message *current_monitor_message;
 };
@@ -46,15 +55,26 @@ struct array *array_create(char *new_array_name, char *cmc_address, uint16_t con
         new_array->name = strdup(new_array_name);
         new_array->n_antennas = n_antennas;
         new_array->cmc_address = strdup(cmc_address);
+
         new_array->control_port = control_port;
+        new_array->control_fd = net_connect(cmc_address, control_port, NETC_VERBOSE_ERRORS | NETC_VERBOSE_STATS);
+        new_array->control_katcl_line = create_katcl(new_array->control_fd);
+        new_array->outgoing_control_msg_queue = queue_create();
+
+        struct message *new_message = message_create('?');
+        message_add_word(new_message, "log-local");
+        message_add_word(new_message, "off");
+        queue_push(new_array->outgoing_control_msg_queue, new_message);
+
         new_array->monitor_port = monitor_port;
+        new_array->monitor_fd = net_connect(cmc_address, monitor_port, NETC_VERBOSE_ERRORS | NETC_VERBOSE_STATS);
+        new_array->monitor_katcl_line = create_katcl(new_array->monitor_fd);
+        queue_push(new_array->outgoing_control_msg_queue, new_message);
+
         new_array->number_of_teams = 2;
         new_array->team_list = malloc(sizeof(new_array->team_list)*(new_array->number_of_teams));
         new_array->team_list[0] = team_create('f', new_array->n_antennas);
         new_array->team_list[1] = team_create('x', new_array->n_antennas);
-
-        new_array->monitor_fd = net_connect(cmc_address, monitor_port, NETC_VERBOSE_ERRORS | NETC_VERBOSE_STATS);
-        new_array->monitor_katcl_line = create_katcl(new_array->monitor_fd);
    }
    return new_array;
 }
@@ -66,11 +86,23 @@ void array_destroy(struct array *this_array)
     {
         free(this_array->cmc_address);
         free(this_array->name);
+
         size_t i;
         for (i = 0; i < this_array->number_of_teams; i++)
         {
             team_destroy(this_array->team_list[i]);
         }
+
+        destroy_katcl(this_array->control_katcl_line, 1);
+        close(this_array->control_fd);
+        queue_destroy(this_array->outgoing_control_msg_queue);
+        message_destroy(this_array->current_control_message);
+
+        destroy_katcl(this_array->monitor_katcl_line, 1);
+        close(this_array->monitor_fd);
+        queue_destroy(this_array->outgoing_monitor_msg_queue);
+        message_destroy(this_array->current_monitor_message);
+
         free(this_array);
         this_array = NULL;
     }
@@ -181,7 +213,7 @@ void array_setup_katcp_writes(struct array *this_array)
 {
     if (this_array->current_monitor_message)
     {
-        if (this_array->state == ARRAY_SEND_FRONT_OF_QUEUE)
+        if (this_array->monitor_state == ARRAY_SEND_FRONT_OF_QUEUE)
         {
             int n = message_get_number_of_words(this_array->current_monitor_message);
             if (n > 0)
@@ -212,7 +244,7 @@ void array_setup_katcp_writes(struct array *this_array)
             {
                 verbose_message(WARNING, "A message on %s:%hu's queue had 0 words in it. Cannot send.\n", this_array->cmc_address, this_array->monitor_port);
             }
-            this_array->state = ARRAY_WAIT_RESPONSE;
+            this_array->monitor_state = ARRAY_WAIT_RESPONSE;
         }
     }
 }
@@ -274,7 +306,7 @@ void array_handle_received_katcl_lines(struct array *this_array)
                         //sensor_mark_absent(); // somehow. How will this propagate down?
                     }
 
-                    this_array->state = ARRAY_SEND_FRONT_OF_QUEUE;
+                    this_array->monitor_state = ARRAY_SEND_FRONT_OF_QUEUE;
                     verbose_message(BORING, "%s:%hu still has %u message(s) in its queue...\n", this_array->cmc_address, \
                             this_array->monitor_port, queue_sizeof(this_array->outgoing_monitor_msg_queue));
 
@@ -288,7 +320,7 @@ void array_handle_received_katcl_lines(struct array *this_array)
                         verbose_message(INFO, "%s:%hu going into monitoring state.\n", this_array->cmc_address, this_array->monitor_port);
                         message_destroy(this_array->current_monitor_message);
                         this_array->current_monitor_message = NULL; //doesn't do this in the above function. C problem.
-                        this_array->state = ARRAY_MONITOR;
+                        this_array->monitor_state = ARRAY_MONITOR;
                     }
                 }
                 break;
@@ -343,6 +375,17 @@ char *array_html_detail(struct array *this_array)
         sprintf(array_html_detail, format, array_html_detail);
     }
     return array_html_detail;
+}
+
+
+struct message *array_control_queue_pop(struct array *this_array)
+{
+    if (this_array->current_control_message != NULL)
+    {
+        message_destroy(this_array->current_control_message);
+    }
+    this_array->current_control_message = queue_pop(this_array->outgoing_control_msg_queue);
+    return this_array->current_control_message;
 }
 
 

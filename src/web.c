@@ -111,7 +111,7 @@ static int web_client_buffer_write(struct web_client *client)
         free(http_ok_message);
     }
 
-    verbose_message(DEBUG, "About to write, fd=%d, buffer=0x%lx, byes_written=%d, bytes_to_write=%d\n", \
+    verbose_message(BORING, "About to write, fd=%d, buffer=0x%lx, byes_written=%d, bytes_to_write=%d\n", \
             client->fd, client->buffer, client->bytes_written, bytes_to_write);
     r = write(client->fd, client->buffer + client->bytes_written, bytes_to_write);
     if (r < 0)

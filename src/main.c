@@ -252,8 +252,8 @@ int main(int argc, char **argv)
 
         for (i = 0; i < num_cmcs; i++)
         {
-            cmc_server_set_fds(cmc_list[i], &rd, &wr, &nfds);
             cmc_server_setup_katcp_writes(cmc_list[i]);
+            cmc_server_set_fds(cmc_list[i], &rd, &wr, &nfds);
         }
 
         for (i = 0; i < num_web_clients; i++)

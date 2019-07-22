@@ -38,6 +38,9 @@ struct array {
     struct queue *outgoing_control_msg_queue;
     struct message *current_control_message;
 
+    char *instrument_state;
+    char *config_file;
+
     uint16_t monitor_port;
     int monitor_fd;
     struct katcl_line *monitor_katcl_line;
@@ -66,10 +69,26 @@ struct array *array_create(char *new_array_name, char *cmc_address, uint16_t con
         message_add_word(new_message, "off");
         queue_push(new_array->outgoing_control_msg_queue, new_message);
 
+        new_message = message_create('?');
+        message_add_word(new_message, "sensor-sampling");
+        message_add_word(new_message, "instrument-state");
+        message_add_word(new_message, "auto");
+        queue_push(new_array->outgoing_control_msg_queue, new_message);
+        new_array->instrument_state = strdup("-");
+        new_array->config_file = strdup("-");
+        new_array->control_state = ARRAY_SEND_FRONT_OF_QUEUE;
+
         new_array->monitor_port = monitor_port;
         new_array->monitor_fd = net_connect(cmc_address, monitor_port, NETC_VERBOSE_ERRORS | NETC_VERBOSE_STATS);
         new_array->monitor_katcl_line = create_katcl(new_array->monitor_fd);
         queue_push(new_array->outgoing_control_msg_queue, new_message);
+
+        new_message = message_create('?');
+        message_add_word(new_message, "log-local");
+        message_add_word(new_message, "off");
+        queue_push(new_array->outgoing_monitor_msg_queue, new_message);
+
+        new_array->monitor_state = ARRAY_SEND_FRONT_OF_QUEUE;
 
         new_array->number_of_teams = 2;
         new_array->team_list = malloc(sizeof(new_array->team_list)*(new_array->number_of_teams));
@@ -102,6 +121,9 @@ void array_destroy(struct array *this_array)
         close(this_array->monitor_fd);
         queue_destroy(this_array->outgoing_monitor_msg_queue);
         message_destroy(this_array->current_monitor_message);
+
+        free(this_array->instrument_state);
+        free(this_array->config_file);
 
         free(this_array);
         this_array = NULL;
@@ -200,6 +222,13 @@ char *array_get_sensor_status(struct array *this_array, char team_type, size_t h
 
 void array_set_fds(struct array *this_array, fd_set *rd, fd_set *wr, int *nfds)
 {
+    FD_SET(this_array->control_fd, rd);
+    if (flushing_katcl(this_array->control_katcl_line))
+    {
+        FD_SET(this_array->control_fd, wr);
+    }
+    *nfds = max(*nfds, this_array->control_fd);
+
     FD_SET(this_array->monitor_fd, rd);
     if (flushing_katcl(this_array->monitor_katcl_line))
     {
@@ -211,6 +240,45 @@ void array_set_fds(struct array *this_array, fd_set *rd, fd_set *wr, int *nfds)
 
 void array_setup_katcp_writes(struct array *this_array)
 {
+    if (this_array->current_control_message)
+    {
+        if (this_array->control_state == ARRAY_SEND_FRONT_OF_QUEUE)
+        {
+            int n = message_get_number_of_words(this_array->current_control_message);
+            if (n > 0)
+            {
+                char *composed_message = message_compose(this_array->current_control_message);
+                verbose_message(BORING, "Sending KATCP message \"%s\" to %s:%hu\n", composed_message, this_array->cmc_address, this_array->control_port);
+                free(composed_message);
+                composed_message = NULL;
+
+                char *first_word = malloc(strlen(message_see_word(this_array->current_control_message, 0)) + 2);
+                sprintf(first_word, "%c%s", message_get_type(this_array->current_control_message), message_see_word(this_array->current_control_message, 0));
+                if (message_get_number_of_words(this_array->current_control_message) == 1)
+                    append_string_katcl(this_array->control_katcl_line, KATCP_FLAG_FIRST | KATCP_FLAG_LAST, first_word);
+                else
+                {
+                    append_string_katcl(this_array->control_katcl_line, KATCP_FLAG_FIRST, first_word);
+                    size_t j;
+                    for (j = 1; j < n - 1; j++)
+                    {
+                        append_string_katcl(this_array->control_katcl_line, 0, message_see_word(this_array->current_control_message, j));
+                    }
+                    append_string_katcl(this_array->control_katcl_line, KATCP_FLAG_LAST, message_see_word(this_array->current_control_message, (size_t) n - 1));
+                }
+                free(first_word);
+                first_word = NULL;
+
+                this_array->control_state = ARRAY_WAIT_RESPONSE;
+            }
+            else
+            {
+                verbose_message(WARNING, "A message on %s:%hu's (control) queue had 0 words in it. Cannot send.\n", this_array->cmc_address, this_array->control_port);
+                //TODO push to the next message.
+            }
+        }
+    }
+
     if (this_array->current_monitor_message)
     {
         if (this_array->monitor_state == ARRAY_SEND_FRONT_OF_QUEUE)
@@ -239,12 +307,14 @@ void array_setup_katcp_writes(struct array *this_array)
                 }
                 free(first_word);
                 first_word = NULL;
+
+                this_array->monitor_state = ARRAY_WAIT_RESPONSE;
             }
             else
             {
-                verbose_message(WARNING, "A message on %s:%hu's queue had 0 words in it. Cannot send.\n", this_array->cmc_address, this_array->monitor_port);
+                verbose_message(WARNING, "A message on %s:%hu's (monitor) queue had 0 words in it. Cannot send.\n", this_array->cmc_address, this_array->monitor_port);
+                //TODO push to the next message.
             }
-            this_array->monitor_state = ARRAY_WAIT_RESPONSE;
         }
     }
 }
@@ -253,26 +323,47 @@ void array_setup_katcp_writes(struct array *this_array)
 void array_socket_read_write(struct array *this_array, fd_set *rd, fd_set *wr)
 {
     int r;
+    if (FD_ISSET(this_array->control_fd, rd))
+    {
+        verbose_message(BORING, "Reading katcl_line from %s:%hu (control).\n", this_array->cmc_address, this_array->control_port);
+        r = read_katcl(this_array->control_katcl_line);
+        if (r)
+        {
+            fprintf(stderr, "read from %s:%hu (control) failed\n", this_array->cmc_address, this_array->control_port);
+            /*TODO some kind of error checking, what to do if connection fails.*/
+        }
+    }
+
+    if (FD_ISSET(this_array->control_fd, wr))
+    {
+        verbose_message(BORING, "Writing katcl_line to %s:%hu (control).\n", this_array->cmc_address, this_array->control_port);
+        r = write_katcl(this_array->control_katcl_line);
+        if (r < 0)
+        {
+            fprintf(stderr, "write to from %s:%hu (control) failed\n", this_array->cmc_address, this_array->control_port);
+            /*TODO some kind of error checking, what to do if connection fails.*/
+        }
+    }
+
     if (FD_ISSET(this_array->monitor_fd, rd))
     {
-        verbose_message(BORING, "Reading katcl_line from %s:%hu.\n", this_array->cmc_address, this_array->monitor_port);
+        verbose_message(BORING, "Reading katcl_line from %s:%hu (monitor).\n", this_array->cmc_address, this_array->monitor_port);
         r = read_katcl(this_array->monitor_katcl_line);
         if (r)
         {
-            fprintf(stderr, "read from %s:%hu failed\n", this_array->cmc_address, this_array->monitor_port);
-            perror("array read_katcl()");
-            /*TODO some kind of error checking, what to do if the CMC doesn't connect.*/
+            fprintf(stderr, "read from %s:%hu (monitor) failed\n", this_array->cmc_address, this_array->monitor_port);
+            /*TODO some kind of error checking, what to do if connection fails.*/
         }
     }
 
     if (FD_ISSET(this_array->monitor_fd, wr))
     {
-        verbose_message(BORING, "Writing katcl_line to %s:%hu.\n", this_array->cmc_address, this_array->monitor_port);
+        verbose_message(BORING, "Writing katcl_line to %s:%hu (monitor).\n", this_array->cmc_address, this_array->monitor_port);
         r = write_katcl(this_array->monitor_katcl_line);
         if (r < 0)
         {
-            perror("array write_katcl()");
-            /*TODO some other kind of error checking.*/
+            fprintf(stderr, "write to from %s:%hu (monitor) failed\n", this_array->cmc_address, this_array->monitor_port);
+            /*TODO some kind of error checking, what to do if connection fails.*/
         }
     }
 }
@@ -280,6 +371,74 @@ void array_socket_read_write(struct array *this_array, fd_set *rd, fd_set *wr)
 
 void array_handle_received_katcl_lines(struct array *this_array)
 {
+    while (have_katcl(this_array->control_katcl_line) > 0)
+    {
+        verbose_message(BORING, "From %s:%hu: %s %s %s %s %s\n", this_array->cmc_address, this_array->monitor_port, \
+                arg_string_katcl(this_array->monitor_katcl_line, 0), \
+                arg_string_katcl(this_array->monitor_katcl_line, 1), \
+                arg_string_katcl(this_array->monitor_katcl_line, 2), \
+                arg_string_katcl(this_array->monitor_katcl_line, 3), \
+                arg_string_katcl(this_array->monitor_katcl_line, 4));
+        char received_message_type = arg_string_katcl(this_array->control_katcl_line, 0)[0];
+        switch (received_message_type) {
+            case '!': // it's a katcp response
+                if (!strcmp(arg_string_katcl(this_array->control_katcl_line, 0) + 1, message_see_word(this_array->current_control_message, 0)))
+                {
+                    verbose_message(DEBUG, "%s:%hu received %s %s\n", this_array->cmc_address, this_array->control_port, \
+                            message_see_word(this_array->current_control_message, 0), arg_string_katcl(this_array->control_katcl_line, 1));
+
+                    if (!strcmp(arg_string_katcl(this_array->control_katcl_line, 1), "ok"))
+                    {
+                        //Don't actually need to do anything here, the inform processing code should handle.
+                    }
+                    else
+                    {
+                        //sensor obviously doesn't exist.
+                        //sensor_mark_absent(); // somehow. How will this propagate down?
+                    }
+
+                    this_array->control_state = ARRAY_SEND_FRONT_OF_QUEUE;
+                    verbose_message(BORING, "%s:%hu still has %u message(s) in its queue...\n", this_array->cmc_address, \
+                            this_array->control_port, queue_sizeof(this_array->outgoing_control_msg_queue));
+
+                    if (queue_sizeof(this_array->outgoing_control_msg_queue))
+                    {
+                        verbose_message(BORING, "%s:%hu  popping queue...\n", this_array->cmc_address, this_array->control_port);
+                        array_control_queue_pop(this_array);
+                    }
+                    else
+                    {
+                        verbose_message(INFO, "%s:%hu going into monitoring state.\n", this_array->cmc_address, this_array->control_port);
+                        message_destroy(this_array->current_control_message);
+                        this_array->current_control_message = NULL; //doesn't do this in the above function. C problem.
+                        this_array->control_state = ARRAY_MONITOR;
+                    }
+                }
+                break;
+            case '#': // it's a katcp inform
+                if (!strcmp(arg_string_katcl(this_array->control_katcl_line, 0) + 1, "sensor-status"))
+                {
+                    if (!strcmp(arg_string_katcl(this_array->control_katcl_line, 3), "instrument-state"))
+                    {
+                        free(this_array->instrument_state);
+                        this_array->instrument_state = strdup(arg_string_katcl(this_array->control_katcl_line, 4));
+                        free(this_array->config_file);
+                        this_array->config_file = strdup(arg_string_katcl(this_array->control_katcl_line, 5));
+                    }
+                }
+                else if (!strcmp(arg_string_katcl(this_array->control_katcl_line, 0) + 1, "sensor-value"))
+                {
+                }
+                else if (!strcmp(arg_string_katcl(this_array->control_katcl_line, 0) + 1, "sensor-list"))
+                {
+
+                }
+                break;
+            default:
+                verbose_message(WARNING, "Unexpected KATCP message received, starting with %c\n", received_message_type);
+        }
+    }
+
     while (have_katcl(this_array->monitor_katcl_line) > 0)
     {
         verbose_message(BORING, "From %s:%hu: %s %s %s %s %s\n", this_array->cmc_address, this_array->monitor_port, \
@@ -347,11 +506,11 @@ void array_handle_received_katcl_lines(struct array *this_array)
 
 char *array_html_summary(struct array *this_array, char *cmc_name)
 {
-    char format[] = "<tr><td><a href=\"%s/%s\">%s</a></td><td>%hu</td><td>%hu</td><td>%lu</td>";
-    ssize_t needed = snprintf(NULL, 0, format, cmc_name, this_array->name, this_array->name, this_array->control_port, this_array->monitor_port, this_array->n_antennas) + 1;
+    char format[] = "<tr><td><a href=\"%s/%s\">%s</a></td><td>%hu</td><td>%hu</td><td>%lu</td><td>%s</td><td>%s</td>";
+    ssize_t needed = snprintf(NULL, 0, format, cmc_name, this_array->name, this_array->name, this_array->control_port, this_array->monitor_port, this_array->n_antennas, this_array->config_file, this_array->instrument_state) + 1;
     //TODO checks
     char *html_summary = malloc((size_t) needed);
-    sprintf(html_summary, format, cmc_name, this_array->name, this_array->name, this_array->control_port, this_array->monitor_port, this_array->n_antennas);
+    sprintf(html_summary, format, cmc_name, this_array->name, this_array->name, this_array->control_port, this_array->monitor_port, this_array->n_antennas, this_array->config_file, this_array->instrument_state);
     return html_summary;
 }
 

@@ -115,6 +115,7 @@ void cmc_server_set_fds(struct cmc_server *this_cmc_server, fd_set *rd, fd_set *
     FD_SET(this_cmc_server->katcp_socket_fd, rd);
     if (flushing_katcl(this_cmc_server->katcl_line))
     {
+        verbose_message(BORING, "flushing_katcl() returned true, %s:%hu has a katcp command to send.\n", this_cmc_server->address, this_cmc_server->katcp_port);
         FD_SET(this_cmc_server->katcp_socket_fd, wr);
     }
     *nfds = max(*nfds, this_cmc_server->katcp_socket_fd);
@@ -146,7 +147,10 @@ void cmc_server_setup_katcp_writes(struct cmc_server *this_cmc_server)
                 char *first_word = malloc(strlen(message_see_word(this_cmc_server->current_message, 0)) + 2);
                 sprintf(first_word, "%c%s", message_get_type(this_cmc_server->current_message), message_see_word(this_cmc_server->current_message, 0));
                 if (message_get_number_of_words(this_cmc_server->current_message) == 1)
+                {
+                    verbose_message(BORING, "It's a single-word message.\n");
                     append_string_katcl(this_cmc_server->katcl_line, KATCP_FLAG_FIRST | KATCP_FLAG_LAST, first_word);
+                }
                 else
                 {
                     append_string_katcl(this_cmc_server->katcl_line, KATCP_FLAG_FIRST, first_word);
@@ -159,12 +163,14 @@ void cmc_server_setup_katcp_writes(struct cmc_server *this_cmc_server)
                 }
                 free(first_word);
                 first_word = NULL;
+
+                this_cmc_server->state = CMC_WAIT_RESPONSE;
             }
             else
             {
                 verbose_message(WARNING, "A message on %s:%hu's queue had 0 words in it. Cannot send.\n", this_cmc_server->address, this_cmc_server->katcp_port);
+                //TODO push through the queue if there's an error.
             }
-            this_cmc_server->state = CMC_WAIT_RESPONSE;
         }
     }
 
@@ -182,23 +188,21 @@ void cmc_server_socket_read_write(struct cmc_server *this_cmc_server, fd_set *rd
     size_t i;
     if (FD_ISSET(this_cmc_server->katcp_socket_fd, rd))
     {
-        verbose_message(BORING, "Reading katcl_line from %s:%hu.\n", this_cmc_server->address, this_cmc_server->katcp_port);
+        verbose_message(BORING, "Reading katcl_line from %s:%hu on fd %d.\n", this_cmc_server->address, this_cmc_server->katcp_port, this_cmc_server->katcp_socket_fd);
         r = read_katcl(this_cmc_server->katcl_line);
         if (r)
         {
-            fprintf(stderr, "read from %s:%hu failed\n", this_cmc_server->address, this_cmc_server->katcp_port);
-            perror("cmc_server read_katcl()");
+            fprintf(stderr, "read from %s:%hu on fd %d failed\n", this_cmc_server->address, this_cmc_server->katcp_port, this_cmc_server->katcp_socket_fd);
             /*TODO some kind of error checking, what to do if the CMC doesn't connect.*/
         }
     }
     
     if (FD_ISSET(this_cmc_server->katcp_socket_fd, wr))
     {
-        verbose_message(BORING, "Writing katcl_line to %s:%hu.\n", this_cmc_server->address, this_cmc_server->katcp_port);
+        verbose_message(BORING, "Writing katcl_line to %s:%hu on fd %d.\n", this_cmc_server->address, this_cmc_server->katcp_port, this_cmc_server->katcp_socket_fd);
         r = write_katcl(this_cmc_server->katcl_line);
         if (r < 0)
         {
-            perror("cmc_server write_katcl()");
             /*TODO some other kind of error checking.*/
         }
     }
@@ -406,7 +410,7 @@ char *cmc_server_html_representation(struct cmc_server *this_cmc_server)
 
     {   //putting this in its own block so that I can reuse the names "format" and "needed" later.
         //might not be ready since this is followed by a for-loop, but anyway.
-        char format[] = "<h1>%s</h1>\n<table class=\"cmctable\">\n<tr><th>Array Name</th><th>Control Port</th><th>Monitor Port</th><th>N_Antennas</th></tr>";
+        char format[] = "<h1>%s</h1>\n<table class=\"cmctable\">\n<tr><th>Array Name</th><th>Control Port</th><th>Monitor Port</th><th>N_Antennas</th><th>Config File</th><th>Instrument State</th></tr>";
         ssize_t needed = snprintf(NULL, 0, format, this_cmc_server->address) + 1;
         //TODO checks
         cmc_html_rep = malloc((size_t) needed);

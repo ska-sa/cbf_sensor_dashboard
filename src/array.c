@@ -12,7 +12,9 @@
 #include "message.h"
 #include "verbose.h"
 #include "queue.h"
+#include "tokenise.h"
 
+#define BUF_SIZE 1024
 #undef max
 #define max(x,y) ((x) > (y) ? (x) : (y))
 
@@ -141,7 +143,7 @@ char *array_get_name(struct array *this_array)
 }
 
 
-int array_add_team_host_device_sensor(struct array *this_array, char team_type, unsigned int host_number, char *device_name, char *sensor_name)
+int array_add_team_host_device_sensor(struct array *this_array, char team_type, size_t host_number, char *device_name, char *sensor_name)
 {
     if (this_array != NULL)
     {
@@ -167,7 +169,7 @@ int array_add_team_host_device_sensor(struct array *this_array, char team_type, 
 }
 
 
-int array_add_team_host_engine_device_sensor(struct array *this_array, char team_type, unsigned int host_number, char *engine_name, char *device_name, char *sensor_name)
+int array_add_team_host_engine_device_sensor(struct array *this_array, char team_type, size_t host_number, char *engine_name, char *device_name, char *sensor_name)
 {
     if (this_array != NULL)
     {
@@ -375,7 +377,58 @@ void array_socket_read_write(struct array *this_array, fd_set *rd, fd_set *wr)
 
 static void array_activate(struct array *this_array)
 {
+    verbose_message(INFO, "Detected %s (%s) in nominal state, subscribing to sensors.\n", this_array->name, this_array->cmc_address);
     //TODO read the config file, subscribe to sensors.
+    FILE *config_file = fopen("conf/sensor_list.conf", "r");
+
+    char buffer[BUF_SIZE];
+    char *result;
+
+    for (result = fgets(buffer, BUF_SIZE, config_file); result != NULL; result = fgets(buffer, BUF_SIZE, config_file))
+    {
+        //TODO something. //FOOBAR
+        char **tokens = NULL;
+        size_t n_tokens = tokenise_string(buffer, '.', &tokens);
+        if (!(n_tokens == 2) || (n_tokens == 3)) //can't think of a better way to put it than this. Might be just bare device,
+                                                 // or might be engine and device.
+        {
+            verbose_message(ERROR, "sensor_list.conf has a malformed sensor name: %s.\n", buffer);
+        }
+        else
+        {
+            char team_type = tokens[0][0]; //should be just "f" or "x" at this point.
+            size_t i;
+            if (n_tokens == 2)
+            {
+                for (i = 0; i < this_array->n_antennas; i++)
+                {
+                    array_add_team_host_device_sensor(this_array, team_type, i, tokens[1], "device-status");
+                    //TODO subscribe to the sensor as well.
+                }
+            }
+            if (n_tokens == 3)
+            {
+                for (i = 0; i < this_array->n_antennas; i++)
+                {
+                    size_t j;
+                    for (j = 0; j < 4; j++)
+                    {
+                        //TODO formulate engine name.
+                        char *engine_name;
+                        char format[] = "%s%u";
+                        ssize_t needed = snprintf(NULL, 0, format, tokens[1], j) + 1;
+                        engine_name = malloc((size_t) needed);
+                        sprintf(engine_name, format, tokens[1], j);
+                        array_add_team_host_engine_device_sensor(this_array, team_type, i, engine_name, tokens[2], "device-status");
+                        //TODO subscribe to the sensor as well.
+                        free(engine_name);
+                    }
+                }
+            }
+        }
+        free(tokens);
+    }
+    fclose(config_file);
 }
 
 

@@ -6,8 +6,8 @@ struct team;
 struct team *team_create(char type, size_t number_of_antennas);
 void team_destroy(struct team *this_team);
 
-int team_add_device_sensor(struct team *this_team, unsigned int host_number, char *device_name, char *sensor_name);
-int team_add_engine_device_sensor(struct team *this_team, unsigned int host_number, char *engine_name, char *device_name, char *sensor_name);
+int team_add_device_sensor(struct team *this_team, size_t host_number, char *device_name, char *sensor_name);
+int team_add_engine_device_sensor(struct team *this_team, size_t host_number, char *engine_name, char *device_name, char *sensor_name);
 
 char team_get_type(struct team *this_team);
 

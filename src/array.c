@@ -373,6 +373,12 @@ void array_socket_read_write(struct array *this_array, fd_set *rd, fd_set *wr)
 }
 
 
+static void array_activate(struct array *this_array)
+{
+    //TODO read the config file, subscribe to sensors.
+}
+
+
 void array_handle_received_katcl_lines(struct array *this_array)
 {
     while (have_katcl(this_array->control_katcl_line) > 0)
@@ -424,10 +430,17 @@ void array_handle_received_katcl_lines(struct array *this_array)
                 {
                     if (!strcmp(arg_string_katcl(this_array->control_katcl_line, 3), "instrument-state"))
                     {
-                        free(this_array->instrument_state);
-                        this_array->instrument_state = strdup(arg_string_katcl(this_array->control_katcl_line, 4));
-                        free(this_array->config_file);
-                        this_array->config_file = strdup(arg_string_katcl(this_array->control_katcl_line, 5));
+                        if (strcmp(this_array->instrument_state, arg_string_katcl(this_array->control_katcl_line, 4))) //without ! in front, i.e. they are different.
+                        {
+                            if (!strcmp(this_array->instrument_state, "-") && !strcmp(arg_string_katcl(this_array->control_katcl_line, 4), "nominal"))
+                            {
+                                array_activate(this_array);
+                            }
+                            free(this_array->instrument_state);
+                            this_array->instrument_state = strdup(arg_string_katcl(this_array->control_katcl_line, 4));
+                            free(this_array->config_file);
+                            this_array->config_file = strdup(arg_string_katcl(this_array->control_katcl_line, 5));
+                        }
                     }
                 }
                 else if (!strcmp(arg_string_katcl(this_array->control_katcl_line, 0) + 1, "sensor-value"))

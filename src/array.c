@@ -386,11 +386,10 @@ static void array_activate(struct array *this_array)
 
     for (result = fgets(buffer, BUF_SIZE, config_file); result != NULL; result = fgets(buffer, BUF_SIZE, config_file))
     {
-        //TODO something. //FOOBAR
         char **tokens = NULL;
         size_t n_tokens = tokenise_string(buffer, '.', &tokens);
         if (!(n_tokens == 2) || (n_tokens == 3)) //can't think of a better way to put it than this. Might be just bare device,
-                                                 // or might be engine and device.
+                                                 //or might be engine and device.
         {
             verbose_message(ERROR, "sensor_list.conf has a malformed sensor name: %s.\n", buffer);
         }
@@ -587,23 +586,37 @@ char *array_html_summary(struct array *this_array, char *cmc_name)
 
 char *array_html_detail(struct array *this_array)
 {
-    char *array_html_detail = strdup(""); //must free() later.
+    char *array_detail = strdup(""); //must free() later.
     size_t i, j;
     for (i = 0; i < this_array->n_antennas; i++)
     {
+        char *row_detail = strdup("");
         for (j = 0; j < this_array->number_of_teams; j++)
         {
             char format[] = "%s%s";
-            ssize_t needed = snprintf(NULL, 0, format, array_html_detail, team_get_host_html_detail(this_array->team_list[j], i)) + 1;
-            array_html_detail = realloc(array_html_detail, (size_t) needed);
-            sprintf(array_html_detail, format, array_html_detail, team_get_host_html_detail(this_array->team_list[j], i));
+            ssize_t needed = snprintf(NULL, 0, format, row_detail, team_get_host_html_detail(this_array->team_list[j], i)) + 1;
+            row_detail = realloc(row_detail, (size_t) needed);
+            sprintf(row_detail, format, row_detail, team_get_host_html_detail(this_array->team_list[j], i));
+            verbose_message(BORING, "Row detail: %s\n", row_detail);
         }
-        char format[] = "<tr>%s</tr>\n";
-        ssize_t needed = snprintf(NULL, 0, format, array_html_detail) + 1;
-        array_html_detail = realloc(array_html_detail, (size_t) needed); //TODO checks
-        sprintf(array_html_detail, format, array_html_detail);
+        char format[] = "%s<tr>%s</tr>\n";
+        ssize_t needed = snprintf(NULL, 0, format, array_detail, row_detail) + 1;
+        array_detail = realloc(array_detail, (size_t) needed); //TODO checks
+        sprintf(array_detail, format, array_detail, row_detail);
+        free(row_detail);
     }
-    return array_html_detail;
+
+    verbose_message(BORING, "\nArray detail: %s\nstrlen: %d\n", array_detail, strlen(array_detail));
+    char format[] = "<table>\n%s</table>\n";
+    ssize_t needed = snprintf(NULL, 0, format, array_detail) + 1;
+    char *temp = malloc((size_t) needed); //TODO I really should get around to being rigorous about this
+    if (temp != NULL)
+    {
+        sprintf(temp, format, array_detail);
+    }
+    verbose_message(BORING, "\nArray detail: %s\nstrlen: %d\n", temp, strlen(temp));
+    free(array_detail);
+    return temp;
 }
 
 

@@ -75,7 +75,7 @@ int web_client_buffer_add(struct web_client *client, char *html_text)
         client->buffer = temp;
         strcat(client->buffer, html_text);
         client->bytes_available += strlen(html_text);
-        verbose_message(BORING, "New buffer: %s\n", client->buffer);
+        //verbose_message(BORING, "New buffer: %s\n", client->buffer);
         return 0;
     }
     return -1;
@@ -268,6 +268,11 @@ int web_client_handle_requests(struct web_client *client, struct cmc_server **cm
                 web_client_buffer_add(client, title);
                 free(title_string);
                 free(title);
+
+                char *styles = html_style();
+                web_client_buffer_add(client, styles);
+                free(styles);
+
                 web_client_buffer_add(client, html_script());
                 web_client_buffer_add(client, html_head_close());
             }
@@ -294,8 +299,9 @@ int web_client_handle_requests(struct web_client *client, struct cmc_server **cm
                 int r = cmc_server_check_for_array(cmc_list[i], requested_array);
                 if (r >= 0)
                 {
-                    web_client_buffer_add(client, array_html_detail(cmc_server_get_array(cmc_list[i], (size_t) r)));
-                    //TODO this is where the array detail needs to come in.
+                    char *array_detail = array_html_detail(cmc_server_get_array(cmc_list[i], (size_t) r));
+                    web_client_buffer_add(client, array_detail);
+                    free(array_detail);
                 }
                 else
                 {

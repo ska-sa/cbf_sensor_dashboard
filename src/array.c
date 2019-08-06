@@ -388,7 +388,7 @@ static void array_activate(struct array *this_array)
     {
         char **tokens = NULL;
         size_t n_tokens = tokenise_string(buffer, '.', &tokens);
-        if (!(n_tokens == 2) || (n_tokens == 3)) //can't think of a better way to put it than this. Might be just bare device,
+        if (!((n_tokens == 2) || (n_tokens == 3))) //can't think of a better way to put it than this. Might be just bare device,
                                                  //or might be engine and device.
         {
             verbose_message(ERROR, "sensor_list.conf has a malformed sensor name: %s.\n", buffer);
@@ -402,7 +402,19 @@ static void array_activate(struct array *this_array)
                 for (i = 0; i < this_array->n_antennas; i++)
                 {
                     array_add_team_host_device_sensor(this_array, team_type, i, tokens[1], "device-status");
-                    //TODO subscribe to the sensor as well.
+
+                    char format[] = "%chost%lu.%s.device-status";
+                    ssize_t needed = snprintf(NULL, 0, format, team_type, i, tokens[1]) + 1;
+                    char *sensor_string = malloc((size_t) needed); //TODO check for errors.
+                    sprintf(sensor_string, format, team_type, i, tokens[1]);
+                    free(sensor_string);
+
+                    struct message *new_message = message_create('?');
+                    message_add_word(new_message, "sensor-sampling");
+                    message_add_word(new_message, sensor_string);
+                    message_add_word(new_message, "auto");
+                    queue_push(this_array->outgoing_monitor_msg_queue, new_message);
+                    this_array->monitor_state = ARRAY_SEND_FRONT_OF_QUEUE;
                 }
             }
             if (n_tokens == 3)
@@ -419,8 +431,22 @@ static void array_activate(struct array *this_array)
                         engine_name = malloc((size_t) needed);
                         sprintf(engine_name, format, tokens[1], j);
                         array_add_team_host_engine_device_sensor(this_array, team_type, i, engine_name, tokens[2], "device-status");
-                        //TODO subscribe to the sensor as well.
                         free(engine_name);
+
+                        {
+                            char format[] = "%chost%lu.%s.%s.device-status";
+                            ssize_t needed = snprintf(NULL, 0, format, team_type, i, engine_name, tokens[2], "device-status") + 1;
+                            char *sensor_string = malloc((size_t) needed); //TODO check for errors.
+                            sprintf(sensor_string, format, team_type, i, engine_name, tokens[2]);
+                            free(sensor_string);
+
+                            struct message *new_message = message_create('?');
+                            message_add_word(new_message, "sensor-sampling");
+                            message_add_word(new_message, sensor_string);
+                            message_add_word(new_message, "auto");
+                            queue_push(this_array->outgoing_monitor_msg_queue, new_message);
+                            this_array->monitor_state = ARRAY_SEND_FRONT_OF_QUEUE;
+                        }
                     }
                 }
             }
@@ -482,7 +508,7 @@ void array_handle_received_katcl_lines(struct array *this_array)
                 {
                     if (!strcmp(arg_string_katcl(this_array->control_katcl_line, 3), "instrument-state"))
                     {
-                        if (strcmp(this_array->instrument_state, arg_string_katcl(this_array->control_katcl_line, 4))) //without ! in front, i.e. they are different.
+                        if (strcmp(this_array->instrument_state, arg_string_katcl(this_array->control_katcl_line, 4))) //without ! in front, i.e. if they are different.
                         {
                             if (!strcmp(this_array->instrument_state, "-") && !strcmp(arg_string_katcl(this_array->control_katcl_line, 4), "nominal"))
                             {
@@ -555,6 +581,27 @@ void array_handle_received_katcl_lines(struct array *this_array)
             case '#': // it's a katcp inform
                 if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 0) + 1, "sensor-status"))
                 {
+                    char **tokens = NULL;
+                    size_t n_tokens = tokenise_string(arg_string_katcl(this_array->monitor_katcl_line, 1), '.', &tokens);
+                    char team = tokens[0][0];
+                    size_t team_no;
+                    switch (team) {
+                        case 'f': team_no = 0;
+                                  break;
+                        case 'x': team_no = 1;
+                                  break;
+                        default:  verbose_message(ERROR, "Received unknown team type %c from sensor-status message: %s\n", team, arg_string_katcl(this_array->monitor_katcl_line, 1));
+                    }
+                    switch (n_tokens) {
+                        case 2:
+
+                            team_update_engine_sensor(
+                            break;
+                        case 3:
+                            break;
+                        default:
+                            ; // we're assuming that we won't run into any foul things here.
+                    }
 
                 }
                 else if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 0) + 1, "sensor-value"))

@@ -198,7 +198,7 @@ int main(int argc, char **argv)
                 temp[num_cmcs] = cmc_server_create(tokens[0], (uint16_t) atoi(tokens[1]));
                 if (temp[num_cmcs] == NULL)
                 {
-                    perror("New CMC server allocation");
+                    perror("New CMC server allocation"); //Not sure if perror is appropriate here.
                 }
                 else
                 {

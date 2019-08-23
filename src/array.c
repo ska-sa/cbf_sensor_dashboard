@@ -378,7 +378,6 @@ void array_socket_read_write(struct array *this_array, fd_set *rd, fd_set *wr)
 static void array_activate(struct array *this_array)
 {
     verbose_message(INFO, "Detected %s (%s) in nominal state, subscribing to sensors.\n", this_array->name, this_array->cmc_address);
-    //TODO read the config file, subscribe to sensors.
     FILE *config_file = fopen("conf/sensor_list.conf", "r");
 
     char buffer[BUF_SIZE];
@@ -582,7 +581,7 @@ void array_handle_received_katcl_lines(struct array *this_array)
                 if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 0) + 1, "sensor-status"))
                 {
                     char **tokens = NULL;
-                    size_t n_tokens = tokenise_string(arg_string_katcl(this_array->monitor_katcl_line, 1), '.', &tokens);
+                    size_t n_tokens = tokenise_string(arg_string_katcl(this_array->monitor_katcl_line, 3), '.', &tokens);
                     char team = tokens[0][0];
                     size_t team_no;
                     switch (team) {
@@ -592,12 +591,17 @@ void array_handle_received_katcl_lines(struct array *this_array)
                                   break;
                         default:  verbose_message(ERROR, "Received unknown team type %c from sensor-status message: %s\n", team, arg_string_katcl(this_array->monitor_katcl_line, 1));
                     }
-                    switch (n_tokens) {
-                        case 2:
+                    char *host_no_str = strndup(tokens[0] + 5, 2);
+                    size_t host_no = (size_t) atoi(host_no_str);
+                    free(host_no_str);
+                    host_no_str = NULL;
 
-                            team_update_engine_sensor(
-                            break;
+                    switch (n_tokens) {
                         case 3:
+                            team_update_sensor(this_array->team_list[team_no], host_no, tokens[1], tokens[2], arg_string_katcl(this_array->monitor_katcl_line, 5), arg_string_katcl(this_array->monitor_katcl_line, 4));
+                            break;
+                        case 4:
+                            team_update_engine_sensor(this_array->team_list[team_no], host_no, tokens[1], tokens[2], tokens[3], arg_string_katcl(this_array->monitor_katcl_line, 5), arg_string_katcl(this_array->monitor_katcl_line, 4));
                             break;
                         default:
                             ; // we're assuming that we won't run into any foul things here.

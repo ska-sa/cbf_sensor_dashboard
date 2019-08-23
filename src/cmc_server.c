@@ -19,9 +19,11 @@
 #define max(x,y) ((x) > (y) ? (x) : (y))
 
 enum cmc_state {
+    CMC_WAIT_CONNECT,
     CMC_SEND_FRONT_OF_QUEUE,
     CMC_WAIT_RESPONSE,
     CMC_MONITOR,
+    CMC_DISCONNECTED,
 };
 
 
@@ -43,8 +45,8 @@ struct cmc_server *cmc_server_create(char *address, uint16_t katcp_port)
     struct cmc_server *new_cmc_server = malloc(sizeof(*new_cmc_server));
     new_cmc_server->address = strdup(address);
     new_cmc_server->katcp_port = katcp_port;
-    new_cmc_server->katcp_socket_fd = net_connect(address, katcp_port, NETC_VERBOSE_ERRORS | NETC_VERBOSE_STATS);
-    new_cmc_server->katcl_line = create_katcl(new_cmc_server->katcp_socket_fd);
+    new_cmc_server->katcp_socket_fd = net_connect(address, katcp_port, NETC_VERBOSE_ERRORS | NETC_VERBOSE_STATS | NETC_ASYNC | NETC_TCP_KEEP_ALIVE );
+    new_cmc_server->katcl_line = NULL;
     new_cmc_server->outgoing_msg_queue = queue_create();
 
     new_cmc_server->array_list = NULL;
@@ -68,7 +70,8 @@ struct cmc_server *cmc_server_create(char *address, uint16_t katcp_port)
 
     new_cmc_server->current_message = NULL;
     cmc_server_queue_pop(new_cmc_server);
-    new_cmc_server->state = CMC_SEND_FRONT_OF_QUEUE;
+    //new_cmc_server->state = CMC_SEND_FRONT_OF_QUEUE;
+    new_cmc_server->state = CMC_WAIT_CONNECT;
     return new_cmc_server;
 }
 
@@ -77,7 +80,8 @@ void cmc_server_destroy(struct cmc_server *this_cmc_server)
 {
     if (this_cmc_server != NULL)
     {
-        destroy_katcl(this_cmc_server->katcl_line, 1);
+        if (this_cmc_server->katcl_line != NULL) //because it might not have actually been connected.
+            destroy_katcl(this_cmc_server->katcl_line, 1);
         close(this_cmc_server->katcp_socket_fd);
         queue_destroy(this_cmc_server->outgoing_msg_queue);
         message_destroy(this_cmc_server->current_message);
@@ -112,20 +116,26 @@ char *cmc_server_get_name(struct cmc_server *this_cmc_server)
 
 void cmc_server_set_fds(struct cmc_server *this_cmc_server, fd_set *rd, fd_set *wr, int *nfds)
 {
-    FD_SET(this_cmc_server->katcp_socket_fd, rd);
-    if (flushing_katcl(this_cmc_server->katcl_line))
-    {
-        verbose_message(BORING, "flushing_katcl() returned true, %s:%hu has a katcp command to send.\n", this_cmc_server->address, this_cmc_server->katcp_port);
-        FD_SET(this_cmc_server->katcp_socket_fd, wr);
-    }
-    *nfds = max(*nfds, this_cmc_server->katcp_socket_fd);
-    
-    //now for the individual arrays.
-    verbose_message(BORING, "Setting up fds on %ld arrays on %s:%hu.\n", this_cmc_server->no_of_arrays, this_cmc_server->address, this_cmc_server->katcp_port);
-    size_t i;
-    for (i = 0; i < this_cmc_server->no_of_arrays; i++)
-    {
-        array_set_fds(this_cmc_server->array_list[i], rd, wr, nfds);
+    switch (this_cmc_server->state) {
+        case CMC_WAIT_CONNECT:
+            FD_SET(this_cmc_server->katcp_socket_fd, wr); // If we're still waiting for the connect() to happen, then it'll appear on the writeable FDs.
+            break;
+        default:
+            FD_SET(this_cmc_server->katcp_socket_fd, rd);
+            if (flushing_katcl(this_cmc_server->katcl_line))
+            {
+                verbose_message(BORING, "flushing_katcl() returned true, %s:%hu has a katcp command to send.\n", this_cmc_server->address, this_cmc_server->katcp_port);
+                FD_SET(this_cmc_server->katcp_socket_fd, wr);
+            }
+            *nfds = max(*nfds, this_cmc_server->katcp_socket_fd);
+            
+            //now for the individual arrays.
+            verbose_message(BORING, "Setting up fds on %ld arrays on %s:%hu.\n", this_cmc_server->no_of_arrays, this_cmc_server->address, this_cmc_server->katcp_port);
+            size_t i;
+            for (i = 0; i < this_cmc_server->no_of_arrays; i++)
+            {
+                array_set_fds(this_cmc_server->array_list[i], rd, wr, nfds);
+            }
     }
 }
 
@@ -184,32 +194,61 @@ void cmc_server_setup_katcp_writes(struct cmc_server *this_cmc_server)
 
 void cmc_server_socket_read_write(struct cmc_server *this_cmc_server, fd_set *rd, fd_set *wr)
 {
-    int r;
-    size_t i;
-    if (FD_ISSET(this_cmc_server->katcp_socket_fd, rd))
-    {
-        verbose_message(BORING, "Reading katcl_line from %s:%hu on fd %d.\n", this_cmc_server->address, this_cmc_server->katcp_port, this_cmc_server->katcp_socket_fd);
-        r = read_katcl(this_cmc_server->katcl_line);
-        if (r)
-        {
-            fprintf(stderr, "read from %s:%hu on fd %d failed\n", this_cmc_server->address, this_cmc_server->katcp_port, this_cmc_server->katcp_socket_fd);
-            /*TODO some kind of error checking, what to do if the CMC doesn't connect.*/
-        }
-    }
-    
-    if (FD_ISSET(this_cmc_server->katcp_socket_fd, wr))
-    {
-        verbose_message(BORING, "Writing katcl_line to %s:%hu on fd %d.\n", this_cmc_server->address, this_cmc_server->katcp_port, this_cmc_server->katcp_socket_fd);
-        r = write_katcl(this_cmc_server->katcl_line);
-        if (r < 0)
-        {
-            /*TODO some other kind of error checking.*/
-        }
-    }
+    switch (this_cmc_server->state) {
+        case CMC_WAIT_CONNECT:
+            if (FD_ISSET(this_cmc_server->katcp_socket_fd, wr))
+            {
+                int so_error;
+                socklen_t socklen = sizeof(so_error);
+                getsockopt(this_cmc_server->katcp_socket_fd, SOL_SOCKET, SO_ERROR, &so_error, &socklen);
+                if (so_error == 0)
+                {
+                    //Connection is a success
+                    this_cmc_server->katcl_line = create_katcl(this_cmc_server->katcp_socket_fd);
+                    this_cmc_server->state = CMC_SEND_FRONT_OF_QUEUE;
+                }
+                else
+                {
+                    //Connection failed for whatever reason.
+                    this_cmc_server->state = CMC_DISCONNECTED;
+                }
+            }
+            break;
 
-    for (i=0; i < this_cmc_server->no_of_arrays; i++)
-    {
-        array_socket_read_write(this_cmc_server->array_list[i], rd, wr);
+        case CMC_DISCONNECTED:
+            ; //Do nothing.
+            break;
+
+        default: ; //for some reason a label (default) can only be followed by a statement, and my "int r;" is a declaration, not a statement.
+            int r;
+            size_t i;
+            if (FD_ISSET(this_cmc_server->katcp_socket_fd, rd))
+            {
+                verbose_message(BORING, "Reading katcl_line from %s:%hu on fd %d.\n", this_cmc_server->address, this_cmc_server->katcp_port, this_cmc_server->katcp_socket_fd);
+                r = read_katcl(this_cmc_server->katcl_line);
+                if (r)
+                {
+                    fprintf(stderr, "read from %s:%hu on fd %d failed\n", this_cmc_server->address, this_cmc_server->katcp_port, this_cmc_server->katcp_socket_fd);
+                    /*TODO some kind of error checking, what to do if the CMC doesn't connect.*/
+                    this_cmc_server->state = CMC_DISCONNECTED;
+                }
+            }
+            
+            if (FD_ISSET(this_cmc_server->katcp_socket_fd, wr))
+            {
+                verbose_message(BORING, "Writing katcl_line to %s:%hu on fd %d.\n", this_cmc_server->address, this_cmc_server->katcp_port, this_cmc_server->katcp_socket_fd);
+                r = write_katcl(this_cmc_server->katcl_line);
+                if (r < 0)
+                {
+                    /*TODO some other kind of error checking.*/
+                    this_cmc_server->state = CMC_DISCONNECTED;
+                }
+            }
+
+            for (i=0; i < this_cmc_server->no_of_arrays; i++)
+            {
+                array_socket_read_write(this_cmc_server->array_list[i], rd, wr);
+            }
     }
 }
 
@@ -250,6 +289,11 @@ static int cmc_server_add_array(struct cmc_server *this_cmc_server, char *array_
 
 void cmc_server_handle_received_katcl_lines(struct cmc_server *this_cmc_server)
 {
+    if (this_cmc_server->state == CMC_WAIT_CONNECT || this_cmc_server->state == CMC_DISCONNECTED)
+    {
+        return; //nothing to do here.
+    }
+
     //let's try doing the array stuff before the cmc stuff
     size_t i;
     for (i=0; i < this_cmc_server->no_of_arrays; i++)
@@ -399,44 +443,64 @@ void cmc_server_handle_received_katcl_lines(struct cmc_server *this_cmc_server)
 char *cmc_server_html_representation(struct cmc_server *this_cmc_server)
 {
     char *cmc_html_rep;
-    if (this_cmc_server->no_of_arrays < 1)
-    {
-        char format[] = "<h1>%s</h1>\n<p>No arrays currently running.</p>\n";
-        ssize_t needed = snprintf(NULL, 0, format, this_cmc_server->address) + 1;
-        cmc_html_rep = malloc((size_t) needed);
-        sprintf(cmc_html_rep, format, this_cmc_server->address);
-        return cmc_html_rep;
-    }
+    switch (this_cmc_server->state) {
+        case CMC_WAIT_CONNECT:
+            {
+                char format[] = "<h1>%s</h1>\n<p>Connecting to CMC server...</p>\n";
+                ssize_t needed = snprintf(NULL, 0, format, this_cmc_server->address) + 1;
+                cmc_html_rep = malloc((size_t) needed);
+                sprintf(cmc_html_rep, format, this_cmc_server->address);
+                return cmc_html_rep;
+            }
+            break;
+         case CMC_DISCONNECTED:
+            {
+                char format[] = "<h1>%s</h1>\n<p>Could not connect to CMC server...</p>\n";
+                ssize_t needed = snprintf(NULL, 0, format, this_cmc_server->address) + 1;
+                cmc_html_rep = malloc((size_t) needed);
+                sprintf(cmc_html_rep, format, this_cmc_server->address);
+                return cmc_html_rep;
+            }
+            break;
+        default:
+            if (this_cmc_server->no_of_arrays < 1)
+            {
+                char format[] = "<h1>%s</h1>\n<p>No arrays currently running.</p>\n";
+                ssize_t needed = snprintf(NULL, 0, format, this_cmc_server->address) + 1;
+                cmc_html_rep = malloc((size_t) needed);
+                sprintf(cmc_html_rep, format, this_cmc_server->address);
+                return cmc_html_rep;
+            }
 
-    {   //putting this in its own block so that I can reuse the names "format" and "needed" later.
-        //might not be ready since this is followed by a for-loop, but anyway.
-        char format[] = "<h1>%s</h1>\n<table class=\"cmctable\">\n<tr><th>Array Name</th><th>Control Port</th><th>Monitor Port</th><th>N_Antennas</th><th>Config File</th><th>Instrument State</th></tr>";
-        ssize_t needed = snprintf(NULL, 0, format, this_cmc_server->address) + 1;
-        //TODO checks
-        cmc_html_rep = malloc((size_t) needed);
-        sprintf(cmc_html_rep, format, this_cmc_server->address);
-    }
-    
-    size_t i;
-    for (i = 0; i < this_cmc_server->no_of_arrays; i++)
-    {
-        char format[] = "%s%s\n";
-        char *array_html_rep = array_html_summary(this_cmc_server->array_list[i], this_cmc_server->address);
-        ssize_t needed = snprintf(NULL, 0, format, cmc_html_rep, array_html_rep) + 1;
-        //TODO checks
-        cmc_html_rep = realloc(cmc_html_rep, (size_t) needed); //naughty naughty, no temp variable.
-        sprintf(cmc_html_rep, format, cmc_html_rep, array_html_rep);
-        free(array_html_rep);
-    }
+            {   //putting this in its own block so that I can reuse the names "format" and "needed" later.
+                //might not be ready since this is followed by a for-loop, but anyway.
+                char format[] = "<h1>%s</h1>\n<table class=\"cmctable\">\n<tr><th>Array Name</th><th>Control Port</th><th>Monitor Port</th><th>N_Antennas</th><th>Config File</th><th>Instrument State</th></tr>";
+                ssize_t needed = snprintf(NULL, 0, format, this_cmc_server->address) + 1;
+                //TODO checks
+                cmc_html_rep = malloc((size_t) needed);
+                sprintf(cmc_html_rep, format, this_cmc_server->address);
+            }
+            
+            size_t i;
+            for (i = 0; i < this_cmc_server->no_of_arrays; i++)
+            {
+                char format[] = "%s%s\n";
+                char *array_html_rep = array_html_summary(this_cmc_server->array_list[i], this_cmc_server->address);
+                ssize_t needed = snprintf(NULL, 0, format, cmc_html_rep, array_html_rep) + 1;
+                //TODO checks
+                cmc_html_rep = realloc(cmc_html_rep, (size_t) needed); //naughty naughty, no temp variable.
+                sprintf(cmc_html_rep, format, cmc_html_rep, array_html_rep);
+                free(array_html_rep);
+            }
 
-    {
-        char *format = "%s</table>\n";
-        ssize_t needed = snprintf(NULL, 0, format, cmc_html_rep) + 1;
-        //TODO checks
-        cmc_html_rep = realloc(cmc_html_rep, (size_t) needed);
-        sprintf(cmc_html_rep, format, cmc_html_rep);
+            {
+                char *format = "%s</table>\n";
+                ssize_t needed = snprintf(NULL, 0, format, cmc_html_rep) + 1;
+                //TODO checks
+                cmc_html_rep = realloc(cmc_html_rep, (size_t) needed);
+                sprintf(cmc_html_rep, format, cmc_html_rep);
+            }
     }
-
     return cmc_html_rep;
 }
 

@@ -145,6 +145,7 @@ char *array_get_name(struct array *this_array)
 
 int array_add_team_host_device_sensor(struct array *this_array, char team_type, size_t host_number, char *device_name, char *sensor_name)
 {
+    verbose_message(INFO, "Adding sensor: %chost%02d.%s.%s\n", team_type, host_number, device_name, sensor_name);
     if (this_array != NULL)
     {
        size_t i;
@@ -171,6 +172,7 @@ int array_add_team_host_device_sensor(struct array *this_array, char team_type, 
 
 int array_add_team_host_engine_device_sensor(struct array *this_array, char team_type, size_t host_number, char *engine_name, char *device_name, char *sensor_name)
 {
+    verbose_message(DEBUG, "Adding sensor: %chost%02d.%s.%s.%s\n", team_type, host_number, engine_name, device_name, sensor_name);
     if (this_array != NULL)
     {
         size_t i;
@@ -293,7 +295,7 @@ void array_setup_katcp_writes(struct array *this_array)
             if (n > 0)
             {
                 char *composed_message = message_compose(this_array->current_monitor_message);
-                verbose_message(BORING, "Sending KATCP message \"%s\" to %s:%hu\n", composed_message, this_array->cmc_address, this_array->monitor_port);
+                verbose_message(INFO, "Sending KATCP message \"%s\" to %s:%hu\n", composed_message, this_array->cmc_address, this_array->monitor_port);
                 free(composed_message);
                 composed_message = NULL;
 
@@ -377,7 +379,7 @@ void array_socket_read_write(struct array *this_array, fd_set *rd, fd_set *wr)
 
 static void array_activate(struct array *this_array)
 {
-    verbose_message(INFO, "Detected %s (%s) in nominal state, subscribing to sensors.\n", this_array->name, this_array->cmc_address);
+    verbose_message(INFO, "Detected %s (monitor port %s:%hu) in nominal state, subscribing to sensors.\n", this_array->name, this_array->cmc_address, this_array->monitor_port);
     FILE *config_file = fopen("conf/sensor_list.conf", "r");
 
     char buffer[BUF_SIZE];
@@ -385,6 +387,7 @@ static void array_activate(struct array *this_array)
 
     for (result = fgets(buffer, BUF_SIZE, config_file); result != NULL; result = fgets(buffer, BUF_SIZE, config_file))
     {
+        verbose_message(DEBUG, "\n\nRead line from sensor-list file: %s", buffer);
         char **tokens = NULL;
         size_t n_tokens = tokenise_string(buffer, '.', &tokens);
         if (!((n_tokens == 2) || (n_tokens == 3))) //can't think of a better way to put it than this. Might be just bare device,
@@ -402,18 +405,17 @@ static void array_activate(struct array *this_array)
                 {
                     array_add_team_host_device_sensor(this_array, team_type, i, tokens[1], "device-status");
 
-                    char format[] = "%chost%lu.%s.device-status";
+                    char format[] = "%chost%02lu.%s.device-status"; //FOOBAR
                     ssize_t needed = snprintf(NULL, 0, format, team_type, i, tokens[1]) + 1;
                     char *sensor_string = malloc((size_t) needed); //TODO check for errors.
                     sprintf(sensor_string, format, team_type, i, tokens[1]);
-                    free(sensor_string);
 
                     struct message *new_message = message_create('?');
                     message_add_word(new_message, "sensor-sampling");
                     message_add_word(new_message, sensor_string);
                     message_add_word(new_message, "auto");
+                    free(sensor_string);
                     queue_push(this_array->outgoing_monitor_msg_queue, new_message);
-                    this_array->monitor_state = ARRAY_SEND_FRONT_OF_QUEUE;
                 }
             }
             if (n_tokens == 3)
@@ -430,28 +432,32 @@ static void array_activate(struct array *this_array)
                         engine_name = malloc((size_t) needed);
                         sprintf(engine_name, format, tokens[1], j);
                         array_add_team_host_engine_device_sensor(this_array, team_type, i, engine_name, tokens[2], "device-status");
-                        free(engine_name);
 
                         {
-                            char format[] = "%chost%lu.%s.%s.device-status";
+                            char format[] = "%chost%02lu.%s.%s.device-status";
                             ssize_t needed = snprintf(NULL, 0, format, team_type, i, engine_name, tokens[2], "device-status") + 1;
                             char *sensor_string = malloc((size_t) needed); //TODO check for errors.
                             sprintf(sensor_string, format, team_type, i, engine_name, tokens[2]);
-                            free(sensor_string);
 
                             struct message *new_message = message_create('?');
                             message_add_word(new_message, "sensor-sampling");
                             message_add_word(new_message, sensor_string);
                             message_add_word(new_message, "auto");
+                            free(sensor_string);
                             queue_push(this_array->outgoing_monitor_msg_queue, new_message);
-                            this_array->monitor_state = ARRAY_SEND_FRONT_OF_QUEUE;
                         }
+                        free(engine_name);
                     }
                 }
             }
         }
+        size_t i;
+        for (i = 0; i < n_tokens; i++)
+            free(tokens[i]);
         free(tokens);
     }
+    array_monitor_queue_pop(this_array);
+    this_array->monitor_state = ARRAY_SEND_FRONT_OF_QUEUE;
     fclose(config_file);
 }
 
@@ -505,9 +511,15 @@ void array_handle_received_katcl_lines(struct array *this_array)
             case '#': // it's a katcp inform
                 if (!strcmp(arg_string_katcl(this_array->control_katcl_line, 0) + 1, "sensor-status"))
                 {
+                    verbose_message(INFO, "Received sensor-status on the control port of %s:%hu.\n", this_array->cmc_address, this_array->control_port);
                     if (!strcmp(arg_string_katcl(this_array->control_katcl_line, 3), "instrument-state"))
                     {
+                        verbose_message(INFO, "Instrument state to be updated: %s - %s\n",
+                                arg_string_katcl(this_array->control_katcl_line, 5),
+                                arg_string_katcl(this_array->control_katcl_line, 4));
+
                         if (strcmp(this_array->instrument_state, arg_string_katcl(this_array->control_katcl_line, 4))) //without ! in front, i.e. if they are different.
+                                                                        //4 is the state, so if the state is changing then something needs to be updated.
                         {
                             if (!strcmp(this_array->instrument_state, "-") && !strcmp(arg_string_katcl(this_array->control_katcl_line, 4), "nominal"))
                             {
@@ -606,15 +618,18 @@ void array_handle_received_katcl_lines(struct array *this_array)
                         default:
                             ; // we're assuming that we won't run into any foul things here.
                     }
-
+                    size_t i;
+                    for (i = 0; i < n_tokens; i++)
+                        free(tokens[i]);
+                    free(tokens);
                 }
                 else if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 0) + 1, "sensor-value"))
                 {
-
+                    //TODO
                 }
                 else if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 0) + 1, "sensor-list"))
                 {
-
+                    //TODO
                 }
                 break;
             default:

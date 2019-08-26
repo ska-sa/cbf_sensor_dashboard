@@ -97,6 +97,18 @@ void cmc_server_destroy(struct cmc_server *this_cmc_server)
 }
 
 
+void cmc_server_try_reconnect(struct cmc_server *this_cmc_server)
+{
+    if (this_cmc_server->state == CMC_DISCONNECTED)
+    {
+        close(this_cmc_server->katcp_socket_fd);
+        //TODO destroy all the arrays underneath as well?
+        this_cmc_server->katcp_socket_fd = net_connect(this_cmc_server->address, this_cmc_server->katcp_port, NETC_VERBOSE_ERRORS | NETC_VERBOSE_STATS | NETC_ASYNC | NETC_TCP_KEEP_ALIVE);
+        this_cmc_server->state = CMC_WAIT_CONNECT;
+    }
+}
+
+
 struct message *cmc_server_queue_pop(struct cmc_server *this_cmc_server)
 {
     if (this_cmc_server->current_message != NULL)
@@ -116,9 +128,22 @@ char *cmc_server_get_name(struct cmc_server *this_cmc_server)
 
 void cmc_server_set_fds(struct cmc_server *this_cmc_server, fd_set *rd, fd_set *wr, int *nfds)
 {
+    //verbose_message(BORING, "Setting CMC server (%s:%hu) FDs. Current state: %d.\n", this_cmc_server->address, this_cmc_server->katcp_port, this_cmc_server->state);
+    /*
+    int so_error;
+    socklen_t len = sizeof(so_error);
+    getsockopt(this_cmc_server->katcp_socket_fd, SOL_SOCKET, SO_ERROR, &so_error, &len);
+    if (so_error != 0)
+    {
+        verbose_message(ERROR, "Socket error on %s%hu: %s\n", this_cmc_server->address, this_cmc_server->katcp_port, strerror(so_error));
+        this_cmc_server->state = CMC_DISCONNECTED;
+    }
+    */
     switch (this_cmc_server->state) {
         case CMC_WAIT_CONNECT:
+            verbose_message(DEBUG, "CMC server %s:%hu still not connected...\n", this_cmc_server->address, this_cmc_server->katcp_port);
             FD_SET(this_cmc_server->katcp_socket_fd, wr); // If we're still waiting for the connect() to happen, then it'll appear on the writeable FDs.
+            *nfds = max(*nfds, this_cmc_server->katcp_socket_fd);
             break;
         default:
             FD_SET(this_cmc_server->katcp_socket_fd, rd);
@@ -198,18 +223,21 @@ void cmc_server_socket_read_write(struct cmc_server *this_cmc_server, fd_set *rd
         case CMC_WAIT_CONNECT:
             if (FD_ISSET(this_cmc_server->katcp_socket_fd, wr))
             {
+                verbose_message(DEBUG, "%s:%hu file descriptor writeable.\n", this_cmc_server->address, this_cmc_server->katcp_port);
                 int so_error;
                 socklen_t socklen = sizeof(so_error);
                 getsockopt(this_cmc_server->katcp_socket_fd, SOL_SOCKET, SO_ERROR, &so_error, &socklen);
                 if (so_error == 0)
                 {
                     //Connection is a success
+                    verbose_message(DEBUG, "Connection successful.\n");
                     this_cmc_server->katcl_line = create_katcl(this_cmc_server->katcp_socket_fd);
                     this_cmc_server->state = CMC_SEND_FRONT_OF_QUEUE;
                 }
                 else
                 {
                     //Connection failed for whatever reason.
+                    verbose_message(DEBUG, "Connection failed: %s\n", strerror(so_error));
                     this_cmc_server->state = CMC_DISCONNECTED;
                 }
             }

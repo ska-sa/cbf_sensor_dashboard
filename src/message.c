@@ -4,6 +4,7 @@
 #include <stdarg.h>
 
 #include "verbose.h"
+#include "message.h"
 
 struct message {
     char message_type; /*?, ! or #, but for the purposes we'll probably just be using ?.*/
@@ -32,6 +33,12 @@ void message_destroy(struct message *this_message)
     if (this_message != NULL)
     {
         verbose_message(BORING, "Destroying message 0x%08lx\n", this_message);
+        {
+            char *composed_message = message_compose(this_message);
+            verbose_message(BORING, "Message was supposed to be: %s\n", composed_message);
+            free(composed_message);
+            composed_message = NULL;
+        }
         size_t i;
         for (i = 0; i < this_message->number_of_words; i++)
             free(this_message->word_list[i]);

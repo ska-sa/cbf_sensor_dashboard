@@ -13,6 +13,8 @@ struct cmc_server;
 struct cmc_server *cmc_server_create(char *address, uint16_t katcp_port);
 void cmc_server_destroy(struct cmc_server *this_cmc_server);
 
+void cmc_server_try_reconnect(struct cmc_server *this_cmc_server);
+
 char *cmc_server_get_name(struct cmc_server *this_cmc_server);
 
 void cmc_server_set_fds(struct cmc_server *this_cmc_server, fd_set *rd, fd_set *wr, int *nfds);

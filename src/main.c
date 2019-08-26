@@ -238,6 +238,10 @@ int main(int argc, char **argv)
      * select() loop
      *********************************/
 
+    struct timespec to;
+    to.tv_sec = 10;
+    to.tv_nsec = 0;
+
     while (!stop)
     {
         //printf("new select() loop\n");
@@ -250,6 +254,13 @@ int main(int argc, char **argv)
         FD_SET(server_fd, &rd);
         nfds = max(nfds, server_fd);
 
+        if (to.tv_sec == 0 && to.tv_nsec == 0) //i.e. we've timed out.
+        {
+            //reset the timeout to ten seconds. Otherwise carry on where we left off.
+            to.tv_sec = 10;
+            to.tv_nsec = 0;
+        }
+
         for (i = 0; i < num_cmcs; i++)
         {
             cmc_server_setup_katcp_writes(cmc_list[i]);
@@ -261,7 +272,15 @@ int main(int argc, char **argv)
             web_client_set_fds(client_list[i], &rd, &wr, &nfds);
         }
         
-        r = pselect(nfds + 1, &rd, &wr, NULL, NULL, &orig_mask);
+        r = pselect(nfds + 1, &rd, &wr, NULL, &to, &orig_mask);
+
+        if (r == 0) //timeout
+        {
+            for (i = 0; i < num_cmcs; i++)
+            {
+                cmc_server_try_reconnect(cmc_list[i]);
+            }
+        }
 
         if (r > 0) //==0 means timeout, <0 means error. TODO Could possibly be interrupt, which can just be ignored.
         {

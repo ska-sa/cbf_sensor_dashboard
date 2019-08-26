@@ -44,10 +44,13 @@ void host_destroy(struct host *this_host)
         unsigned int i;
         for (i = 0; i < this_host->number_of_vdevices; i++)
             vdevice_destroy(this_host->vdevice_list[i]);
+        free(this_host->vdevice_list);
         for (i = 0; i < this_host->number_of_devices; i++)
             device_destroy(this_host->device_list[i]);
+        free(this_host->device_list);
         for (i = 0; i < this_host->number_of_engines; i++)
             engine_destroy(this_host->engine_list[i]);
+        free(this_host->engine_list);
         free(this_host);
         this_host = NULL;
     }

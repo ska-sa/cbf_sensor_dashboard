@@ -10,7 +10,10 @@ size_t tokenise_string(char* input_string, char delim, char ***tokens)
     size_t string_len = strlen(string);
     //If the string ends in a \n we want to remove it.
     if (string[string_len-1] == '\n')
+    {
         string[string_len-1] = '\0';
+        string_len--;
+    }
 
     size_t previous_delim_location = 0;
 

@@ -304,7 +304,7 @@ int main(int argc, char **argv)
                 }
                 else
                 {
-                    verbose_message(INFO, "Connection from %s:%u (FD %d)\n", inet_ntoa(client_address.sin_addr), client_address.sin_port, r);
+                    verbose_message(DEBUG, "Connection from %s:%u (FD %d)\n", inet_ntoa(client_address.sin_addr), client_address.sin_port, r);
                     struct web_client **temp = realloc(client_list, sizeof(*client_list)*(num_web_clients + 1));
                     if (temp)
                     {

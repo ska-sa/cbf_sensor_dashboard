@@ -145,6 +145,8 @@ void cmc_server_set_fds(struct cmc_server *this_cmc_server, fd_set *rd, fd_set *
             FD_SET(this_cmc_server->katcp_socket_fd, wr); // If we're still waiting for the connect() to happen, then it'll appear on the writeable FDs.
             *nfds = max(*nfds, this_cmc_server->katcp_socket_fd);
             break;
+        case CMC_DISCONNECTED:
+            break; //Nothing to do here.
         default:
             FD_SET(this_cmc_server->katcp_socket_fd, rd);
             if (flushing_katcl(this_cmc_server->katcl_line))

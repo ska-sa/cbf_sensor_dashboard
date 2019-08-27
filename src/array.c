@@ -592,6 +592,7 @@ void array_handle_received_katcl_lines(struct array *this_array)
             case '#': // it's a katcp inform
                 if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 0) + 1, "sensor-status"))
                 {
+                    verbose_message(INFO, "Received sensor-status on the monitor port of %s:%hu.\n", this_array->cmc_address, this_array->control_port);
                     char **tokens = NULL;
                     size_t n_tokens = tokenise_string(arg_string_katcl(this_array->monitor_katcl_line, 3), '.', &tokens);
                     char team = tokens[0][0];
@@ -616,7 +617,7 @@ void array_handle_received_katcl_lines(struct array *this_array)
                             team_update_engine_sensor(this_array->team_list[team_no], host_no, tokens[1], tokens[2], tokens[3], arg_string_katcl(this_array->monitor_katcl_line, 5), arg_string_katcl(this_array->monitor_katcl_line, 4));
                             break;
                         default:
-                            ; // we're assuming that we won't run into any foul things here.
+                            verbose_message(ERROR, "There was an unexpected number of tokens (%d) in the message: %s\n", n_tokens, arg_string_katcl(this_array->monitor_katcl_line, 3)); 
                     }
                     size_t i;
                     for (i = 0; i < n_tokens; i++)

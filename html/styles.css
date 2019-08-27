@@ -49,6 +49,42 @@
 }
 .error:hover {opacity: 1}
 
+.failure {
+  background-color: #FF0000;
+  border: none;
+  color: white;
+  padding: 15 px 32 px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 16px;
+  margin: 4px 2px;
+  cursor: pointer;
+  opacity: 0.8;
+  transition: 0.2s;
+  display: inline-block;
+}
+.faulure :hover {opacity: 1}
+
+.unknown {
+  background-color: #777777;
+  border: none;
+  color: white;
+  padding: 15 px 32 px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 16px;
+  margin: 4px 2px;
+  cursor: pointer;
+  opacity: 0.8;
+  transition: 0.2s;
+  display: inline-block;
+}
+.error:hover {opacity: 1}
+
+
+
 h1 {
     font-size: 50px;
 }

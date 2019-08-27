@@ -161,7 +161,9 @@ void cmc_server_set_fds(struct cmc_server *this_cmc_server, fd_set *rd, fd_set *
             size_t i;
             for (i = 0; i < this_cmc_server->no_of_arrays; i++)
             {
-                array_set_fds(this_cmc_server->array_list[i], rd, wr, nfds);
+                if (array_functional(this_cmc_server->array_list[i]) >= 0)
+                    array_set_fds(this_cmc_server->array_list[i], rd, wr, nfds);
+                //TODO some other way to deal with this.
             }
     }
 }

@@ -22,6 +22,7 @@ enum array_state {
     ARRAY_SEND_FRONT_OF_QUEUE,
     ARRAY_WAIT_RESPONSE,
     ARRAY_MONITOR,
+    ARRAY_DISCONNECTED = -1, //this must be the last thing in the enum so that it gives an error in another place.
 };
 
 
@@ -197,6 +198,15 @@ int array_add_team_host_engine_device_sensor(struct array *this_array, char team
 }
 
 
+int array_functional(struct array *this_array)
+{
+    if (this_array->control_state == ARRAY_DISCONNECTED || this_array->monitor_state == ARRAY_DISCONNECTED)
+        return -1;
+    else
+        return 1;
+}
+
+
 char *array_get_sensor_value(struct array *this_array, char team_type, size_t host_number, char *device_name, char *sensor_name)
 {
     if (this_array != NULL)
@@ -337,8 +347,8 @@ void array_socket_read_write(struct array *this_array, fd_set *rd, fd_set *wr)
         r = read_katcl(this_array->control_katcl_line);
         if (r)
         {
-            fprintf(stderr, "read from %s:%hu (control) failed\n", this_array->cmc_address, this_array->control_port);
-            /*TODO some kind of error checking, what to do if connection fails.*/
+            verbose_message(ERROR, "read from %s:%hu (control) failed\n", this_array->cmc_address, this_array->control_port);
+            this_array->control_state = ARRAY_DISCONNECTED;
         }
     }
 
@@ -348,8 +358,8 @@ void array_socket_read_write(struct array *this_array, fd_set *rd, fd_set *wr)
         r = write_katcl(this_array->control_katcl_line);
         if (r < 0)
         {
-            fprintf(stderr, "write to from %s:%hu (control) failed\n", this_array->cmc_address, this_array->control_port);
-            /*TODO some kind of error checking, what to do if connection fails.*/
+            verbose_message(ERROR, "write to from %s:%hu (control) failed\n", this_array->cmc_address, this_array->control_port);
+            this_array->control_state = ARRAY_DISCONNECTED;
         }
     }
 
@@ -359,8 +369,8 @@ void array_socket_read_write(struct array *this_array, fd_set *rd, fd_set *wr)
         r = read_katcl(this_array->monitor_katcl_line);
         if (r)
         {
-            fprintf(stderr, "read from %s:%hu (monitor) failed\n", this_array->cmc_address, this_array->monitor_port);
-            /*TODO some kind of error checking, what to do if connection fails.*/
+            verbose_message(ERROR, "read from %s:%hu (monitor) failed\n", this_array->cmc_address, this_array->monitor_port);
+            this_array->monitor_state = ARRAY_DISCONNECTED;
         }
     }
 
@@ -370,8 +380,8 @@ void array_socket_read_write(struct array *this_array, fd_set *rd, fd_set *wr)
         r = write_katcl(this_array->monitor_katcl_line);
         if (r < 0)
         {
-            fprintf(stderr, "write to from %s:%hu (monitor) failed\n", this_array->cmc_address, this_array->monitor_port);
-            /*TODO some kind of error checking, what to do if connection fails.*/
+            verbose_message(ERROR, "write to from %s:%hu (monitor) failed\n", this_array->cmc_address, this_array->monitor_port);
+            this_array->monitor_state = ARRAY_DISCONNECTED;
         }
     }
 }

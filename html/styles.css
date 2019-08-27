@@ -6,7 +6,6 @@
   text-align: center;
   text-decoration: none;
   display: inline-block;
-  font-size: 16px;
   margin: 4px 2px;
   cursor: pointer;
   opacity: 0.4;
@@ -23,7 +22,6 @@
   text-align: center;
   text-decoration: none;
   display: inline-block;
-  font-size: 16px;
   margin: 4px 2px;
   cursor: pointer;
   opacity: 0.6;
@@ -40,7 +38,6 @@
   text-align: center;
   text-decoration: none;
   display: inline-block;
-  font-size: 16px;
   margin: 4px 2px;
   cursor: pointer;
   opacity: 0.8;
@@ -57,7 +54,6 @@
   text-align: center;
   text-decoration: none;
   display: inline-block;
-  font-size: 16px;
   margin: 4px 2px;
   cursor: pointer;
   opacity: 0.8;
@@ -74,7 +70,6 @@
   text-align: center;
   text-decoration: none;
   display: inline-block;
-  font-size: 16px;
   margin: 4px 2px;
   cursor: pointer;
   opacity: 0.8;
@@ -83,7 +78,10 @@
 }
 .error:hover {opacity: 1}
 
-
+button {
+    width: 95%;
+    font-size: 8px;
+}
 
 h1 {
     font-size: 50px;
@@ -96,7 +94,11 @@ table, th, td {
 }
 
 td {
-    text-align: center;
+  width: 4%;
+  vertical-align: center;
+  text-align: center;
+  font-family: sans;
+  font-size: 8px;
 }
 
 
@@ -106,7 +108,10 @@ td {
     }
 
     table, th, td {
-        font-size: 50px;
+        font-size: 22px;
+    }
+    button {
+        font-size: 20px;
     }
 }
 

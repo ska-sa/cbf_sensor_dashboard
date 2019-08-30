@@ -621,9 +621,11 @@ void array_handle_received_katcl_lines(struct array *this_array)
 
                     switch (n_tokens) {
                         case 3:
+                            verbose_message(DEBUG, "Updating %chost%02d.%s.%s\n", team, host_no, tokens[1], tokens[2]);
                             team_update_sensor(this_array->team_list[team_no], host_no, tokens[1], tokens[2], arg_string_katcl(this_array->monitor_katcl_line, 5), arg_string_katcl(this_array->monitor_katcl_line, 4));
                             break;
                         case 4:
+                            verbose_message(DEBUG, "Updating %chost%02d.%s.%s.%s\n", team, host_no, tokens[1], tokens[2], tokens[3]);
                             team_update_engine_sensor(this_array->team_list[team_no], host_no, tokens[1], tokens[2], tokens[3], arg_string_katcl(this_array->monitor_katcl_line, 5), arg_string_katcl(this_array->monitor_katcl_line, 4));
                             break;
                         default:

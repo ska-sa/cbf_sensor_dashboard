@@ -139,14 +139,34 @@ int host_add_device_to_engine(struct host *this_host, char *engine_name, char *n
 int host_add_sensor_to_engine_device(struct host *this_host, char *engine_name, char *device_name, char *new_sensor_name)
 {
     int i;
+    int r = -1;
     for (i = 0; i < this_host->number_of_engines; i++)
     {
         if (!strcmp(engine_name, engine_get_name(this_host->engine_list[i])))
         {
-            return engine_add_sensor_to_device(this_host->engine_list[i], device_name, new_sensor_name);
+            r = engine_add_sensor_to_device(this_host->engine_list[i], device_name, new_sensor_name);
         }
     }
-    return -1;
+    if (r>=0)
+    {
+        for (i = 0; i < this_host->number_of_vdevices; i++)
+        {
+            if (!strcmp(device_name, vdevice_get_name(this_host->vdevice_list[i])))
+                break;
+        }
+        if (i == this_host->number_of_vdevices)
+        {
+            struct vdevice **temp = realloc(this_host->vdevice_list, \
+                    sizeof(*(this_host->vdevice_list))*(this_host->number_of_vdevices + 1));
+            if (temp != NULL)
+            {
+                this_host->vdevice_list = temp;
+                this_host->vdevice_list[this_host->number_of_vdevices] = vdevice_create(device_name, &this_host->engine_list, &this_host->number_of_engines);
+                this_host->number_of_vdevices++;
+            }
+        }
+    }
+    return r;
 }
 
 
@@ -220,6 +240,12 @@ char *host_html_detail(struct host *this_host)
 {
     size_t i;
     char *host_detail = strdup(""); //need it to be zero length but don't want it to be null
+    /*{
+        char format[] = "<!--Host: %s Devices: %u, Engines: %u, Vdevices: %u -->";
+        ssize_t needed = snprintf(NULL, 0, format, this_host->hostname, this_host->number_of_devices, this_host->number_of_engines, this_host->number_of_vdevices) + 1;
+        host_detail = realloc(host_detail, (size_t) needed);
+        sprintf(host_detail, format, this_host->hostname, this_host->number_of_devices, this_host->number_of_engines, this_host->number_of_vdevices);
+    }*/ //No longer needed, was just for debugging.
     for (i = 0; i < this_host->number_of_devices; i++)
     {
         char format[] = "%s%s";

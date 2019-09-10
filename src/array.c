@@ -619,6 +619,10 @@ void array_handle_received_katcl_lines(struct array *this_array)
                     free(host_no_str);
                     host_no_str = NULL;
 
+                    //TODO - this needs to be sanitised a bit to be robust.
+                    //If the arg_string_katcl returns a null, then this naively passes through to the
+                    //lower-level function and tries to strdup a null eventually which causes a segfault.
+
                     switch (n_tokens) {
                         case 3:
                             verbose_message(DEBUG, "Updating %chost%02d.%s.%s\n", team, host_no, tokens[1], tokens[2]);

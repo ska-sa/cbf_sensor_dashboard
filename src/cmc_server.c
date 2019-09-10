@@ -241,7 +241,7 @@ void cmc_server_socket_read_write(struct cmc_server *this_cmc_server, fd_set *rd
                 else
                 {
                     //Connection failed for whatever reason.
-                    verbose_message(DEBUG, "Connection failed: %s\n", strerror(so_error));
+                    verbose_message(WARNING, "Connection failed: %s\n", strerror(so_error));
                     this_cmc_server->state = CMC_DISCONNECTED;
                 }
             }

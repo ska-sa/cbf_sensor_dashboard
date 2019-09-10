@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdarg.h>
+#include <time.h>
 
 #include "verbose.h"
 
@@ -17,21 +18,28 @@ int verbose_message(enum verbosity_level msg_verbosity_level, const char *restri
     {
         va_list args;
         va_start(args, message_format);
-        switch (msg_verbosity_level) {
+
+        time_t current_time = time(NULL);
+        struct tm *tm = localtime(&current_time);
+        char format[] = "%F %T";
+        char str_time[20];
+        strftime(str_time, 20, format, tm);
+
+        switch (msg_verbosity_level) { //TODO there could be a more elegant way of doing this...
             case ERROR:
-                printf("ERROR: ");
+                printf("ERROR   [%s] ", str_time);
                 break;
             case WARNING:
-                printf("WARNING: ");
+                printf("WARNING [%s] ", str_time);
                 break;
             case INFO:
-                printf("INFO: ");
+                printf("INFO    [%s] ", str_time);
                 break;
             case DEBUG:
-                printf("DEBUG: ");
+                printf("DEBUG   [%s] ", str_time);
                 break;
             case BORING:
-                printf("BORING: ");
+                printf("BORING  [%s] ", str_time);
                 break;
             default:
                 ;

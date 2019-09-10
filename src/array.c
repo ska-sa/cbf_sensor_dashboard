@@ -602,7 +602,7 @@ void array_handle_received_katcl_lines(struct array *this_array)
             case '#': // it's a katcp inform
                 if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 0) + 1, "sensor-status"))
                 {
-                    verbose_message(INFO, "Received sensor-status on the monitor port of %s:%hu.\n", this_array->cmc_address, this_array->control_port);
+                    //verbose_message(INFO, "Received sensor-status on the monitor port of %s:%hu.\n", this_array->cmc_address, this_array->control_port);
                     char **tokens = NULL;
                     size_t n_tokens = tokenise_string(arg_string_katcl(this_array->monitor_katcl_line, 3), '.', &tokens);
                     char team = tokens[0][0];

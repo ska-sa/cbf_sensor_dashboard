@@ -23,7 +23,7 @@ struct team *team_create(char type, size_t number_of_antennas)
         int i;
         for (i = 0; i < new_team->number_of_antennas; i++)
         {
-            new_team->host_list[i] = host_create();
+            new_team->host_list[i] = host_create(type, i);
         }
     }
     return new_team;

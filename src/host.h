@@ -3,7 +3,7 @@
 
 struct host;
 
-struct host *host_create();
+struct host *host_create(char type, int host_number);
 void host_destroy(struct host *this_host);
 
 int host_add_device(struct host *this_host, char *new_device_name);

@@ -9,6 +9,8 @@
 
 struct host {
     char *hostname;
+    char type;
+    int host_number;
     struct device **device_list;
     size_t number_of_devices;
     struct vdevice **vdevice_list;
@@ -18,19 +20,20 @@ struct host {
 };
     
 
-struct host *host_create()
+struct host *host_create(char type, int host_number)
 {
     struct host *new_host = malloc(sizeof(*new_host));
     if (new_host != NULL)
     {
         new_host->hostname = strdup("unknown");
+        new_host->type = type;
+        new_host->host_number = host_number;
         new_host->number_of_devices = 0;
         new_host->device_list = NULL;
         new_host->number_of_vdevices = 0;
         new_host->vdevice_list = NULL;
         new_host->number_of_engines = 0;
         new_host->engine_list = NULL;
-        /*TODO: do I need to explicitly make pointers null?*/
     }
     return new_host;
 }
@@ -246,6 +249,12 @@ char *host_html_detail(struct host *this_host)
         host_detail = realloc(host_detail, (size_t) needed);
         sprintf(host_detail, format, this_host->hostname, this_host->number_of_devices, this_host->number_of_engines, this_host->number_of_vdevices);
     }*/ //No longer needed, was just for debugging.
+    {
+        char format[] = "<td>%c%d</td>";
+        ssize_t needed = snprintf(NULL, 0, format, this_host->type, this_host->host_number) + 1;
+        host_detail = realloc(host_detail, (size_t) needed); //TODO checks for errors.
+        sprintf(host_detail, format, this_host->type, this_host->host_number);
+    }
     for (i = 0; i < this_host->number_of_devices; i++)
     {
         char format[] = "%s%s";

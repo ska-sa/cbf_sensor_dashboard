@@ -28,6 +28,8 @@ enum array_state {
 
 struct array {
     char *name;
+    int array_is_active;
+
     struct team **team_list;
     size_t number_of_teams;
     size_t n_antennas;
@@ -59,6 +61,7 @@ struct array *array_create(char *new_array_name, char *cmc_address, uint16_t con
    if (new_array != NULL)
    {
         new_array->name = strdup(new_array_name);
+        new_array->array_is_active = 1;
         new_array->n_antennas = n_antennas;
         new_array->cmc_address = strdup(cmc_address);
 
@@ -195,6 +198,27 @@ int array_add_team_host_engine_device_sensor(struct array *this_array, char team
         }
     }
     return -1;
+}
+
+
+void array_mark_suspect(struct array *this_array)
+{
+    this_array->array_is_active = 0;
+}
+
+
+int array_check_suspect(struct array *this_array)
+{
+    if (this_array != NULL)
+        return !this_array->array_is_active; //i.e. it's not suspect if it's active.
+    else
+        return -1;
+}
+
+
+void array_mark_fine(struct array *this_array)
+{
+    this_array->array_is_active = 1;
 }
 
 

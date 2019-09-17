@@ -14,6 +14,7 @@ struct cmc_server *cmc_server_create(char *address, uint16_t katcp_port);
 void cmc_server_destroy(struct cmc_server *this_cmc_server);
 
 void cmc_server_try_reconnect(struct cmc_server *this_cmc_server);
+void cmc_server_poll_array_list(struct cmc_server *this_cmc_server);
 
 char *cmc_server_get_name(struct cmc_server *this_cmc_server);
 

@@ -242,6 +242,9 @@ int main(int argc, char **argv)
     to.tv_sec = 10;
     to.tv_nsec = 0;
 
+    time_t time_left_s = 10;
+    time_t time_left_ns = 0;
+
     while (!stop)
     {
         //printf("new select() loop\n");
@@ -256,9 +259,15 @@ int main(int argc, char **argv)
 
         if (to.tv_sec == 0 && to.tv_nsec == 0) //i.e. we've timed out.
         {
+            verbose_message(ERROR, "Timeout reached, resetting to 10 seconds.\n");
             //reset the timeout to ten seconds. Otherwise carry on where we left off.
             to.tv_sec = 10;
             to.tv_nsec = 0;
+        }
+        else
+        {
+            to.tv_sec = time_left_s;
+            to.tv_nsec = time_left_ns;
         }
 
         for (i = 0; i < num_cmcs; i++)
@@ -274,11 +283,18 @@ int main(int argc, char **argv)
         
         r = pselect(nfds + 1, &rd, &wr, NULL, &to, &orig_mask);
 
+        time_left_s = to.tv_sec;
+        time_left_ns = to.tv_nsec;
+
         if (r == 0) //timeout
         {
             for (i = 0; i < num_cmcs; i++)
             {
+                //This will only do something if it has disconnected.
                 cmc_server_try_reconnect(cmc_list[i]);
+                
+                //re-request array list
+                cmc_server_poll_array_list(cmc_list[i]);
             }
         }
 

@@ -70,7 +70,6 @@ struct cmc_server *cmc_server_create(char *address, uint16_t katcp_port)
 
     new_cmc_server->current_message = NULL;
     cmc_server_queue_pop(new_cmc_server);
-    //new_cmc_server->state = CMC_SEND_FRONT_OF_QUEUE;
     new_cmc_server->state = CMC_WAIT_CONNECT;
     return new_cmc_server;
 }
@@ -106,6 +105,23 @@ void cmc_server_try_reconnect(struct cmc_server *this_cmc_server)
         this_cmc_server->katcp_socket_fd = net_connect(this_cmc_server->address, this_cmc_server->katcp_port, NETC_VERBOSE_ERRORS | NETC_VERBOSE_STATS | NETC_ASYNC | NETC_TCP_KEEP_ALIVE);
         this_cmc_server->state = CMC_WAIT_CONNECT;
     }
+}
+
+
+void cmc_server_poll_array_list(struct cmc_server *this_cmc_server)
+{
+    //Mark the arrays as potentially missing.
+    size_t i;
+    for (i = 0; i < this_cmc_server->no_of_arrays; i++)
+    {
+        array_mark_suspect(this_cmc_server->array_list[i]);
+    }
+    struct message *new_message = message_create('?');
+    new_message = message_create('?');
+    message_add_word(new_message, "array-list");
+    queue_push(this_cmc_server->outgoing_msg_queue, new_message);
+    verbose_message(ERROR, "Pushed an array-list poll onto the queue. Current message: %s - Queue length: %u.\n", message_compose(this_cmc_server->current_message), queue_sizeof(this_cmc_server->outgoing_msg_queue));
+    this_cmc_server->state = CMC_SEND_FRONT_OF_QUEUE;
 }
 
 
@@ -294,7 +310,8 @@ static int cmc_server_add_array(struct cmc_server *this_cmc_server, char *array_
         {
             //Might want to think about comparing the other stuff as well, just in case for some reason the
             //original array got destroyed and another different one but called the same name snuck in.
-            verbose_message(INFO, "Attempting to add array \"%s\" to %s:%hu while an array of this name already exists.\n", array_name, this_cmc_server->address, this_cmc_server->katcp_port);
+            verbose_message(INFO, "Attempting to add array \"%s\" to %s:%hu while an array of this name already exists. Marking it active instead.\n", array_name, this_cmc_server->address, this_cmc_server->katcp_port);
+            array_mark_fine(this_cmc_server->array_list[i]);
             return (int) i;
         }
     }
@@ -371,7 +388,24 @@ void cmc_server_handle_received_katcl_lines(struct cmc_server *this_cmc_server)
                                 message_see_word(this_cmc_server->current_message, 0), arg_string_katcl(this_cmc_server->katcl_line, 1));
                         this_cmc_server->state = CMC_SEND_FRONT_OF_QUEUE;
                     }
-
+                    //If the "!array-list ok" message is received, we need to prune the arrays which aren't active anymore. 
+                    if (!strcmp(arg_string_katcl(this_cmc_server->katcl_line, 0) + 1, "array-list"))
+                    {
+                        size_t i;
+                        for (i = 0; i < this_cmc_server->no_of_arrays; i++)
+                        {
+                            if (array_check_suspect(this_cmc_server->array_list[i]))
+                            {
+                                verbose_message(INFO, "%s:%hu destroying array %s.\n", this_cmc_server->address, this_cmc_server->katcp_port, array_get_name(this_cmc_server->array_list[i]));
+                                array_destroy(this_cmc_server->array_list[i]);
+                                memmove(&this_cmc_server->array_list[i], &this_cmc_server->array_list[i+1], sizeof(*(this_cmc_server->array_list))*(this_cmc_server->no_of_arrays - i - 1));
+                                this_cmc_server->array_list = realloc(this_cmc_server->array_list, sizeof(*(this_cmc_server->array_list))*(this_cmc_server->no_of_arrays - 1));
+                                //TODO should probably do the sanitary thing here and use a temp variable. Lazy right now.
+                                this_cmc_server->no_of_arrays--;
+                                i--;
+                            }
+                        }
+                    }
                 }
                 break;
             case '#': // it's a katcp inform
@@ -411,6 +445,7 @@ void cmc_server_handle_received_katcl_lines(struct cmc_server *this_cmc_server)
                     cmc_server_add_array(this_cmc_server, array_name, control_port, monitor_port, number_of_antennas);
                     //TODO check if return is proper.
                 }
+                /* //going to ignore these for the time being.
                 else if (!strcmp(arg_string_katcl(this_cmc_server->katcl_line, 0) + 1, "group-created"))
                 {
                     char *temp = arg_string_katcl(this_cmc_server->katcl_line, 1);
@@ -460,7 +495,7 @@ void cmc_server_handle_received_katcl_lines(struct cmc_server *this_cmc_server)
                             this_cmc_server->no_of_arrays--;
                         }
                     }
-                }
+                }*/
                 break;
             default:
                 verbose_message(WARNING, "Unexpected KATCP message received, starting with %c\n", received_message_type);

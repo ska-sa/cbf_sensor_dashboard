@@ -81,7 +81,11 @@ void vdevice_destroy(struct vdevice *this_vdevice)
      * by the host that contains it.
      */
     if (this_vdevice != NULL)
+    {
+        free(this_vdevice->name);
+        free(this_vdevice->status);
         free(this_vdevice);
+    }
 }
 
 

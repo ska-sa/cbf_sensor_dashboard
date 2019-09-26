@@ -50,7 +50,7 @@ static char doc[] =
 static char args_doc[] = "LISTEN_PORT";
 
 static struct argp_option options[] = {
-  {"verbose",  'v', "VERBOSITY_LEVEL",      0,  "Produce verbose output" },
+  {"verbose",  'v', "VERBOS_LVL",      0,  "Produce verbose output" },
   { 0 }
 };
 

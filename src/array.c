@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <stdint.h>
+#include <time.h>
 #include <netc.h>
 #include <katcp.h>
 #include <katcl.h>
@@ -36,6 +37,8 @@ struct array {
 
     char *cmc_address;
 
+    time_t last_updated;
+
     uint16_t control_port;
     int control_fd;
     struct katcl_line *control_katcl_line;
@@ -64,6 +67,8 @@ struct array *array_create(char *new_array_name, char *cmc_address, uint16_t con
         new_array->array_is_active = 1;
         new_array->n_antennas = n_antennas;
         new_array->cmc_address = strdup(cmc_address);
+
+        new_array->last_updated = time(0);
 
         new_array->control_port = control_port;
         new_array->control_fd = net_connect(cmc_address, control_port, NETC_VERBOSE_ERRORS | NETC_VERBOSE_STATS);
@@ -678,6 +683,10 @@ void array_handle_received_katcl_lines(struct array *this_array)
                         default:
                             verbose_message(ERROR, "There was an unexpected number of tokens (%d) in the message: %s\n", n_tokens, arg_string_katcl(this_array->monitor_katcl_line, 3)); 
                     }
+
+                    //Update the time
+                    this_array->last_updated = time(0);
+
                     size_t i;
                     for (i = 0; i < n_tokens; i++)
                         free(tokens[i]);
@@ -715,6 +724,16 @@ char *array_html_summary(struct array *this_array, char *cmc_name)
 char *array_html_detail(struct array *this_array)
 {
     char *array_detail = strdup(""); //must free() later.
+    {
+        char format[] = "<p align=\"right\">Last updated: %s (%d seconds ago).</p>";
+        char time_str[20];
+        struct tm *last_updated_tm = localtime(&this_array->last_updated);
+        strftime(time_str, 20, "%F %T", last_updated_tm);
+        ssize_t needed = snprintf(NULL, 0, format, time_str, (int)(time(0) - this_array->last_updated)) + 1;
+        array_detail = realloc(array_detail, (size_t) needed);
+        sprintf(array_detail, format, time_str, (int)(time(0) - this_array->last_updated));
+    }
+    
     size_t i, j;
     for (i = 0; i < this_array->n_antennas; i++)
     {

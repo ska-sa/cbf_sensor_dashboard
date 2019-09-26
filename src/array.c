@@ -154,7 +154,7 @@ char *array_get_name(struct array *this_array)
 
 int array_add_team_host_device_sensor(struct array *this_array, char team_type, size_t host_number, char *device_name, char *sensor_name)
 {
-    verbose_message(INFO, "Adding sensor: %chost%02d.%s.%s\n", team_type, host_number, device_name, sensor_name);
+    verbose_message(BORING, "Adding sensor: %chost%02d.%s.%s\n", team_type, host_number, device_name, sensor_name);
     if (this_array != NULL)
     {
        size_t i;
@@ -181,7 +181,7 @@ int array_add_team_host_device_sensor(struct array *this_array, char team_type, 
 
 int array_add_team_host_engine_device_sensor(struct array *this_array, char team_type, size_t host_number, char *engine_name, char *device_name, char *sensor_name)
 {
-    verbose_message(DEBUG, "Adding sensor: %chost%02d.%s.%s.%s\n", team_type, host_number, engine_name, device_name, sensor_name);
+    verbose_message(BORING, "Adding sensor: %chost%02d.%s.%s.%s\n", team_type, host_number, engine_name, device_name, sensor_name);
     if (this_array != NULL)
     {
         size_t i;
@@ -426,7 +426,7 @@ static void array_activate(struct array *this_array)
 
     for (result = fgets(buffer, BUF_SIZE, config_file); result != NULL; result = fgets(buffer, BUF_SIZE, config_file))
     {
-        verbose_message(DEBUG, "\n\nRead line from sensor-list file: %s", buffer);
+        verbose_message(DEBUG, "Read line from sensor-list file: %s", buffer);
         char **tokens = NULL;
         size_t n_tokens = tokenise_string(buffer, '.', &tokens);
         if (!((n_tokens == 2) || (n_tokens == 3))) //can't think of a better way to put it than this. Might be just bare device,
@@ -540,7 +540,7 @@ void array_handle_received_katcl_lines(struct array *this_array)
                     }
                     else
                     {
-                        verbose_message(INFO, "%s:%hu going into monitoring state.\n", this_array->cmc_address, this_array->control_port);
+                        verbose_message(BORING, "%s:%hu going into monitoring state.\n", this_array->cmc_address, this_array->control_port);
                         message_destroy(this_array->current_control_message);
                         this_array->current_control_message = NULL; //doesn't do this in the above function. C problem.
                         this_array->control_state = ARRAY_MONITOR;
@@ -557,12 +557,13 @@ void array_handle_received_katcl_lines(struct array *this_array)
                                 arg_string_katcl(this_array->control_katcl_line, 5),
                                 arg_string_katcl(this_array->control_katcl_line, 4));
 
-                        if (strcmp(this_array->instrument_state, arg_string_katcl(this_array->control_katcl_line, 4))) //without ! in front, i.e. if they are different.
-                                                                        //4 is the state, so if the state is changing then something needs to be updated.
+                        if (strcmp(this_array->instrument_state, arg_string_katcl(this_array->control_katcl_line, 4)) || \
+                             strcmp(this_array->config_file, arg_string_katcl(this_array->control_katcl_line, 5))  ) //without ! in front, i.e. if they are different.
+                                                                        //4 is the state, 5 is the config file, so if either one changes the stuff should update.
                         {
-                            if (!strcmp(this_array->instrument_state, "-") && !strcmp(arg_string_katcl(this_array->control_katcl_line, 4), "nominal"))
+                            if (!strcmp(arg_string_katcl(this_array->control_katcl_line, 4), "nominal")) 
                             {
-                                array_activate(this_array);
+                                array_activate(this_array); 
                             }
                             free(this_array->instrument_state);
                             this_array->instrument_state = strdup(arg_string_katcl(this_array->control_katcl_line, 4));
@@ -595,37 +596,44 @@ void array_handle_received_katcl_lines(struct array *this_array)
         char received_message_type = arg_string_katcl(this_array->monitor_katcl_line, 0)[0];
         switch (received_message_type) {
             case '!': // it's a katcp response
-                if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 0) + 1, message_see_word(this_array->current_monitor_message, 0)))
+                if (this_array->current_monitor_message)
                 {
-                    verbose_message(DEBUG, "%s:%hu received %s %s\n", this_array->cmc_address, this_array->monitor_port, \
-                            message_see_word(this_array->current_monitor_message, 0), arg_string_katcl(this_array->monitor_katcl_line, 1));
+                    if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 0) + 1, message_see_word(this_array->current_monitor_message, 0)))
+                    {
+                        verbose_message(DEBUG, "%s:%hu received %s %s\n", this_array->cmc_address, this_array->monitor_port, \
+                                message_see_word(this_array->current_monitor_message, 0), arg_string_katcl(this_array->monitor_katcl_line, 1));
 
-                    if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 1), "ok"))
-                    {
-                        //Don't actually need to do anything here, the inform processing code should handle.
-                    }
-                    else
-                    {
-                        //sensor obviously doesn't exist.
-                        //sensor_mark_absent(); // somehow. How will this propagate down?
-                    }
+                        if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 1), "ok"))
+                        {
+                            //Don't actually need to do anything here, the inform processing code should handle.
+                        }
+                        else
+                        {
+                            //sensor obviously doesn't exist.
+                            //sensor_mark_absent(); // somehow. How will this propagate down?
+                        }
 
-                    this_array->monitor_state = ARRAY_SEND_FRONT_OF_QUEUE;
-                    verbose_message(BORING, "%s:%hu still has %u message(s) in its queue...\n", this_array->cmc_address, \
-                            this_array->monitor_port, queue_sizeof(this_array->outgoing_monitor_msg_queue));
+                        this_array->monitor_state = ARRAY_SEND_FRONT_OF_QUEUE;
+                        verbose_message(BORING, "%s:%hu still has %u message(s) in its queue...\n", this_array->cmc_address, \
+                                this_array->monitor_port, queue_sizeof(this_array->outgoing_monitor_msg_queue));
 
-                    if (queue_sizeof(this_array->outgoing_monitor_msg_queue))
-                    {
-                        verbose_message(BORING, "%s:%hu  popping queue...\n", this_array->cmc_address, this_array->monitor_port);
-                        array_monitor_queue_pop(this_array);
+                        if (queue_sizeof(this_array->outgoing_monitor_msg_queue))
+                        {
+                            verbose_message(BORING, "%s:%hu  popping queue...\n", this_array->cmc_address, this_array->monitor_port);
+                            array_monitor_queue_pop(this_array);
+                        }
+                        else
+                        {
+                            verbose_message(BORING, "%s:%hu going into monitoring state.\n", this_array->cmc_address, this_array->monitor_port);
+                            message_destroy(this_array->current_monitor_message);
+                            this_array->current_monitor_message = NULL; //doesn't do this in the above function. C problem.
+                            this_array->monitor_state = ARRAY_MONITOR;
+                        }
                     }
-                    else
-                    {
-                        verbose_message(INFO, "%s:%hu going into monitoring state.\n", this_array->cmc_address, this_array->monitor_port);
-                        message_destroy(this_array->current_monitor_message);
-                        this_array->current_monitor_message = NULL; //doesn't do this in the above function. C problem.
-                        this_array->monitor_state = ARRAY_MONITOR;
-                    }
+                }
+                else
+                {
+                    verbose_message(WARNING, "Received a katcp response %s %s %s - unexpectedly.\n", arg_string_katcl(this_array->monitor_katcl_line, 0) + 1, arg_string_katcl(this_array->monitor_katcl_line, 1), arg_string_katcl(this_array->monitor_katcl_line, 2));
                 }
                 break;
             case '#': // it's a katcp inform

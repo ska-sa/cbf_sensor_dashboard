@@ -120,7 +120,9 @@ void cmc_server_poll_array_list(struct cmc_server *this_cmc_server)
     new_message = message_create('?');
     message_add_word(new_message, "array-list");
     queue_push(this_cmc_server->outgoing_msg_queue, new_message);
-    verbose_message(ERROR, "Pushed an array-list poll onto the queue. Current message: %s - Queue length: %u.\n", message_compose(this_cmc_server->current_message), queue_sizeof(this_cmc_server->outgoing_msg_queue));
+    if (!message_compose(this_cmc_server->current_message))
+        cmc_server_queue_pop(this_cmc_server);
+    verbose_message(BORING, "Pushed an array-list poll onto the queue. Current message: %s - Queue length: %u.\n", message_compose(this_cmc_server->current_message), queue_sizeof(this_cmc_server->outgoing_msg_queue));
     this_cmc_server->state = CMC_SEND_FRONT_OF_QUEUE;
 }
 
@@ -310,7 +312,7 @@ static int cmc_server_add_array(struct cmc_server *this_cmc_server, char *array_
         {
             //Might want to think about comparing the other stuff as well, just in case for some reason the
             //original array got destroyed and another different one but called the same name snuck in.
-            verbose_message(INFO, "Attempting to add array \"%s\" to %s:%hu while an array of this name already exists. Marking it active instead.\n", array_name, this_cmc_server->address, this_cmc_server->katcp_port);
+            verbose_message(BORING, "Attempting to add array \"%s\" to %s:%hu while an array of this name already exists. Marking it active instead.\n", array_name, this_cmc_server->address, this_cmc_server->katcp_port);
             array_mark_fine(this_cmc_server->array_list[i]);
             return (int) i;
         }
@@ -364,7 +366,7 @@ void cmc_server_handle_received_katcl_lines(struct cmc_server *this_cmc_server)
                 {
                     if (!strcmp(arg_string_katcl(this_cmc_server->katcl_line, 1), "ok"))
                     {
-                        verbose_message(DEBUG, "%s:%hu received %s ok!\n",\
+                        verbose_message(BORING, "%s:%hu received %s ok!\n",\
                                 this_cmc_server->address, this_cmc_server->katcp_port, message_see_word(this_cmc_server->current_message, 0));
                         this_cmc_server->state = CMC_SEND_FRONT_OF_QUEUE;
                         verbose_message(BORING, "%s:%hu still has %u message(s) in its queue...\n",\
@@ -376,7 +378,7 @@ void cmc_server_handle_received_katcl_lines(struct cmc_server *this_cmc_server)
                         }
                         else
                         {
-                            verbose_message(INFO, "%s:%hu going into monitoring state.\n", this_cmc_server->address, this_cmc_server->katcp_port);
+                            verbose_message(BORING, "%s:%hu going into monitoring state.\n", this_cmc_server->address, this_cmc_server->katcp_port);
                             message_destroy(this_cmc_server->current_message);
                             this_cmc_server->current_message = NULL; //doesn't do this in the above function. C problem.
                             this_cmc_server->state = CMC_MONITOR;

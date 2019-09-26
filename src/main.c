@@ -19,6 +19,7 @@
 #include <string.h>
 #include <unistd.h> /* Needed for read() and write() */
 #include <signal.h>
+#include <time.h>
 #include <katcp.h>
 #include <katcl.h>
 #include <netc.h>
@@ -238,12 +239,7 @@ int main(int argc, char **argv)
      * select() loop
      *********************************/
 
-    struct timespec to;
-    to.tv_sec = 10;
-    to.tv_nsec = 0;
-
-    time_t time_left_s = 10;
-    time_t time_left_ns = 0;
+    time_t last_array_list_poll = time(0);
 
     while (!stop)
     {
@@ -257,17 +253,11 @@ int main(int argc, char **argv)
         FD_SET(server_fd, &rd);
         nfds = max(nfds, server_fd);
 
-        if (to.tv_sec == 0 && to.tv_nsec == 0) //i.e. we've timed out.
+        if ((time(0) - last_array_list_poll) >= 10) //check for a change
         {
-            verbose_message(ERROR, "Timeout reached, resetting to 10 seconds.\n");
-            //reset the timeout to ten seconds. Otherwise carry on where we left off.
-            to.tv_sec = 10;
-            to.tv_nsec = 0;
-        }
-        else
-        {
-            to.tv_sec = time_left_s;
-            to.tv_nsec = time_left_ns;
+            for (i = 0; i < num_cmcs; i++)
+                cmc_server_poll_array_list(cmc_list[i]);
+            last_array_list_poll = time(0);
         }
 
         for (i = 0; i < num_cmcs; i++)
@@ -281,12 +271,9 @@ int main(int argc, char **argv)
             web_client_set_fds(client_list[i], &rd, &wr, &nfds);
         }
         
-        r = pselect(nfds + 1, &rd, &wr, NULL, &to, &orig_mask);
+        r = pselect(nfds + 1, &rd, &wr, NULL, NULL, &orig_mask);
 
-        time_left_s = to.tv_sec;
-        time_left_ns = to.tv_nsec;
-
-        if (r == 0) //timeout
+        /*if (r == 0) //timeout
         {
             for (i = 0; i < num_cmcs; i++)
             {
@@ -294,9 +281,8 @@ int main(int argc, char **argv)
                 cmc_server_try_reconnect(cmc_list[i]);
                 
                 //re-request array list
-                cmc_server_poll_array_list(cmc_list[i]);
             }
-        }
+        }*/
 
         if (r > 0) //==0 means timeout, <0 means error. TODO Could possibly be interrupt, which can just be ignored.
         {

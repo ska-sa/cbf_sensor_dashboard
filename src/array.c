@@ -643,18 +643,37 @@ void array_handle_received_katcl_lines(struct array *this_array)
                     free(host_no_str);
                     host_no_str = NULL;
 
-                    //TODO - this needs to be sanitised a bit to be robust.
-                    //If the arg_string_katcl returns a null, then this naively passes through to the
-                    //lower-level function and tries to strdup a null eventually which causes a segfault.
+                    //Sanitise the katcl strings. Nulls cause strdup to segfault.
+                    char *new_value;
+                    if (arg_string_katcl(this_array->monitor_katcl_line, 5) != NULL) //I guess the "!= NULL" is redundant, but I want this to be explicit and readable
+                    {
+                        new_value = strdup(arg_string_katcl(this_array->monitor_katcl_line, 5));
+                    }
+                    else
+                    {
+                        verbose_message(ERROR, "KATCP message from %s:%s for sensor-status %chost%02d.%s.%s - null value received.", this_array->cmc_address, this_array->name, team, host_no, tokens[1], tokens[2]);
+                        new_value = strdup("none");
+                    }
+
+                    char *new_status;
+                    if (arg_string_katcl(this_array->monitor_katcl_line, 4) != NULL) 
+                    {
+                        new_status = strdup(arg_string_katcl(this_array->monitor_katcl_line, 4));
+                    }
+                    else
+                    {
+                        verbose_message(ERROR, "KATCP message from %s:%s for sensor-status %chost%02d.%s.%s - null status received.", this_array->cmc_address, this_array->name, team, host_no, tokens[1], tokens[2]);
+                        new_status = strdup("none");
+                    }
 
                     switch (n_tokens) {
                         case 3:
                             verbose_message(DEBUG, "Updating %chost%02d.%s.%s\n", team, host_no, tokens[1], tokens[2]);
-                            team_update_sensor(this_array->team_list[team_no], host_no, tokens[1], tokens[2], arg_string_katcl(this_array->monitor_katcl_line, 5), arg_string_katcl(this_array->monitor_katcl_line, 4));
+                            team_update_sensor(this_array->team_list[team_no], host_no, tokens[1], tokens[2], new_value, new_status);
                             break;
                         case 4:
                             verbose_message(DEBUG, "Updating %chost%02d.%s.%s.%s\n", team, host_no, tokens[1], tokens[2], tokens[3]);
-                            team_update_engine_sensor(this_array->team_list[team_no], host_no, tokens[1], tokens[2], tokens[3], arg_string_katcl(this_array->monitor_katcl_line, 5), arg_string_katcl(this_array->monitor_katcl_line, 4));
+                            team_update_engine_sensor(this_array->team_list[team_no], host_no, tokens[1], tokens[2], tokens[3], new_value, new_status);
                             break;
                         default:
                             verbose_message(ERROR, "There was an unexpected number of tokens (%d) in the message: %s\n", n_tokens, arg_string_katcl(this_array->monitor_katcl_line, 3)); 
@@ -663,6 +682,8 @@ void array_handle_received_katcl_lines(struct array *this_array)
                     for (i = 0; i < n_tokens; i++)
                         free(tokens[i]);
                     free(tokens);
+                    free(new_value);
+                    free(new_status);
                 }
                 else if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 0) + 1, "sensor-value"))
                 {

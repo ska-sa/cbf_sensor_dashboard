@@ -9,7 +9,13 @@ struct sensor {
     char *status;
 };
 
-
+/**
+ * \brief  Create a sensor object.
+ *
+ * \detail Allocate memory for a sensor object and populate the members
+ *         with sensible default values.
+ *
+ */
 struct sensor *sensor_create(char *new_name)
 {
     /* TODO think about sanitising the name a bit perhaps. */

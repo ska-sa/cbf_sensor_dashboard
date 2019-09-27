@@ -6,6 +6,15 @@
 
 static enum verbosity_level verbosity = 0;
 
+/**
+ * \brief    Set the runtime output verbosity level.
+ *
+ * \details  The verbosity level is set in a static variable in this file. This can be set by the
+ *           user and will allow any module in the program using it to print messages of varying
+ *           levels of importance.
+ *
+ */
+
 void set_verbosity(enum verbosity_level setting)
 {
     verbosity = setting;

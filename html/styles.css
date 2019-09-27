@@ -47,7 +47,7 @@
 .error:hover {opacity: 1}
 
 .failure {
-  background-color: #FF0000;
+  background-color: #777777;
   border: none;
   color: white;
   padding: 15 px 32 px;
@@ -77,6 +77,38 @@
   display: inline-block;
 }
 .error:hover {opacity: 1}
+
+.unreachable {
+  background-color: #777777;
+  border: none;
+  color: white;
+  padding: 15 px 32 px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  margin: 4px 2px;
+  cursor: pointer;
+  opacity: 0.8;
+  transition: 0.2s;
+  display: inline-block;
+}
+.unreachable:hover {opacity: 1}
+
+.inactive {
+  background-color: #777777;
+  border: none;
+  color: white;
+  padding: 15 px 32 px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  margin: 4px 2px;
+  cursor: pointer;
+  opacity: 0.8;
+  transition: 0.2s;
+  display: inline-block;
+}
+.inactive:hover {opacity: 1}
 
 button {
     width: 95%;

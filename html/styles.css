@@ -2,7 +2,6 @@
   background-color: #4CAF50;
   border: none;
   color: white;
-  padding: 15 px 32 px;
   text-align: center;
   text-decoration: none;
   display: inline-block;
@@ -18,7 +17,6 @@
   background-color: #FF9E1F;
   border: none;
   color: white;
-  padding: 15 px 32 px;
   text-align: center;
   text-decoration: none;
   display: inline-block;
@@ -34,7 +32,6 @@
   background-color: #FF0000;
   border: none;
   color: white;
-  padding: 15 px 32 px;
   text-align: center;
   text-decoration: none;
   display: inline-block;
@@ -50,7 +47,6 @@
   background-color: #777777;
   border: none;
   color: white;
-  padding: 15 px 32 px;
   text-align: center;
   text-decoration: none;
   display: inline-block;
@@ -66,7 +62,6 @@
   background-color: #777777;
   border: none;
   color: white;
-  padding: 15 px 32 px;
   text-align: center;
   text-decoration: none;
   display: inline-block;
@@ -82,7 +77,6 @@
   background-color: #777777;
   border: none;
   color: white;
-  padding: 15 px 32 px;
   text-align: center;
   text-decoration: none;
   display: inline-block;
@@ -98,7 +92,6 @@
   background-color: #777777;
   border: none;
   color: white;
-  padding: 15 px 32 px;
   text-align: center;
   text-decoration: none;
   display: inline-block;
@@ -113,16 +106,25 @@
 button {
     width: 95%;
     font-size: 8px;
+    padding: 0 px 32 px;
 }
 
 h1 {
     font-size: 50px;
 }
 
-table, th, td {
+table {
+    width: 100%;
+}
+
+tr {
     border: 1px solid black;
+}
+
+table, th, td {
     border-collapse: collapse;
-    font-size: 25px;
+    font-size: 16px;
+    padding: 0px;
 }
 
 td {
@@ -143,7 +145,7 @@ td {
         font-size: 22px;
     }
     button {
-        font-size: 20px;
+        font-size: 17px;
     }
 }
 

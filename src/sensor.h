@@ -3,7 +3,8 @@
 
 /**
  * \file   sensor.h
- * \brief  Header file for the sensor type.
+ * \brief  The sensor type stores the name, value and status of a sensor.
+ *         It is meant to be a member of a device object.
  */
 
 struct sensor;

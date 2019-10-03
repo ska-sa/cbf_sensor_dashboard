@@ -1,6 +1,13 @@
 #ifndef _DEVICE_H_
 #define _DEVICE_H_
 
+/**
+ * \file   device.h
+ * \brief  The device type stores the status of a device on the FPGA reported by the corr2_sensor_servelet.
+ *         The device collects a number of specific sensors, but its overall status is defined by a
+ *         "device-status" sensor.
+ */
+
 struct device;
 
 struct device *device_create(char *new_name);
@@ -13,8 +20,5 @@ char *device_get_sensor_status(struct device *this_device, char *sensor_name);
 int device_update_sensor(struct device *this_device, char *sensor_name, char *new_sensor_value, char *new_sensor_status);
 
 char *device_html_summary(struct device *this_device);
-
-/* functions for debugging, for removal later. */
-void device_print_sensors(struct device *this_device);
 
 #endif

@@ -11,14 +11,11 @@ struct sensor {
 
 
 /**
- * \fn     struct sensor *sensor_create(char *new_name)
- *
- * \detail Allocate memory for a sensor object and populate the members
- *         with sensible default values.
- *
- * \param  new_name A name for the sensor to be created.
- *
- * \return A pointer to the newly-created sensor object.
+ * \fn      struct sensor *sensor_create(char *new_name)
+ * \details Allocate memory for a sensor object and populate the members
+ *          with sensible default values.
+ * \param   new_name A name for the sensor to be created.
+ * \return  A pointer to the newly-created sensor object.
  */
 struct sensor *sensor_create(char *new_name)
 {
@@ -35,13 +32,10 @@ struct sensor *sensor_create(char *new_name)
 
 
 /**
- * \fn     void sensor_destroy(struct sensor *this_sensor)
- *
- * \detail Free the memory associated with the sensor object.
- *
- * \param  this_sensor a pointer to the sensor to be destroyed.
- *
- * \return void
+ * \fn      void sensor_destroy(struct sensor *this_sensor)
+ * \details Free the memory associated with the sensor object.
+ * \param   this_sensor A pointer to the sensor to be destroyed.
+ * \return  void
  */
 void sensor_destroy(struct sensor *this_sensor)
 {
@@ -56,13 +50,11 @@ void sensor_destroy(struct sensor *this_sensor)
 
 
 /**
- * \fn     char *sensor_get_name(struct sensor *this_sensor)
- *
- * \detail Get the name of the given sensor.
- *
- * \param  this_sensor a pointer to the sensor to be queried.
- *
- * \return A pointer to the name string of the sensor. The char pointer is not newly allocated so therefore does not need to be free'd.
+ * \fn      char *sensor_get_name(struct sensor *this_sensor)
+ * \details Get the name of the given sensor.
+ * \param   this_sensor A pointer to the sensor to be queried.
+ * \return  A pointer to the name string of the sensor. The char pointer
+ *          is not newly allocated so therefore must not be free'd.
  */
 char *sensor_get_name(struct sensor *this_sensor)
 {
@@ -71,13 +63,11 @@ char *sensor_get_name(struct sensor *this_sensor)
 
 
 /**
- * \fn     char *sensor_get_value(struct sensor *this_sensor)
- *
- * \detail Get the value of the given sensor.
- *
- * \param  this_sensor a pointer to the sensor to be queried.
- *
- * \return A pointer to the value string of the sensor. The char pointer is not newly allocated so therefore does not need to be free'd.
+ * \fn      char *sensor_get_value(struct sensor *this_sensor)
+ * \details Get the value of the given sensor.
+ * \param   this_sensor A pointer to the sensor to be queried.
+ * \return  A pointer to the value string of the sensor. The char pointer is
+ *          not newly allocated so therefore must not be free'd.
  */
 char *sensor_get_value(struct sensor *this_sensor)
 {
@@ -86,13 +76,11 @@ char *sensor_get_value(struct sensor *this_sensor)
 
 
 /**
- * \fn     char *sensor_get_status(struct sensor *this_sensor)
- *
- * \detail Get the status of the given sensor.
- *
- * \param  this_sensor a pointer to the sensor to be queried.
- *
- * \return A pointer to the status string of the sensor. The char pointer is not newly allocated so therefore does not need to be free'd.
+ * \fn      char *sensor_get_status(struct sensor *this_sensor)
+ * \details Get the status of the given sensor.
+ * \param   this_sensor A pointer to the sensor to be queried.
+ * \return  A pointer to the status string of the sensor. The char pointer is
+ *          not newly allocated so therefore must not be free'd.
  */
 char *sensor_get_status(struct sensor *this_sensor)
 {
@@ -101,15 +89,12 @@ char *sensor_get_status(struct sensor *this_sensor)
 
 
 /**
- * \fn     int sensor_update(struct sensor *this_sensor, char *new_value, char *new_status)
- *
- * \detail Update the given sensor's value and status.
- *
- * \param  this_sensor a pointer to the sensor to be updated.
- * \param  new_value a string to replace the given sensor's stored sensor value.
- * \param  new_status a string to replace the given sensor's stored operational status.
- *
- * \return An integer indicating the success of the operation.
+ * \fn      int sensor_update(struct sensor *this_sensor, char *new_value, char *new_status)
+ * \details Update the given sensor's value and status.
+ * \param   this_sensor A pointer to the sensor to be updated.
+ * \param   new_value A string to replace the given sensor's stored sensor value.
+ * \param   new_status A string to replace the given sensor's stored operational status.
+ * \return  An integer indicating the success of the operation.
  */
 int sensor_update(struct sensor *this_sensor, char *new_value, char *new_status)
 {

@@ -117,7 +117,7 @@ int engine_update_sensor(struct engine *this_engine, char *device_name, char *se
     return -1;
 }
 
-
+/*
 void engine_print(struct engine *this_engine)
 {
     printf("Engine: %s\n", engine_get_name(this_engine));
@@ -127,3 +127,4 @@ void engine_print(struct engine *this_engine)
         device_print_sensors(this_engine->device_list[i]);
     }
 }
+*/

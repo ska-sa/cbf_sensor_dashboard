@@ -13,7 +13,7 @@ char *engine_get_sensor_status(struct engine *this_engine, char *device_name, ch
 int engine_update_sensor(struct engine *this_engine, char *device_name, char *sensor_name, char *new_sensor_value, char *new_sensor_status);
 
 /*debug functions*/
-void engine_print(struct engine *this_engine);
+//void engine_print(struct engine *this_engine);
 
 #endif
 

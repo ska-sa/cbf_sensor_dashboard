@@ -3,9 +3,13 @@
 
 #include "sensor.h"
 
+/// A struct to represent an individual sensor on corr2_sensor_servelet.
 struct sensor {
+    /// The sensor's name.
     char *name;
+    /// The sensor's value.
     char *value;
+    /// The sensor's status - this could be one of [nominal, warn, error, failure, unknown, unreachable, inactive] according to the KATCP spec.
     char *status;
 };
 

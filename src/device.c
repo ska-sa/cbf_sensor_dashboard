@@ -5,9 +5,13 @@
 #include "device.h"
 #include "sensor.h"
 
+/// A struct to represent a device - a collection of related sensors in the corr2_sensor_servelet.
 struct device {
+    /// Name of the device.
     char *name;
+    /// Pointer to a list of sensors.
     struct sensor **sensor_list;
+    /// Number of sensors in the list.
     unsigned int number_of_sensors;
 };
 
@@ -163,8 +167,8 @@ char *device_get_sensor_status(struct device *this_device, char *sensor_name)
  * \details Update the value and status of the named sensor underneath the given device.
  * \param   this_device A pointer to the device.
  * \param   sensor_name A string containing the name of the sensor to be updated.
- * \param   new_value A string to replace the named sensor's stored sensor value
- * \param   new_status A string to replace the named sensor's stored operational status.
+ * \param   new_sensor_value A string to replace the named sensor's stored sensor value
+ * \param   new_sensor_status A string to replace the named sensor's stored operational status.
  * \return  An integer indicating the success of the operation.
  */
 int device_update_sensor(struct device *this_device, char *sensor_name, char *new_sensor_value, char *new_sensor_status)

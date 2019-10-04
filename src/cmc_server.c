@@ -111,19 +111,22 @@ void cmc_server_try_reconnect(struct cmc_server *this_cmc_server)
 void cmc_server_poll_array_list(struct cmc_server *this_cmc_server)
 {
     //Mark the arrays as potentially missing.
-    size_t i;
-    for (i = 0; i < this_cmc_server->no_of_arrays; i++)
+    if (this_cmc_server->state != CMC_DISCONNECTED)
     {
-        array_mark_suspect(this_cmc_server->array_list[i]);
+        size_t i;
+        for (i = 0; i < this_cmc_server->no_of_arrays; i++)
+        {
+            array_mark_suspect(this_cmc_server->array_list[i]);
+        }
+        struct message *new_message = message_create('?');
+        new_message = message_create('?');
+        message_add_word(new_message, "array-list");
+        queue_push(this_cmc_server->outgoing_msg_queue, new_message);
+        if (!message_compose(this_cmc_server->current_message))
+            cmc_server_queue_pop(this_cmc_server);
+        verbose_message(BORING, "Pushed an array-list poll onto the queue. Current message: %s - Queue length: %u.\n", message_compose(this_cmc_server->current_message), queue_sizeof(this_cmc_server->outgoing_msg_queue));
+        this_cmc_server->state = CMC_SEND_FRONT_OF_QUEUE;
     }
-    struct message *new_message = message_create('?');
-    new_message = message_create('?');
-    message_add_word(new_message, "array-list");
-    queue_push(this_cmc_server->outgoing_msg_queue, new_message);
-    if (!message_compose(this_cmc_server->current_message))
-        cmc_server_queue_pop(this_cmc_server);
-    verbose_message(BORING, "Pushed an array-list poll onto the queue. Current message: %s - Queue length: %u.\n", message_compose(this_cmc_server->current_message), queue_sizeof(this_cmc_server->outgoing_msg_queue));
-    this_cmc_server->state = CMC_SEND_FRONT_OF_QUEUE;
 }
 
 

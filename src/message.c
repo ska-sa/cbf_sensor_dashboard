@@ -21,7 +21,7 @@ struct message *message_create(char message_type)
     {
         new_message->word_list = NULL;
         new_message->number_of_words = 0;
-        new_message->message_type = '?';
+        new_message->message_type = message_type;
     }
     verbose_message(BORING, "Message allocated a pointer of 0x%08lx.\n", new_message);
     return new_message;

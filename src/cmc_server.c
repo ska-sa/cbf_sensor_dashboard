@@ -119,12 +119,16 @@ void cmc_server_poll_array_list(struct cmc_server *this_cmc_server)
             array_mark_suspect(this_cmc_server->array_list[i]);
         }
         struct message *new_message = message_create('?');
-        new_message = message_create('?');
         message_add_word(new_message, "array-list");
         queue_push(this_cmc_server->outgoing_msg_queue, new_message);
-        if (!message_compose(this_cmc_server->current_message))
+	char *message_exists = message_compose(this_cmc_server->current_message);
+       	// Don't just check for null, because a message might exists with zero words in it somehow. If it composes to a usable string, then it's legit.
+        if (!message_exists)
             cmc_server_queue_pop(this_cmc_server);
-        verbose_message(BORING, "Pushed an array-list poll onto the queue. Current message: %s - Queue length: %u.\n", message_compose(this_cmc_server->current_message), queue_sizeof(this_cmc_server->outgoing_msg_queue));
+	free(message_exists);
+	char *composed_message = message_compose(this_cmc_server->current_message);
+        verbose_message(BORING, "Pushed an array-list poll onto the queue. Current message: %s - Queue length: %u.\n", composed_message, queue_sizeof(this_cmc_server->outgoing_msg_queue));
+	free(composed_message);
         this_cmc_server->state = CMC_SEND_FRONT_OF_QUEUE;
     }
 }

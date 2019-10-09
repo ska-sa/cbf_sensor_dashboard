@@ -749,10 +749,11 @@ char *array_html_detail(struct array *this_array)
         for (j = 0; j < this_array->number_of_teams; j++)
         {
             char format[] = "%s%s";
-            ssize_t needed = snprintf(NULL, 0, format, row_detail, team_get_host_html_detail(this_array->team_list[j], i)) + 1;
+	    char *host_html_det = team_get_host_html_detail(this_array->team_list[j], i);
+            ssize_t needed = snprintf(NULL, 0, format, row_detail, host_html_det) + 1;
             row_detail = realloc(row_detail, (size_t) needed);
-            sprintf(row_detail, format, row_detail, team_get_host_html_detail(this_array->team_list[j], i));
-            verbose_message(BORING, "Row detail: %s\n", row_detail);
+            sprintf(row_detail, format, row_detail, host_html_det);
+	    free(host_html_det);
         }
         char format[] = "%s<tr>%s</tr>\n";
         ssize_t needed = snprintf(NULL, 0, format, array_detail, row_detail) + 1;

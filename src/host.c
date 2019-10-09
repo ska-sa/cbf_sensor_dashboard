@@ -258,16 +258,20 @@ char *host_html_detail(struct host *this_host)
     for (i = 0; i < this_host->number_of_devices; i++)
     {
         char format[] = "%s%s";
-        ssize_t needed = snprintf(NULL, 0, format, host_detail, device_html_summary(this_host->device_list[i])) + 1;
+        char *dev_html_summ = device_html_summary(this_host->device_list[i]);
+        ssize_t needed = snprintf(NULL, 0, format, host_detail, dev_html_summ) + 1;
         host_detail = realloc(host_detail, (size_t) needed); //TODO checks for errors.
-        sprintf(host_detail, format, host_detail, device_html_summary(this_host->device_list[i]));
+        sprintf(host_detail, format, host_detail, dev_html_summ);
+        free(dev_html_summ);
     }
     for (i = 0; i < this_host->number_of_vdevices; i++)
     {
         char format[] = "%s%s";
-        ssize_t needed = snprintf(NULL, 0, format, host_detail, vdevice_html_summary(this_host->vdevice_list[i])) + 1;
+        char *vdev_html_summ = vdevice_html_summary(this_host->vdevice_list[i]);
+        ssize_t needed = snprintf(NULL, 0, format, host_detail, vdev_html_summ) + 1;
         host_detail = realloc(host_detail, (size_t) needed); //TODO checks for errors.
-        sprintf(host_detail, format, host_detail, vdevice_html_summary(this_host->vdevice_list[i]));
+        sprintf(host_detail, format, host_detail, vdev_html_summ);
+        free(vdev_html_summ);
     }
     return host_detail;
 }

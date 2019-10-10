@@ -1,10 +1,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <syslog.h>
 
 #include "vdevice.h"
 #include "engine.h"
-#include "verbose.h"
 
 struct vdevice {
     char *name;
@@ -28,7 +28,6 @@ int vdevice_update_status(struct vdevice *this_vdevice)
     }
     this_vdevice->status = strdup("unknown"); /*If none of the below triggers, this will remain.*/
     size_t i;
-    verbose_message(BORING, "Updating vdevice status for %s\n", vdevice_get_name(this_vdevice));
     for (i = 0; i < *(this_vdevice->number_of_engines); i++)
     {
         if (!strcmp(engine_get_sensor_status((*this_vdevice->engine_list)[i], this_vdevice->name, "device-status"), "nominal"))

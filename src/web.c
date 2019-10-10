@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <syslog.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
@@ -7,7 +8,6 @@
 #include <arpa/inet.h>
 
 #include "web.h"
-#include "verbose.h"
 #include "html.h"
 
 #define BUF_SIZE 1024
@@ -25,8 +25,6 @@ struct web_client {
 
 struct web_client *web_client_create(int fd)
 {
-    verbose_message(BORING, "Creating web client with FD %d\n", fd);
-
     struct web_client *new_client = malloc(sizeof(*new_client));
     new_client->buffer = malloc(1);
     new_client->buffer[0] = '\0';
@@ -43,8 +41,6 @@ struct web_client *web_client_create(int fd)
 
 void web_client_destroy(struct web_client *client)
 {
-    verbose_message(BORING, "Destroyong web client with FD %d\n", client->fd);
-
     int r;
     r = shutdown(client->fd, SHUT_RDWR);
     if (r < 0)
@@ -67,7 +63,6 @@ int web_client_buffer_add(struct web_client *client, char *html_text)
     /* checks because they seem to be needed */
     if (client->buffer == NULL || html_text == NULL)
         return -1;
-    verbose_message(BORING, "Adding '%s' to buffer of client on FD %d.\n", html_text, client->fd);
     size_t needed = strlen(client->buffer) + strlen(html_text) + 1;
     char *temp = realloc(client->buffer, needed);
     if (temp)
@@ -75,7 +70,6 @@ int web_client_buffer_add(struct web_client *client, char *html_text)
         client->buffer = temp;
         strcat(client->buffer, html_text);
         client->bytes_available += strlen(html_text);
-        //verbose_message(BORING, "New buffer: %s\n", client->buffer);
         return 0;
     }
     return -1;
@@ -111,8 +105,6 @@ static int web_client_buffer_write(struct web_client *client)
         free(http_ok_message);
     }
 
-    verbose_message(BORING, "About to write, fd=%d, buffer=0x%lx, byes_written=%d, bytes_to_write=%d\n", \
-            client->fd, client->buffer, client->bytes_written, bytes_to_write);
     r = write(client->fd, client->buffer + client->bytes_written, bytes_to_write);
     if (r < 0)
     {
@@ -165,7 +157,6 @@ int web_client_socket_read(struct web_client *client, fd_set *rd)
 
     if (FD_ISSET(client->fd, rd))
     {
-        //verbose_message(BORING, "FD %d indicated it has something for us to read.\n", client->fd);
         r = read(client->fd, buffer, BUF_SIZE - 1);
         if (r<0)
         {
@@ -174,12 +165,10 @@ int web_client_socket_read(struct web_client *client, fd_set *rd)
         }
         if (r==0)
         {
-            verbose_message(BORING, "FD %d read zero bytes, closing.\n", client->fd);
             return -1;//this just means that r has nothing left to say. No error.
         }
 
         buffer[r] = '\0'; //just for good safety.
-        //verbose_message(BORING, "Received %ld bytes: '%s' on fd %d.\n", r, buffer, client->fd);
         //TODO take some decision on what to do with the information read.
         char first_word[BUF_SIZE];
         sprintf(first_word, "%s", strtok(buffer, " "));
@@ -187,7 +176,7 @@ int web_client_socket_read(struct web_client *client, fd_set *rd)
         {
             client->get_received = 1;
             client->requested_resource = strdup(strtok(NULL, " "));
-            verbose_message(BORING, "Client on FD %d requested %s.\n", client->fd, client->requested_resource);
+            syslog(LOG_DEBUG, "Client on FD %d requested %s.", client->fd, client->requested_resource);
             return 1;
         }
         //We're basically ignoring everything except GET requests. We don't even really care about the other stuff.
@@ -202,7 +191,6 @@ int web_client_socket_write(struct web_client *client, fd_set *wr)
 
     if (FD_ISSET(client->fd, wr))
     {
-        verbose_message(BORING, "FD %d marked for write.\n", client->fd);
         r = web_client_buffer_write(client);
     }
     return r; //no read
@@ -256,7 +244,7 @@ int web_client_handle_requests(struct web_client *client, struct cmc_server **cm
             //TODO need to think about accessing the individual devices in the arrays here.
             if (strtok(NULL, ""))
             {
-                verbose_message(WARNING, "URL too long. Expect <cmc>/<array_name> only.\n");
+                syslog(LOG_WARNING, "Requested URL too long. Expect <cmc>/<array_name> only.");
             }
 
             {

@@ -3,7 +3,6 @@
 #include <string.h>
 #include <stdarg.h>
 
-#include "verbose.h"
 #include "message.h"
 
 struct message {
@@ -15,7 +14,6 @@ struct message {
 
 struct message *message_create(char message_type)
 {
-    verbose_message(BORING, "Creating new message of type %c\n", message_type);
     struct message *new_message = malloc(sizeof(*new_message));
     if (new_message != NULL)
     {
@@ -23,7 +21,6 @@ struct message *message_create(char message_type)
         new_message->number_of_words = 0;
         new_message->message_type = message_type;
     }
-    verbose_message(BORING, "Message allocated a pointer of 0x%08lx.\n", new_message);
     return new_message;
 }
 
@@ -32,10 +29,8 @@ void message_destroy(struct message *this_message)
 {
     if (this_message != NULL)
     {
-        verbose_message(BORING, "Destroying message 0x%08lx\n", this_message);
         {
             char *composed_message = message_compose(this_message);
-            verbose_message(BORING, "Message was supposed to be: %s\n", composed_message);
             free(composed_message);
             composed_message = NULL;
         }
@@ -47,7 +42,7 @@ void message_destroy(struct message *this_message)
         this_message = NULL;
     }
     else
-        verbose_message(WARNING, "Attempted to destroy NULL message.\n");
+        ;
 }
 
 

@@ -1,10 +1,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <syslog.h>
 
 #include "message.h"
 #include "queue.h"
-#include "verbose.h"
 
 struct queue {
     struct message **message_queue;
@@ -47,13 +47,14 @@ int queue_push(struct queue *this_queue, struct message *new_message)
     if (this_queue == NULL)
     {
         char *composed_message = message_compose(new_message);
-        verbose_message(ERROR, "Attempted to push %s onto a NULL queue.\n", composed_message);
+        //TODO figure out how to make this error message a bit more useful. Queue doesn't know who its parents are.
+        syslog(LOG_ERR, "Attempted to push %s onto a NULL queue.", composed_message);
         free(composed_message);
         return -1;
     }
     if (new_message == NULL)
     {
-        verbose_message(ERROR, "Attempted to push NULL message onto a queue.\n");
+        syslog(LOG_ERR, "Attempted to push NULL message onto a queue.");
         return -2;
     }
     struct message **temp = realloc(this_queue->message_queue, sizeof(*(this_queue->message_queue))*(this_queue->queue_length + 1));
@@ -67,7 +68,7 @@ int queue_push(struct queue *this_queue, struct message *new_message)
     else
     {
         perror("realloc");
-        verbose_message(ERROR, "Couldn't reallocate message queue.\n");
+        syslog(LOG_ERR, "Couldn't reallocate message queue.");
         return -3;
     }
 }
@@ -77,12 +78,12 @@ struct message *queue_pop(struct queue *this_queue)
 {
     if (this_queue == NULL)
     {
-        verbose_message(ERROR, "Attempted to pop NULL queue.\n");
+        syslog(LOG_ERR, "Attempted to pop NULL queue.");
         return NULL;
     }
     if (this_queue->queue_length == 0)
     {
-        verbose_message(ERROR, "Attempted to pop zero-length queue.\n");
+        syslog(LOG_ERR, "Attempted to pop zero-length queue.");
         return NULL;
     }
 
@@ -107,13 +108,12 @@ struct message *queue_pop(struct queue *this_queue)
     {
         if (this_queue->queue_length == 1)
         {
-            verbose_message(BORING, "Queue length for queue 0x%08x now zero.\n", this_queue);
             this_queue->message_queue = NULL;
             this_queue->queue_length = 0;
         }
         else
         {
-            verbose_message(ERROR, "Unable to realloc() memory for newly-shortened queue!\n");
+            syslog(LOG_ERR, "Unable to realloc() memory for newly-shortened queue!");
         }
     }
     return front_message;

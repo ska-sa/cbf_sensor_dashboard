@@ -28,7 +28,6 @@
 #include "cmc_server.h"
 #include "message.h"
 #include "tokenise.h"
-#include "verbose.h"
 #include "utils.h"
 #include "web.h"
 
@@ -162,7 +161,7 @@ int main(int argc, char **argv)
     struct arguments arguments;
     arguments.verbose = 0; //default
     argp_parse (&argp, argc, argv, 0, 0, &arguments);
-    set_verbosity(arguments.verbose);    
+    setlogmask(LOG_UPTO(arguments.verbose));
 
     /********   SECTION    ***********
      * read list of cmcs from the config file, populate array of structs

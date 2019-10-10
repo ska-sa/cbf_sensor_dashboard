@@ -6,8 +6,7 @@
 #include <netc.h>
 #include <string.h>
 #include <stdint.h>
-
-#include "verbose.h"
+#include <syslog.h>
 
 #include "cmc_server.h"
 #include "queue.h"
@@ -110,9 +109,9 @@ void cmc_server_try_reconnect(struct cmc_server *this_cmc_server)
 
 void cmc_server_poll_array_list(struct cmc_server *this_cmc_server)
 {
-    //Mark the arrays as potentially missing.
-    if (this_cmc_server->state != CMC_DISCONNECTED)
+    if (this_cmc_server->state != CMC_DISCONNECTED && this_cmc_server->state != CMC_WAIT_CONNECT) //no sense if we're not connected yet.
     {
+        //Mark the arrays as potentially missing.
         size_t i;
         for (i = 0; i < this_cmc_server->no_of_arrays; i++)
         {
@@ -121,14 +120,12 @@ void cmc_server_poll_array_list(struct cmc_server *this_cmc_server)
         struct message *new_message = message_create('?');
         message_add_word(new_message, "array-list");
         queue_push(this_cmc_server->outgoing_msg_queue, new_message);
-	char *message_exists = message_compose(this_cmc_server->current_message);
+        char *message_exists = message_compose(this_cmc_server->current_message);
        	// Don't just check for null, because a message might exists with zero words in it somehow. If it composes to a usable string, then it's legit.
         if (!message_exists)
             cmc_server_queue_pop(this_cmc_server);
-	free(message_exists);
-	char *composed_message = message_compose(this_cmc_server->current_message);
-        verbose_message(BORING, "Pushed an array-list poll onto the queue. Current message: %s - Queue length: %u.\n", composed_message, queue_sizeof(this_cmc_server->outgoing_msg_queue));
-	free(composed_message);
+        free(message_exists);
+        //syslog(LOG_DEBUG, "%s:%hu pushed an array-list poll onto its message queue.", this_cmc_server->address, this_cmc_server->katcp_port);
         this_cmc_server->state = CMC_SEND_FRONT_OF_QUEUE;
     }
 }
@@ -153,20 +150,18 @@ char *cmc_server_get_name(struct cmc_server *this_cmc_server)
 
 void cmc_server_set_fds(struct cmc_server *this_cmc_server, fd_set *rd, fd_set *wr, int *nfds)
 {
-    //verbose_message(BORING, "Setting CMC server (%s:%hu) FDs. Current state: %d.\n", this_cmc_server->address, this_cmc_server->katcp_port, this_cmc_server->state);
     /*
     int so_error;
     socklen_t len = sizeof(so_error);
     getsockopt(this_cmc_server->katcp_socket_fd, SOL_SOCKET, SO_ERROR, &so_error, &len);
     if (so_error != 0)
     {
-        verbose_message(ERROR, "Socket error on %s%hu: %s\n", this_cmc_server->address, this_cmc_server->katcp_port, strerror(so_error));
         this_cmc_server->state = CMC_DISCONNECTED;
     }
     */
     switch (this_cmc_server->state) {
         case CMC_WAIT_CONNECT:
-            verbose_message(DEBUG, "CMC server %s:%hu still not connected...\n", this_cmc_server->address, this_cmc_server->katcp_port);
+            syslog(LOG_NOTICE, "CMC server %s:%hu still not connected...\n", this_cmc_server->address, this_cmc_server->katcp_port);
             FD_SET(this_cmc_server->katcp_socket_fd, wr); // If we're still waiting for the connect() to happen, then it'll appear on the writeable FDs.
             *nfds = max(*nfds, this_cmc_server->katcp_socket_fd);
             break;
@@ -176,13 +171,11 @@ void cmc_server_set_fds(struct cmc_server *this_cmc_server, fd_set *rd, fd_set *
             FD_SET(this_cmc_server->katcp_socket_fd, rd);
             if (flushing_katcl(this_cmc_server->katcl_line))
             {
-                verbose_message(BORING, "flushing_katcl() returned true, %s:%hu has a katcp command to send.\n", this_cmc_server->address, this_cmc_server->katcp_port);
                 FD_SET(this_cmc_server->katcp_socket_fd, wr);
             }
             *nfds = max(*nfds, this_cmc_server->katcp_socket_fd);
             
             //now for the individual arrays.
-            verbose_message(BORING, "Setting up fds on %ld arrays on %s:%hu.\n", this_cmc_server->no_of_arrays, this_cmc_server->address, this_cmc_server->katcp_port);
             size_t i;
             for (i = 0; i < this_cmc_server->no_of_arrays; i++)
             {
@@ -204,7 +197,7 @@ void cmc_server_setup_katcp_writes(struct cmc_server *this_cmc_server)
             if (n > 0)
             {
                 char *composed_message = message_compose(this_cmc_server->current_message);
-                verbose_message(BORING, "Sending KATCP message \"%s\" to %s:%hu\n", composed_message, this_cmc_server->address, this_cmc_server->katcp_port);
+                syslog(LOG_DEBUG, "%s is sending a message: %s", this_cmc_server->address, composed_message);
                 free(composed_message);
                 composed_message = NULL;
 
@@ -212,7 +205,6 @@ void cmc_server_setup_katcp_writes(struct cmc_server *this_cmc_server)
                 sprintf(first_word, "%c%s", message_get_type(this_cmc_server->current_message), message_see_word(this_cmc_server->current_message, 0));
                 if (message_get_number_of_words(this_cmc_server->current_message) == 1)
                 {
-                    verbose_message(BORING, "It's a single-word message.\n");
                     append_string_katcl(this_cmc_server->katcl_line, KATCP_FLAG_FIRST | KATCP_FLAG_LAST, first_word);
                 }
                 else
@@ -225,16 +217,18 @@ void cmc_server_setup_katcp_writes(struct cmc_server *this_cmc_server)
                     }
                     append_string_katcl(this_cmc_server->katcl_line, KATCP_FLAG_LAST, message_see_word(this_cmc_server->current_message, (size_t) n - 1));
                 }
-                free(first_word);
-                first_word = NULL;
 
+                syslog(LOG_DEBUG, "%s message sent successfully.", first_word);
+                free(first_word);
                 this_cmc_server->state = CMC_WAIT_RESPONSE;
             }
+            /*
             else
             {
-                verbose_message(WARNING, "A message on %s:%hu's queue had 0 words in it. Cannot send.\n", this_cmc_server->address, this_cmc_server->katcp_port);
+                syslog(LOG_WARNING, "A message on %s:%hu's queue had 0 words in it. Cannot send.", this_cmc_server->address, this_cmc_server->katcp_port);
                 //TODO push through the queue if there's an error.
             }
+            */
         }
     }
 
@@ -252,21 +246,21 @@ void cmc_server_socket_read_write(struct cmc_server *this_cmc_server, fd_set *rd
         case CMC_WAIT_CONNECT:
             if (FD_ISSET(this_cmc_server->katcp_socket_fd, wr))
             {
-                verbose_message(DEBUG, "%s:%hu file descriptor writeable.\n", this_cmc_server->address, this_cmc_server->katcp_port);
+                syslog(LOG_DEBUG, "%s:%hu file descriptor writeable.", this_cmc_server->address, this_cmc_server->katcp_port);
                 int so_error;
                 socklen_t socklen = sizeof(so_error);
                 getsockopt(this_cmc_server->katcp_socket_fd, SOL_SOCKET, SO_ERROR, &so_error, &socklen);
                 if (so_error == 0)
                 {
                     //Connection is a success
-                    verbose_message(DEBUG, "Connection successful.\n");
+                    syslog(LOG_INFO, "%s:%hu connected.", this_cmc_server->address, this_cmc_server->katcp_port);
                     this_cmc_server->katcl_line = create_katcl(this_cmc_server->katcp_socket_fd);
                     this_cmc_server->state = CMC_SEND_FRONT_OF_QUEUE;
                 }
                 else
                 {
                     //Connection failed for whatever reason.
-                    verbose_message(WARNING, "Connection failed: %s\n", strerror(so_error));
+                    syslog(LOG_ERR, "Connection to %s%hu failed: %s", this_cmc_server->address, this_cmc_server->katcp_port, strerror(so_error));
                     this_cmc_server->state = CMC_DISCONNECTED;
                 }
             }
@@ -281,7 +275,6 @@ void cmc_server_socket_read_write(struct cmc_server *this_cmc_server, fd_set *rd
             size_t i;
             if (FD_ISSET(this_cmc_server->katcp_socket_fd, rd))
             {
-                verbose_message(BORING, "Reading katcl_line from %s:%hu on fd %d.\n", this_cmc_server->address, this_cmc_server->katcp_port, this_cmc_server->katcp_socket_fd);
                 r = read_katcl(this_cmc_server->katcl_line);
                 if (r)
                 {
@@ -293,7 +286,6 @@ void cmc_server_socket_read_write(struct cmc_server *this_cmc_server, fd_set *rd
             
             if (FD_ISSET(this_cmc_server->katcp_socket_fd, wr))
             {
-                verbose_message(BORING, "Writing katcl_line to %s:%hu on fd %d.\n", this_cmc_server->address, this_cmc_server->katcp_port, this_cmc_server->katcp_socket_fd);
                 r = write_katcl(this_cmc_server->katcl_line);
                 if (r < 0)
                 {
@@ -319,7 +311,6 @@ static int cmc_server_add_array(struct cmc_server *this_cmc_server, char *array_
         {
             //Might want to think about comparing the other stuff as well, just in case for some reason the
             //original array got destroyed and another different one but called the same name snuck in.
-            verbose_message(BORING, "Attempting to add array \"%s\" to %s:%hu while an array of this name already exists. Marking it active instead.\n", array_name, this_cmc_server->address, this_cmc_server->katcp_port);
             array_mark_fine(this_cmc_server->array_list[i]);
             return (int) i;
         }
@@ -329,17 +320,17 @@ static int cmc_server_add_array(struct cmc_server *this_cmc_server, char *array_
     struct array **temp = realloc(this_cmc_server->array_list, sizeof(*(this_cmc_server->array_list))*(this_cmc_server->no_of_arrays + 1));
     if (temp == NULL)
     {
-        verbose_message(ERROR, "Unable to realloc memory to add array \"%s\" to %s:%hu.\n", array_name, this_cmc_server->address, this_cmc_server->katcp_port);
+        syslog(LOG_ERR, "Unable to realloc memory to add array \"%s\" to %s:%hu.", array_name, this_cmc_server->address, this_cmc_server->katcp_port);
         return -1;
     }
     this_cmc_server->array_list = temp;
     this_cmc_server->array_list[this_cmc_server->no_of_arrays] = array_create(array_name, this_cmc_server->address, control_port, monitor_port, number_of_antennas);
     if (this_cmc_server->array_list[this_cmc_server->no_of_arrays] == NULL)
     {
-        verbose_message(ERROR, "Unable to create array \"%s\" on %s:%hu.\n", array_name, this_cmc_server->address, this_cmc_server->katcp_port);
+        syslog(LOG_ERR, "Unable to create array \"%s\" on %s:%hu.", array_name, this_cmc_server->address, this_cmc_server->katcp_port);
         return -1;
     }
-    verbose_message(INFO, "Added array \"%s\" to %s:%hu.\n", array_name, this_cmc_server->address, this_cmc_server->katcp_port);
+    syslog(LOG_INFO, "Added array \"%s\" to %s:%hu.", array_name, this_cmc_server->address, this_cmc_server->katcp_port);
     this_cmc_server->no_of_arrays++;
     return 0;
 }
@@ -360,12 +351,6 @@ void cmc_server_handle_received_katcl_lines(struct cmc_server *this_cmc_server)
     }
     while (have_katcl(this_cmc_server->katcl_line) > 0)
     {
-        verbose_message(BORING, "From %s:%hu: %s %s %s %s %s\n", this_cmc_server->address, this_cmc_server->katcp_port, \
-                arg_string_katcl(this_cmc_server->katcl_line, 0), \
-                arg_string_katcl(this_cmc_server->katcl_line, 1), \
-                arg_string_katcl(this_cmc_server->katcl_line, 2), \
-                arg_string_katcl(this_cmc_server->katcl_line, 3), \
-                arg_string_katcl(this_cmc_server->katcl_line, 4)); 
         char received_message_type = arg_string_katcl(this_cmc_server->katcl_line, 0)[0];
         switch (received_message_type) {
             case '!': // it's a katcp response
@@ -373,19 +358,14 @@ void cmc_server_handle_received_katcl_lines(struct cmc_server *this_cmc_server)
                 {
                     if (!strcmp(arg_string_katcl(this_cmc_server->katcl_line, 1), "ok"))
                     {
-                        verbose_message(BORING, "%s:%hu received %s ok!\n",\
-                                this_cmc_server->address, this_cmc_server->katcp_port, message_see_word(this_cmc_server->current_message, 0));
                         this_cmc_server->state = CMC_SEND_FRONT_OF_QUEUE;
-                        verbose_message(BORING, "%s:%hu still has %u message(s) in its queue...\n",\
-                                this_cmc_server->address, this_cmc_server->katcp_port, queue_sizeof(this_cmc_server->outgoing_msg_queue));
                         if (queue_sizeof(this_cmc_server->outgoing_msg_queue))
                         {
-                            verbose_message(BORING, "%s:%hu  popping queue...\n", this_cmc_server->address, this_cmc_server->katcp_port);
                             cmc_server_queue_pop(this_cmc_server);
                         }
                         else
                         {
-                            verbose_message(BORING, "%s:%hu going into monitoring state.\n", this_cmc_server->address, this_cmc_server->katcp_port);
+                            syslog(LOG_DEBUG, "%s:%hu going into monitoring state.", this_cmc_server->address, this_cmc_server->katcp_port);
                             message_destroy(this_cmc_server->current_message);
                             this_cmc_server->current_message = NULL; //doesn't do this in the above function. C problem.
                             this_cmc_server->state = CMC_MONITOR;
@@ -393,7 +373,7 @@ void cmc_server_handle_received_katcl_lines(struct cmc_server *this_cmc_server)
                     }
                     else 
                     {
-                        verbose_message(WARNING, "Received %s %s. Retrying the request...",\
+                        syslog(LOG_WARNING, "Received %s %s. Retrying the request...",\
                                 message_see_word(this_cmc_server->current_message, 0), arg_string_katcl(this_cmc_server->katcl_line, 1));
                         this_cmc_server->state = CMC_SEND_FRONT_OF_QUEUE;
                     }
@@ -405,7 +385,7 @@ void cmc_server_handle_received_katcl_lines(struct cmc_server *this_cmc_server)
                         {
                             if (array_check_suspect(this_cmc_server->array_list[i]))
                             {
-                                verbose_message(INFO, "%s:%hu destroying array %s.\n", this_cmc_server->address, this_cmc_server->katcp_port, array_get_name(this_cmc_server->array_list[i]));
+                                syslog(LOG_INFO, "%s:%hu destroying array %s.\n", this_cmc_server->address, this_cmc_server->katcp_port, array_get_name(this_cmc_server->array_list[i]));
                                 array_destroy(this_cmc_server->array_list[i]);
                                 memmove(&this_cmc_server->array_list[i], &this_cmc_server->array_list[i+1], sizeof(*(this_cmc_server->array_list))*(this_cmc_server->no_of_arrays - i - 1));
                                 this_cmc_server->array_list = realloc(this_cmc_server->array_list, sizeof(*(this_cmc_server->array_list))*(this_cmc_server->no_of_arrays - 1));
@@ -507,7 +487,7 @@ void cmc_server_handle_received_katcl_lines(struct cmc_server *this_cmc_server)
                 }*/
                 break;
             default:
-                verbose_message(WARNING, "Unexpected KATCP message received, starting with %c\n", received_message_type);
+                syslog(LOG_NOTICE, "Unexpected KATCP message received, starting with %c", received_message_type);
         }
     }
 }

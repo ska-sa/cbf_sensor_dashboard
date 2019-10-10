@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <syslog.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
@@ -11,7 +12,6 @@
 #include "array.h"
 #include "team.h"
 #include "message.h"
-#include "verbose.h"
 #include "queue.h"
 #include "tokenise.h"
 
@@ -156,7 +156,6 @@ char *array_get_name(struct array *this_array)
 
 int array_add_team_host_device_sensor(struct array *this_array, char team_type, size_t host_number, char *device_name, char *sensor_name)
 {
-    verbose_message(BORING, "Adding sensor: %chost%02d.%s.%s\n", team_type, host_number, device_name, sensor_name);
     if (this_array != NULL)
     {
        size_t i;
@@ -183,7 +182,6 @@ int array_add_team_host_device_sensor(struct array *this_array, char team_type, 
 
 int array_add_team_host_engine_device_sensor(struct array *this_array, char team_type, size_t host_number, char *engine_name, char *device_name, char *sensor_name)
 {
-    verbose_message(BORING, "Adding sensor: %chost%02d.%s.%s.%s\n", team_type, host_number, engine_name, device_name, sensor_name);
     if (this_array != NULL)
     {
         size_t i;
@@ -297,7 +295,6 @@ void array_setup_katcp_writes(struct array *this_array)
             if (n > 0)
             {
                 char *composed_message = message_compose(this_array->current_control_message);
-                verbose_message(BORING, "Sending KATCP message \"%s\" to %s:%hu\n", composed_message, this_array->cmc_address, this_array->control_port);
                 free(composed_message);
                 composed_message = NULL;
 
@@ -322,7 +319,7 @@ void array_setup_katcp_writes(struct array *this_array)
             }
             else
             {
-                verbose_message(WARNING, "A message on %s:%hu's (control) queue had 0 words in it. Cannot send.\n", this_array->cmc_address, this_array->control_port);
+                syslog(LOG_WARNING, "A message on %s:%hu's (control) queue had 0 words in it. Cannot send.", this_array->cmc_address, this_array->control_port);
                 //TODO push to the next message.
             }
         }
@@ -336,7 +333,6 @@ void array_setup_katcp_writes(struct array *this_array)
             if (n > 0)
             {
                 char *composed_message = message_compose(this_array->current_monitor_message);
-                verbose_message(INFO, "Sending KATCP message \"%s\" to %s:%hu\n", composed_message, this_array->cmc_address, this_array->monitor_port);
                 free(composed_message);
                 composed_message = NULL;
 
@@ -361,7 +357,7 @@ void array_setup_katcp_writes(struct array *this_array)
             }
             else
             {
-                verbose_message(WARNING, "A message on %s:%hu's (monitor) queue had 0 words in it. Cannot send.\n", this_array->cmc_address, this_array->monitor_port);
+                syslog(LOG_WARNING, "A message on %s:%hu's (monitor) queue had 0 words in it. Cannot send.", this_array->cmc_address, this_array->monitor_port);
                 //TODO push to the next message.
             }
         }
@@ -374,44 +370,40 @@ void array_socket_read_write(struct array *this_array, fd_set *rd, fd_set *wr)
     int r;
     if (FD_ISSET(this_array->control_fd, rd))
     {
-        verbose_message(BORING, "Reading katcl_line from %s:%hu (control).\n", this_array->cmc_address, this_array->control_port);
         r = read_katcl(this_array->control_katcl_line);
         if (r)
         {
-            verbose_message(ERROR, "read from %s:%hu (control) failed\n", this_array->cmc_address, this_array->control_port);
+            syslog(LOG_ERR, "Read from %s:%hu (control) failed.", this_array->cmc_address, this_array->control_port);
             this_array->control_state = ARRAY_DISCONNECTED;
         }
     }
 
     if (FD_ISSET(this_array->control_fd, wr))
     {
-        verbose_message(BORING, "Writing katcl_line to %s:%hu (control).\n", this_array->cmc_address, this_array->control_port);
         r = write_katcl(this_array->control_katcl_line);
         if (r < 0)
         {
-            verbose_message(ERROR, "write to from %s:%hu (control) failed\n", this_array->cmc_address, this_array->control_port);
+            syslog(LOG_ERR, "Write to %s:%hu (control) failed.", this_array->cmc_address, this_array->control_port);
             this_array->control_state = ARRAY_DISCONNECTED;
         }
     }
 
     if (FD_ISSET(this_array->monitor_fd, rd))
     {
-        verbose_message(BORING, "Reading katcl_line from %s:%hu (monitor).\n", this_array->cmc_address, this_array->monitor_port);
         r = read_katcl(this_array->monitor_katcl_line);
         if (r)
         {
-            verbose_message(ERROR, "read from %s:%hu (monitor) failed\n", this_array->cmc_address, this_array->monitor_port);
+            syslog(LOG_ERR, "Read from %s:%hu (monitor) failed.", this_array->cmc_address, this_array->monitor_port);
             this_array->monitor_state = ARRAY_DISCONNECTED;
         }
     }
 
     if (FD_ISSET(this_array->monitor_fd, wr))
     {
-        verbose_message(BORING, "Writing katcl_line to %s:%hu (monitor).\n", this_array->cmc_address, this_array->monitor_port);
         r = write_katcl(this_array->monitor_katcl_line);
         if (r < 0)
         {
-            verbose_message(ERROR, "write to from %s:%hu (monitor) failed\n", this_array->cmc_address, this_array->monitor_port);
+            syslog(LOG_ERR, "Write to from %s:%hu (monitor) failed.", this_array->cmc_address, this_array->monitor_port);
             this_array->monitor_state = ARRAY_DISCONNECTED;
         }
     }
@@ -420,7 +412,7 @@ void array_socket_read_write(struct array *this_array, fd_set *rd, fd_set *wr)
 
 static void array_activate(struct array *this_array)
 {
-    verbose_message(INFO, "Detected %s (monitor port %s:%hu) in nominal state, subscribing to sensors.\n", this_array->name, this_array->cmc_address, this_array->monitor_port);
+    syslog(LOG_NOTICE, "Detected %s (monitor port %s:%hu) in nominal state, subscribing to sensors.", this_array->name, this_array->cmc_address, this_array->monitor_port);
     FILE *config_file = fopen(SENSOR_LIST_CONFIG_FILE, "r");
 
     char buffer[BUF_SIZE];
@@ -428,13 +420,12 @@ static void array_activate(struct array *this_array)
 
     for (result = fgets(buffer, BUF_SIZE, config_file); result != NULL; result = fgets(buffer, BUF_SIZE, config_file))
     {
-        verbose_message(DEBUG, "Read line from sensor-list file: %s", buffer);
         char **tokens = NULL;
         size_t n_tokens = tokenise_string(buffer, '.', &tokens);
         if (!((n_tokens == 2) || (n_tokens == 3))) //can't think of a better way to put it than this. Might be just bare device,
                                                  //or might be engine and device.
         {
-            verbose_message(ERROR, "sensor_list.conf has a malformed sensor name: %s.\n", buffer);
+            syslog(LOG_ERR, "sensor_list.conf has a malformed sensor name: %s.", buffer);
         }
         else
         {
@@ -507,20 +498,11 @@ void array_handle_received_katcl_lines(struct array *this_array)
 {
     while (have_katcl(this_array->control_katcl_line) > 0)
     {
-        verbose_message(BORING, "From %s:%hu: %s %s %s %s %s\n", this_array->cmc_address, this_array->monitor_port, \
-                arg_string_katcl(this_array->monitor_katcl_line, 0), \
-                arg_string_katcl(this_array->monitor_katcl_line, 1), \
-                arg_string_katcl(this_array->monitor_katcl_line, 2), \
-                arg_string_katcl(this_array->monitor_katcl_line, 3), \
-                arg_string_katcl(this_array->monitor_katcl_line, 4));
         char received_message_type = arg_string_katcl(this_array->control_katcl_line, 0)[0];
         switch (received_message_type) {
             case '!': // it's a katcp response
                 if (!strcmp(arg_string_katcl(this_array->control_katcl_line, 0) + 1, message_see_word(this_array->current_control_message, 0)))
                 {
-                    verbose_message(DEBUG, "%s:%hu received %s %s\n", this_array->cmc_address, this_array->control_port, \
-                            message_see_word(this_array->current_control_message, 0), arg_string_katcl(this_array->control_katcl_line, 1));
-
                     if (!strcmp(arg_string_katcl(this_array->control_katcl_line, 1), "ok"))
                     {
                         //Don't actually need to do anything here, the inform processing code should handle.
@@ -532,17 +514,14 @@ void array_handle_received_katcl_lines(struct array *this_array)
                     }
 
                     this_array->control_state = ARRAY_SEND_FRONT_OF_QUEUE;
-                    verbose_message(BORING, "%s:%hu still has %u message(s) in its queue...\n", this_array->cmc_address, \
-                            this_array->control_port, queue_sizeof(this_array->outgoing_control_msg_queue));
 
                     if (queue_sizeof(this_array->outgoing_control_msg_queue))
                     {
-                        verbose_message(BORING, "%s:%hu  popping queue...\n", this_array->cmc_address, this_array->control_port);
                         array_control_queue_pop(this_array);
                     }
                     else
                     {
-                        verbose_message(BORING, "%s:%hu going into monitoring state.\n", this_array->cmc_address, this_array->control_port);
+                        syslog(LOG_DEBUG, "%s:%hu going into monitoring state.", this_array->cmc_address, this_array->control_port);
                         message_destroy(this_array->current_control_message);
                         this_array->current_control_message = NULL; //doesn't do this in the above function. C problem.
                         this_array->control_state = ARRAY_MONITOR;
@@ -552,10 +531,11 @@ void array_handle_received_katcl_lines(struct array *this_array)
             case '#': // it's a katcp inform
                 if (!strcmp(arg_string_katcl(this_array->control_katcl_line, 0) + 1, "sensor-status"))
                 {
-                    verbose_message(INFO, "Received sensor-status on the control port of %s:%hu.\n", this_array->cmc_address, this_array->control_port);
                     if (!strcmp(arg_string_katcl(this_array->control_katcl_line, 3), "instrument-state"))
                     {
-                        verbose_message(INFO, "Instrument state to be updated: %s - %s\n",
+                        //TODO consider copying these things into their own strings to make for a bit more clarity.
+                        syslog(LOG_NOTICE, "%s (%s) Instrument state to be updated: %s - %s",
+                                this_array->name, this_array->cmc_address,
                                 arg_string_katcl(this_array->control_katcl_line, 5),
                                 arg_string_katcl(this_array->control_katcl_line, 4));
 
@@ -583,18 +563,12 @@ void array_handle_received_katcl_lines(struct array *this_array)
                 }
                 break;
             default:
-                verbose_message(WARNING, "Unexpected KATCP message received, starting with %c\n", received_message_type);
+                ; //This shouldn't ever happen.
         }
     }
 
     while (have_katcl(this_array->monitor_katcl_line) > 0)
     {
-        verbose_message(BORING, "From %s:%hu: %s %s %s %s %s\n", this_array->cmc_address, this_array->monitor_port, \
-                arg_string_katcl(this_array->monitor_katcl_line, 0), \
-                arg_string_katcl(this_array->monitor_katcl_line, 1), \
-                arg_string_katcl(this_array->monitor_katcl_line, 2), \
-                arg_string_katcl(this_array->monitor_katcl_line, 3), \
-                arg_string_katcl(this_array->monitor_katcl_line, 4));
         char received_message_type = arg_string_katcl(this_array->monitor_katcl_line, 0)[0];
         switch (received_message_type) {
             case '!': // it's a katcp response
@@ -602,9 +576,6 @@ void array_handle_received_katcl_lines(struct array *this_array)
                 {
                     if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 0) + 1, message_see_word(this_array->current_monitor_message, 0)))
                     {
-                        verbose_message(DEBUG, "%s:%hu received %s %s\n", this_array->cmc_address, this_array->monitor_port, \
-                                message_see_word(this_array->current_monitor_message, 0), arg_string_katcl(this_array->monitor_katcl_line, 1));
-
                         if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 1), "ok"))
                         {
                             //Don't actually need to do anything here, the inform processing code should handle.
@@ -616,17 +587,14 @@ void array_handle_received_katcl_lines(struct array *this_array)
                         }
 
                         this_array->monitor_state = ARRAY_SEND_FRONT_OF_QUEUE;
-                        verbose_message(BORING, "%s:%hu still has %u message(s) in its queue...\n", this_array->cmc_address, \
-                                this_array->monitor_port, queue_sizeof(this_array->outgoing_monitor_msg_queue));
 
                         if (queue_sizeof(this_array->outgoing_monitor_msg_queue))
                         {
-                            verbose_message(BORING, "%s:%hu  popping queue...\n", this_array->cmc_address, this_array->monitor_port);
                             array_monitor_queue_pop(this_array);
                         }
                         else
                         {
-                            verbose_message(BORING, "%s:%hu going into monitoring state.\n", this_array->cmc_address, this_array->monitor_port);
+                            syslog(LOG_DEBUG, "%s:%hu going into monitoring state.", this_array->cmc_address, this_array->monitor_port);
                             message_destroy(this_array->current_monitor_message);
                             this_array->current_monitor_message = NULL; //doesn't do this in the above function. C problem.
                             this_array->monitor_state = ARRAY_MONITOR;
@@ -635,13 +603,12 @@ void array_handle_received_katcl_lines(struct array *this_array)
                 }
                 else
                 {
-                    verbose_message(WARNING, "Received a katcp response %s %s %s - unexpectedly.\n", arg_string_katcl(this_array->monitor_katcl_line, 0) + 1, arg_string_katcl(this_array->monitor_katcl_line, 1), arg_string_katcl(this_array->monitor_katcl_line, 2));
+                    syslog(LOG_WARNING, "Received a katcp response %s %s %s - unexpectedly.", arg_string_katcl(this_array->monitor_katcl_line, 0) + 1, arg_string_katcl(this_array->monitor_katcl_line, 1), arg_string_katcl(this_array->monitor_katcl_line, 2));
                 }
                 break;
             case '#': // it's a katcp inform
                 if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 0) + 1, "sensor-status"))
                 {
-                    //verbose_message(INFO, "Received sensor-status on the monitor port of %s:%hu.\n", this_array->cmc_address, this_array->control_port);
                     char **tokens = NULL;
                     size_t n_tokens = tokenise_string(arg_string_katcl(this_array->monitor_katcl_line, 3), '.', &tokens);
                     char team = tokens[0][0];
@@ -651,7 +618,7 @@ void array_handle_received_katcl_lines(struct array *this_array)
                                   break;
                         case 'x': team_no = 1;
                                   break;
-                        default:  verbose_message(ERROR, "Received unknown team type %c from sensor-status message: %s\n", team, arg_string_katcl(this_array->monitor_katcl_line, 1));
+                        default:  syslog(LOG_WARNING, "Received unknown team type %c from sensor-status message: %s", team, arg_string_katcl(this_array->monitor_katcl_line, 1));
                     }
                     char *host_no_str = strndup(tokens[0] + 5, 2);
                     size_t host_no = (size_t) atoi(host_no_str);
@@ -666,7 +633,7 @@ void array_handle_received_katcl_lines(struct array *this_array)
                     }
                     else
                     {
-                        verbose_message(ERROR, "KATCP message from %s:%s for sensor-status %chost%02d.%s.%s - null value received.", this_array->cmc_address, this_array->name, team, host_no, tokens[1], tokens[2]);
+                        syslog(LOG_ERR, "KATCP message from %s:%s for sensor-status %chost%02ld.%s.%s - null value received.", this_array->cmc_address, this_array->name, team, host_no, tokens[1], tokens[2]);
                         new_value = strdup("none");
                     }
 
@@ -677,21 +644,20 @@ void array_handle_received_katcl_lines(struct array *this_array)
                     }
                     else
                     {
-                        verbose_message(ERROR, "KATCP message from %s:%s for sensor-status %chost%02d.%s.%s - null status received.", this_array->cmc_address, this_array->name, team, host_no, tokens[1], tokens[2]);
+                        syslog(LOG_ERR, "KATCP message from %s:%s for sensor-status %chost%02ld.%s.%s - null status received.", this_array->cmc_address, this_array->name, team, host_no, tokens[1], tokens[2]);
                         new_status = strdup("none");
                     }
 
                     switch (n_tokens) {
                         case 3:
-                            verbose_message(DEBUG, "Updating %chost%02d.%s.%s\n", team, host_no, tokens[1], tokens[2]);
                             team_update_sensor(this_array->team_list[team_no], host_no, tokens[1], tokens[2], new_value, new_status);
                             break;
                         case 4:
-                            verbose_message(DEBUG, "Updating %chost%02d.%s.%s.%s\n", team, host_no, tokens[1], tokens[2], tokens[3]);
                             team_update_engine_sensor(this_array->team_list[team_no], host_no, tokens[1], tokens[2], tokens[3], new_value, new_status);
                             break;
                         default:
-                            verbose_message(ERROR, "There was an unexpected number of tokens (%d) in the message: %s\n", n_tokens, arg_string_katcl(this_array->monitor_katcl_line, 3)); 
+                            //TODO make this error message a bit more reasonable so that I'd be able to find it if I needed to.
+                            syslog(LOG_ERR, "There was an unexpected number of tokens (%ld) in the message: %s", n_tokens, arg_string_katcl(this_array->monitor_katcl_line, 3)); 
                     }
 
                     //Update the time
@@ -714,7 +680,7 @@ void array_handle_received_katcl_lines(struct array *this_array)
                 }
                 break;
             default:
-                verbose_message(WARNING, "Unexpected KATCP message received, starting with %c\n", received_message_type);
+                ; //This shouldn't ever happen.
         }
     }
 }
@@ -764,7 +730,6 @@ char *array_html_detail(struct array *this_array)
         free(row_detail);
     }
 
-    verbose_message(BORING, "\nArray detail: %s\nstrlen: %d\n", array_detail, strlen(array_detail));
     char format[] = "<table>\n%s</table>\n";
     ssize_t needed = snprintf(NULL, 0, format, array_detail) + 1;
     char *temp = malloc((size_t) needed); //TODO I really should get around to being rigorous about this
@@ -772,7 +737,6 @@ char *array_html_detail(struct array *this_array)
     {
         sprintf(temp, format, array_detail);
     }
-    verbose_message(BORING, "\nArray detail: %s\nstrlen: %d\n", temp, strlen(temp));
     free(array_detail);
     return temp;
 }

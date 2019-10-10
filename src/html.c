@@ -6,6 +6,7 @@
 #include "html.h"
 
 #define BUF_SIZE 1024
+#define STYLE_FILE_LOCATION "/usr/local/share/cbf_sensor_dashboard/html/styles.css"
 
 char *html_doctype()
 {
@@ -45,10 +46,10 @@ char *html_script()
 
 char *html_style()
 {
-    FILE *style_file = fopen("html/styles.css", "r");
+    FILE *style_file = fopen(STYLE_FILE_LOCATION, "r");
     if (style_file == NULL)
     {
-        perror("fopen(html/styles.css)");
+        perror("fopen(styles.css)");
         return NULL;
     }
 

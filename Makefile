@@ -11,6 +11,11 @@ SRCDIR      := src
 INCDIR      := inc
 BUILDDIR    := obj
 TARGETDIR   := bin
+CONFDIR     := conf
+HTMLDIR     := html
+INSTALLDIR  := /usr/local/sbin
+CONFDESTDIR := /etc/cbf_sensor_dashboard
+HTMLDESTDIR := /usr/local/share/cbf_sensor_dashboard/html
 SRCEXT      := c
 DEPEXT      := d
 OBJEXT      := o
@@ -43,15 +48,20 @@ directories:
 clean:
 	$(RM) -rf $(BUILDDIR)
 	$(RM) -rf $(TARGETDIR)
-	$(RM) $(TARGET)
 
 #Pull in dependency info for *existing* .o files
 -include $(OBJECTS:.$(OBJEXT)=.$(DEPEXT))
 
+install: $(TARGETDIR)/$(TARGET)
+	install -v -o root -g root -m 744 -C $(TARGETDIR)/$(TARGET) -t $(INSTALLDIR)
+	install -v -o root -g root -m 644 -C $(CONFDIR)/30-cbf_sensor_dashboard.conf -t /etc/rsyslog.d
+	install -v -o root -g root -m 644 -C -D $(CONFDIR)/cmc_list.conf -t $(CONFDESTDIR)
+	install -v -o root -g root -m 644 -C -D $(CONFDIR)/sensor_list.conf -t $(CONFDESTDIR)
+	install -v -o root -g root -m 644 -C -D $(HTMLDIR)/* -t $(HTMLDESTDIR)
+
 #Link
 $(TARGET): $(OBJECTS)
 	$(CC) -o $(TARGETDIR)/$(TARGET) $^ $(LIB)
-	mv $(TARGETDIR)/$(TARGET) .
 
 #Compile
 $(BUILDDIR)/%.$(OBJEXT): $(SRCDIR)/%.$(SRCEXT)

@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <time.h>
+#include <syslog.h>
 
 #include "verbose.h"
 

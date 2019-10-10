@@ -16,6 +16,8 @@
 #include "tokenise.h"
 
 #define BUF_SIZE 1024
+#define SENSOR_LIST_CONFIG_FILE "/etc/cbf_sensor_dashboard/sensor_list.conf"
+
 #undef max
 #define max(x,y) ((x) > (y) ? (x) : (y))
 
@@ -419,7 +421,7 @@ void array_socket_read_write(struct array *this_array, fd_set *rd, fd_set *wr)
 static void array_activate(struct array *this_array)
 {
     verbose_message(INFO, "Detected %s (monitor port %s:%hu) in nominal state, subscribing to sensors.\n", this_array->name, this_array->cmc_address, this_array->monitor_port);
-    FILE *config_file = fopen("conf/sensor_list.conf", "r");
+    FILE *config_file = fopen(SENSOR_LIST_CONFIG_FILE, "r");
 
     char buffer[BUF_SIZE];
     char *result;

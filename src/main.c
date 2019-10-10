@@ -7,6 +7,7 @@
  */
 
 #include <stdio.h>
+#include <syslog.h>
 #include <stdlib.h>
 #include <argp.h>
 #include <stdint.h>
@@ -32,7 +33,7 @@
 #include "web.h"
 
 #define BUF_SIZE 1024
-
+#define CMC_CONFIG_FILE "/etc/cbf_sensor_dashboard/cmc_list.conf"
 /* This is handy for keeping track of the number of file descriptors. */
 #undef max
 #define max(x,y) ((x) > (y) ? (x) : (y))
@@ -108,7 +109,7 @@ static void handler(int signo)
     //if (signo == SIGINT || signo == SIGTERM)
     if (signo == SIGINT)
     {
-        verbose_message(INFO, "Exiting cleanly...\n");
+        syslog(LOG_INFO, "SIGINT caught, exiting cleanly...");
         stop = 1;
     }
 }
@@ -120,6 +121,10 @@ static void handler(int signo)
 
 int main(int argc, char **argv)
 {
+
+    openlog(NULL, 0, LOG_DAEMON);
+    syslog(LOG_INFO, "Starting...");
+
     int r;
     size_t i;
     
@@ -163,7 +168,7 @@ int main(int argc, char **argv)
      * read list of cmcs from the config file, populate array of structs
      *********************************/
 
-    FILE *cmc_config = fopen("conf/cmc_list.conf", "r");
+    FILE *cmc_config = fopen(CMC_CONFIG_FILE, "r");
     if (cmc_config == NULL)
     {
         perror("Error (cmc_list.conf)");
@@ -224,7 +229,7 @@ int main(int argc, char **argv)
     int server_fd = listen_on_socket(listening_port);
     if (server_fd == -1)
     {
-        verbose_message(ERROR, "Unable to create socket on port %u!\n", listening_port);
+        syslog(LOG_CRIT, "Unable to create socket on port %u!\n", listening_port);
         return -1;
     }
 
@@ -306,7 +311,7 @@ int main(int argc, char **argv)
                 }
                 else
                 {
-                    verbose_message(BORING, "Connection from %s:%u (FD %d)\n", inet_ntoa(client_address.sin_addr), client_address.sin_port, r);
+                    syslog(LOG_DEBUG, "Connection from %s:%u (FD %d)\n", inet_ntoa(client_address.sin_addr), client_address.sin_port, r);
                     struct web_client **temp = realloc(client_list, sizeof(*client_list)*(num_web_clients + 1));
                     if (temp)
                     {
@@ -319,7 +324,7 @@ int main(int argc, char **argv)
                         shutdown(r, SHUT_RDWR);
                         close(r);
                         perror("realloc");
-                        verbose_message(ERROR, "Unable to allocate memory for another web client.\n");
+                        syslog(LOG_ERR, "Unable to allocate memory for another web client.\n");
                     }
                 }
             }
@@ -387,7 +392,7 @@ int main(int argc, char **argv)
         }
     }
 
-    verbose_message(INFO, "exited the loop.\n");
+    syslog(LOG_INFO, "Exited select loop.");
     /********   SECTION    ***********
      * cleanup
      *********************************/
@@ -397,7 +402,9 @@ int main(int argc, char **argv)
     }
     free(cmc_list);
     cmc_list = NULL;
-    verbose_message(INFO, "cleanup complete.\n");
+    syslog(LOG_INFO, "Cleanup complete.");
+
+    closelog();
 
     return 0;
 }

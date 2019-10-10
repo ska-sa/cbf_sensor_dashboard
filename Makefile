@@ -16,6 +16,7 @@ HTMLDIR     := html
 INSTALLDIR  := /usr/local/sbin
 CONFDESTDIR := /etc/cbf_sensor_dashboard
 HTMLDESTDIR := /usr/local/share/cbf_sensor_dashboard/html
+SYSTEMDDIR  := /lib/systemd/system
 SRCEXT      := c
 DEPEXT      := d
 OBJEXT      := o
@@ -58,6 +59,9 @@ install: $(TARGETDIR)/$(TARGET)
 	install -v -o root -g root -m 644 -C -D $(CONFDIR)/cmc_list.conf -t $(CONFDESTDIR)
 	install -v -o root -g root -m 644 -C -D $(CONFDIR)/sensor_list.conf -t $(CONFDESTDIR)
 	install -v -o root -g root -m 644 -C -D $(HTMLDIR)/* -t $(HTMLDESTDIR)
+	install -v -o root -g root -m 644 -C -D $(CONFDIR)/cbf_sensor_dashboard.service -t $(SYSTEMDDIR)
+	systemctl enable cbf_sensor_dashboard
+	systemctl start cbf_sensor_dashboard
 
 #Link
 $(TARGET): $(OBJECTS)

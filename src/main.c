@@ -42,7 +42,7 @@
  * set up command line options and arguments
  *********************************/
 const char *argp_program_version =
-  "cbf-sensor-dashboard 0.2";
+  "cbf-sensor-dashboard 0.3";
 const char *argp_program_bug_address =
   "<jsmith@ska.ac.za>";
 /* TODO Program documentation. */
@@ -51,7 +51,7 @@ static char doc[] =
 static char args_doc[] = "LISTEN_PORT";
 
 static struct argp_option options[] = {
-  {"verbose",  'v', "VERBOS_LVL",      0,  "Produce verbose output" },
+  {"verbose",  'v', "VERBOS_LVL",      0,  "Level of verbosity for the output logs, according to rsyslog's standard levels." },
   { 0 }
 };
 

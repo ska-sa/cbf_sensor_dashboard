@@ -83,6 +83,13 @@ int team_add_engine_device_sensor(struct team *this_team, size_t host_number, ch
 }
 
 
+int team_set_host_serial_no(struct team *this_team, size_t host_number, char *host_serial)
+{
+    //TODO this could be a lot more rigorous. Lack of error checking very sloppy...
+    return host_set_serial_no(this_team->host_list[host_number], host_serial);
+}
+
+
 char team_get_type(struct team *this_team)
 {
     if (this_team != NULL)

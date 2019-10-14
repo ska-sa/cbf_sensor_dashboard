@@ -8,7 +8,7 @@
 
 
 struct host {
-    char *hostname;
+    char *host_serial;
     char type;
     int host_number;
     struct device **device_list;
@@ -25,7 +25,7 @@ struct host *host_create(char type, int host_number)
     struct host *new_host = malloc(sizeof(*new_host));
     if (new_host != NULL)
     {
-        new_host->hostname = strdup("unknown");
+        new_host->host_serial = strdup("unknwn");
         new_host->type = type;
         new_host->host_number = host_number;
         new_host->number_of_devices = 0;
@@ -43,7 +43,7 @@ void host_destroy(struct host *this_host)
 {
     if (this_host != NULL)
     {
-        free(this_host->hostname);
+        free(this_host->host_serial);
         unsigned int i;
         for (i = 0; i < this_host->number_of_vdevices; i++)
             vdevice_destroy(this_host->vdevice_list[i]);
@@ -57,6 +57,14 @@ void host_destroy(struct host *this_host)
         free(this_host);
         this_host = NULL;
     }
+}
+
+
+int host_set_serial_no(struct host *this_host, char *host_serial)
+{
+    free(this_host->host_serial);
+    this_host->host_serial = strdup(host_serial);
+    return 1;
 }
 
 
@@ -250,10 +258,10 @@ char *host_html_detail(struct host *this_host)
         sprintf(host_detail, format, this_host->hostname, this_host->number_of_devices, this_host->number_of_engines, this_host->number_of_vdevices);
     }*/ //No longer needed, was just for debugging.
     {
-        char format[] = "<td>%c%d</td>";
-        ssize_t needed = snprintf(NULL, 0, format, this_host->type, this_host->host_number) + 1;
+        char format[] = "<td>%c%d %s</td>";
+        ssize_t needed = snprintf(NULL, 0, format, this_host->type, this_host->host_number, this_host->host_serial) + 1;
         host_detail = realloc(host_detail, (size_t) needed); //TODO checks for errors.
-        sprintf(host_detail, format, this_host->type, this_host->host_number);
+        sprintf(host_detail, format, this_host->type, this_host->host_number, this_host->host_serial);
     }
     for (i = 0; i < this_host->number_of_devices; i++)
     {

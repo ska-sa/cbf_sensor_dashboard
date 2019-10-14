@@ -6,6 +6,8 @@ struct host;
 struct host *host_create(char type, int host_number);
 void host_destroy(struct host *this_host);
 
+int host_set_serial_no(struct host *this_host, char *host_serial);
+
 int host_add_device(struct host *this_host, char *new_device_name);
 int host_add_sensor_to_device(struct host *this_host, char *device_name, char *new_sensor_name);
 

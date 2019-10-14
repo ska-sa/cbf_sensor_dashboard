@@ -455,6 +455,11 @@ static void array_activate(struct array *this_array)
         message_add_word(new_message, "sensor-value");
         message_add_word(new_message, "hostname-functional-mapping");
         queue_push(this_array->outgoing_monitor_msg_queue, new_message);
+
+        new_message = message_create('?');
+        message_add_word(new_message, "sensor-value");
+        message_add_word(new_message, "input-labelling");
+        queue_push(this_array->outgoing_control_msg_queue, new_message);
      } ///TODO figure out some way to deal with this!
 
     //This needs to be hardcoded unfortunately.
@@ -623,10 +628,10 @@ void array_handle_received_katcl_lines(struct array *this_array)
                 }
                 else if (!strcmp(arg_string_katcl(this_array->control_katcl_line, 0) + 1, "sensor-value"))
                 {
+                    //TODO handle input-labelling here
                 }
                 else if (!strcmp(arg_string_katcl(this_array->control_katcl_line, 0) + 1, "sensor-list"))
                 {
-
                 }
                 break;
             default:
@@ -742,7 +747,33 @@ void array_handle_received_katcl_lines(struct array *this_array)
                 }
                 else if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 0) + 1, "sensor-value"))
                 {
-                    //TODO
+                    if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 3), "hostname-functional-mapping"))
+                    {
+                        int i;
+                        for (i = 0; i < 2*this_array->n_antennas; i++)
+                        {
+                            char *sensor_value = arg_string_katcl(this_array->monitor_katcl_line, 5);
+                            char host_type = sensor_value[i*30 + 21];
+                            char *host_number_str = strndup(sensor_value + (i*30 + 26), 2);
+                            size_t host_number = (size_t) atoi(host_number_str);
+                            char *host_serial = strndup(sensor_value + (i*30 + 8), 6);
+                            switch (host_type)
+                            {
+                                //TODO: this should probably check more rigorously against team types.
+                                case 'f':
+                                    team_set_host_serial_no(this_array->team_list[0], host_number, host_serial);
+                                    break;
+                                case 'x':
+                                    team_set_host_serial_no(this_array->team_list[1], host_number, host_serial);
+                                    break;
+                                default:
+                                    syslog(LOG_WARNING, "Couldn't properly parse hostname-functional-mapping for %s:%s.", \
+                                            this_array->cmc_address, this_array->name);
+                            }
+                            free(host_serial);
+                            free(host_number_str);
+                        }
+                    }
                 }
                 else if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 0) + 1, "sensor-list"))
                 {
@@ -774,7 +805,7 @@ char *array_html_detail(struct array *this_array)
     {
         //collect the top-level sensors first.
         size_t i;
-        char *tl_sensors_rep = NULL;
+        char *tl_sensors_rep = strdup("");
         for (i = 0; i < this_array->num_top_level_sensors; i++)
         {
             char tl_sensors_format[] = "%s<button class=\"%s\" style=\"width:200px\">%s</button> ";

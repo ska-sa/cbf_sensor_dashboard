@@ -10,6 +10,7 @@
 #include <katcl.h>
 
 #include "array.h"
+#include "sensor.h"
 #include "team.h"
 #include "message.h"
 #include "queue.h"
@@ -32,6 +33,9 @@ enum array_state {
 struct array {
     char *name;
     int array_is_active;
+
+    struct sensor **top_level_sensor_list;
+    size_t num_top_level_sensors;
 
     struct team **team_list;
     size_t number_of_teams;
@@ -105,6 +109,9 @@ struct array *array_create(char *new_array_name, char *cmc_address, uint16_t con
         new_array->current_monitor_message = NULL;
         array_monitor_queue_pop(new_array);
         new_array->monitor_state = ARRAY_SEND_FRONT_OF_QUEUE;
+
+        new_array->top_level_sensor_list = NULL;
+        new_array->num_top_level_sensors = 0;
 
         new_array->number_of_teams = 2;
         new_array->team_list = malloc(sizeof(new_array->team_list)*(new_array->number_of_teams));
@@ -203,6 +210,31 @@ int array_add_team_host_engine_device_sensor(struct array *this_array, char team
         }
     }
     return -1;
+}
+
+
+int array_add_top_level_sensor(struct array *this_array, char *sensor_name)
+{
+    this_array->top_level_sensor_list = realloc(this_array->top_level_sensor_list, \
+            sizeof(*(this_array->top_level_sensor_list))*(this_array->num_top_level_sensors + 1));
+    this_array->top_level_sensor_list[this_array->num_top_level_sensors] = sensor_create(sensor_name);
+    this_array->num_top_level_sensors++;
+    return 0; //TODO indicate failure somehow.
+}
+
+
+int array_update_top_level_sensor(struct array *this_array, char *sensor_name, char *new_value, char *new_status)
+{
+    size_t i;
+    for (i = 0; i < this_array->num_top_level_sensors; i++)
+    {
+        if (!strcmp(sensor_name, sensor_get_name(this_array->top_level_sensor_list[i])))
+        {
+            return sensor_update(this_array->top_level_sensor_list[i], new_value, new_status); 
+            /// \retval 0 The operation was successful.
+        }
+    }
+    return -1; /// \retval -1 The operation failed.
 }
 
 
@@ -412,18 +444,37 @@ void array_socket_read_write(struct array *this_array, fd_set *rd, fd_set *wr)
 
 static void array_activate(struct array *this_array)
 {
-    syslog(LOG_NOTICE, "Detected %s (monitor port %s:%hu) in nominal state, subscribing to sensors.", this_array->name, this_array->cmc_address, this_array->monitor_port);
+    syslog(LOG_NOTICE, "Detected %s:%s in nominal state, subscribing to sensors.", this_array->cmc_address, this_array->name);
     FILE *config_file = fopen(SENSOR_LIST_CONFIG_FILE, "r");
 
     char buffer[BUF_SIZE];
     char *result;
 
+    {
+        struct message *new_message = message_create('?');
+        message_add_word(new_message, "sensor-value");
+        message_add_word(new_message, "hostname-functional-mapping");
+        queue_push(this_array->outgoing_monitor_msg_queue, new_message);
+     } ///TODO figure out some way to deal with this!
+
+    //This needs to be hardcoded unfortunately.
+    array_add_top_level_sensor(this_array, "device-status");
+    struct message *new_message = message_create('?');
+    message_add_word(new_message, "sensor-sampling");
+    message_add_word(new_message, "device-status");
+    message_add_word(new_message, "auto");
+    queue_push(this_array->outgoing_monitor_msg_queue, new_message);
+    
+    //Subscribe to sensors configured in the config file.
     for (result = fgets(buffer, BUF_SIZE, config_file); result != NULL; result = fgets(buffer, BUF_SIZE, config_file))
     {
         char **tokens = NULL;
         size_t n_tokens = tokenise_string(buffer, '.', &tokens);
-        if (!((n_tokens == 2) || (n_tokens == 3))) //can't think of a better way to put it than this. Might be just bare device,
-                                                 //or might be engine and device.
+        if (!((n_tokens == 1) || (n_tokens == 2) || (n_tokens == 3)))
+            //can't think of a better way to put it than this.i
+            //one token means top-level array sensor,
+            //two means team, host, device,
+            //three means team, host, engine, device
         {
             syslog(LOG_ERR, "sensor_list.conf has a malformed sensor name: %s.", buffer);
         }
@@ -431,45 +482,27 @@ static void array_activate(struct array *this_array)
         {
             char team_type = tokens[0][0]; //should be just "f" or "x" at this point.
             size_t i;
-            if (n_tokens == 2)
-            {
-                for (i = 0; i < this_array->n_antennas; i++)
-                {
-                    array_add_team_host_device_sensor(this_array, team_type, i, tokens[1], "device-status");
-
-                    char format[] = "%chost%02lu.%s.device-status"; //FOOBAR
-                    ssize_t needed = snprintf(NULL, 0, format, team_type, i, tokens[1]) + 1;
-                    char *sensor_string = malloc((size_t) needed); //TODO check for errors.
-                    sprintf(sensor_string, format, team_type, i, tokens[1]);
-
-                    struct message *new_message = message_create('?');
-                    message_add_word(new_message, "sensor-sampling");
-                    message_add_word(new_message, sensor_string);
-                    message_add_word(new_message, "auto");
-                    free(sensor_string);
-                    queue_push(this_array->outgoing_monitor_msg_queue, new_message);
-                }
-            }
-            if (n_tokens == 3)
-            {
-                for (i = 0; i < this_array->n_antennas; i++)
-                {
-                    size_t j;
-                    for (j = 0; j < 4; j++)
+            switch (n_tokens) {
+                case 1:
                     {
-                        //TODO formulate engine name.
-                        char *engine_name;
-                        char format[] = "%s%u";
-                        ssize_t needed = snprintf(NULL, 0, format, tokens[1], j) + 1;
-                        engine_name = malloc((size_t) needed);
-                        sprintf(engine_name, format, tokens[1], j);
-                        array_add_team_host_engine_device_sensor(this_array, team_type, i, engine_name, tokens[2], "device-status");
-
+                        array_add_top_level_sensor(this_array, tokens[0]);
+                        struct message *new_message = message_create('?');
+                        message_add_word(new_message, "sensor-sampling");
+                        message_add_word(new_message, tokens[0]);
+                        message_add_word(new_message, "auto");
+                        queue_push(this_array->outgoing_monitor_msg_queue, new_message);
+                    }
+                    break;
+                case 2:
+                    {
+                        for (i = 0; i < this_array->n_antennas; i++)
                         {
-                            char format[] = "%chost%02lu.%s.%s.device-status";
-                            ssize_t needed = snprintf(NULL, 0, format, team_type, i, engine_name, tokens[2], "device-status") + 1;
+                            array_add_team_host_device_sensor(this_array, team_type, i, tokens[1], "device-status");
+
+                            char format[] = "%chost%02lu.%s.device-status"; //FOOBAR
+                            ssize_t needed = snprintf(NULL, 0, format, team_type, i, tokens[1]) + 1;
                             char *sensor_string = malloc((size_t) needed); //TODO check for errors.
-                            sprintf(sensor_string, format, team_type, i, engine_name, tokens[2]);
+                            sprintf(sensor_string, format, team_type, i, tokens[1]);
 
                             struct message *new_message = message_create('?');
                             message_add_word(new_message, "sensor-sampling");
@@ -478,9 +511,43 @@ static void array_activate(struct array *this_array)
                             free(sensor_string);
                             queue_push(this_array->outgoing_monitor_msg_queue, new_message);
                         }
-                        free(engine_name);
                     }
-                }
+                    break;
+                case 3:
+                    {
+                        for (i = 0; i < this_array->n_antennas; i++)
+                        {
+                            size_t j;
+                            for (j = 0; j < 4; j++)
+                            {
+                                //TODO formulate engine name.
+                                char *engine_name;
+                                char format[] = "%s%u";
+                                ssize_t needed = snprintf(NULL, 0, format, tokens[1], j) + 1;
+                                engine_name = malloc((size_t) needed);
+                                sprintf(engine_name, format, tokens[1], j);
+                                array_add_team_host_engine_device_sensor(this_array, team_type, i, engine_name, tokens[2], "device-status");
+
+                                {
+                                    char format[] = "%chost%02lu.%s.%s.device-status";
+                                    ssize_t needed = snprintf(NULL, 0, format, team_type, i, engine_name, tokens[2], "device-status") + 1;
+                                    char *sensor_string = malloc((size_t) needed); //TODO check for errors.
+                                    sprintf(sensor_string, format, team_type, i, engine_name, tokens[2]);
+
+                                    struct message *new_message = message_create('?');
+                                    message_add_word(new_message, "sensor-sampling");
+                                    message_add_word(new_message, sensor_string);
+                                    message_add_word(new_message, "auto");
+                                    free(sensor_string);
+                                    queue_push(this_array->outgoing_monitor_msg_queue, new_message);
+                                }
+                                free(engine_name);
+                            }
+                        }
+                    }
+                    break;
+                default:
+                    ; //won't get here, checked earlier.
             }
         }
         size_t i;
@@ -510,7 +577,7 @@ void array_handle_received_katcl_lines(struct array *this_array)
                     else
                     {
                         //sensor obviously doesn't exist.
-                        //sensor_mark_absent(); // somehow. How will this propagate down?
+                        //sensor_mark_absent(); // TODO somehow. How will this propagate down? -- this is needed to indicate that there's something wrong in the config file.
                     }
 
                     this_array->control_state = ARRAY_SEND_FRONT_OF_QUEUE;
@@ -649,6 +716,9 @@ void array_handle_received_katcl_lines(struct array *this_array)
                     }
 
                     switch (n_tokens) {
+                        case 1:
+                            array_update_top_level_sensor(this_array, tokens[0], new_value, new_status);
+                            break;
                         case 3:
                             team_update_sensor(this_array->team_list[team_no], host_no, tokens[1], tokens[2], new_value, new_status);
                             break;
@@ -699,17 +769,32 @@ char *array_html_summary(struct array *this_array, char *cmc_name)
 
 char *array_html_detail(struct array *this_array)
 {
-    char *array_detail = strdup(""); //must free() later.
+
+    char *top_detail = strdup("");
     {
-        char format[] = "<p align=\"right\">Last updated: %s (%d seconds ago).</p>";
+        //collect the top-level sensors first.
+        size_t i;
+        char *tl_sensors_rep = NULL;
+        for (i = 0; i < this_array->num_top_level_sensors; i++)
+        {
+            char tl_sensors_format[] = "%s<button class=\"%s\" style=\"width:200px\">%s</button> ";
+            ssize_t needed = snprintf(NULL, 0, tl_sensors_format, tl_sensors_rep, sensor_get_status(this_array->top_level_sensor_list[i]), \
+                    sensor_get_name(this_array->top_level_sensor_list[i])) + 1;
+            tl_sensors_rep = realloc(tl_sensors_rep, (size_t) needed); //TODO check for -1
+            sprintf(tl_sensors_rep, tl_sensors_format, tl_sensors_rep, sensor_get_status(this_array->top_level_sensor_list[i]), \
+                    sensor_get_name(this_array->top_level_sensor_list[i]));
+        }
+        char format[] = "<p align=\"right\">%s Last updated: %s (%d seconds ago).</p>";
         char time_str[20];
         struct tm *last_updated_tm = localtime(&this_array->last_updated);
         strftime(time_str, 20, "%F %T", last_updated_tm);
-        ssize_t needed = snprintf(NULL, 0, format, time_str, (int)(time(0) - this_array->last_updated)) + 1;
-        array_detail = realloc(array_detail, (size_t) needed);
-        sprintf(array_detail, format, time_str, (int)(time(0) - this_array->last_updated));
+        ssize_t needed = snprintf(NULL, 0, format, tl_sensors_rep, time_str, (int)(time(0) - this_array->last_updated)) + 1;
+        top_detail = realloc(top_detail, (size_t) needed);
+        sprintf(top_detail, format, tl_sensors_rep, time_str, (int)(time(0) - this_array->last_updated));
+        free(tl_sensors_rep);
     }
     
+    char *array_detail = strdup(""); //must free() later.
     size_t i, j;
     for (i = 0; i < this_array->n_antennas; i++)
     {
@@ -717,11 +802,11 @@ char *array_html_detail(struct array *this_array)
         for (j = 0; j < this_array->number_of_teams; j++)
         {
             char format[] = "%s%s";
-	    char *host_html_det = team_get_host_html_detail(this_array->team_list[j], i);
+            char *host_html_det = team_get_host_html_detail(this_array->team_list[j], i);
             ssize_t needed = snprintf(NULL, 0, format, row_detail, host_html_det) + 1;
             row_detail = realloc(row_detail, (size_t) needed);
             sprintf(row_detail, format, row_detail, host_html_det);
-	    free(host_html_det);
+            free(host_html_det);
         }
         char format[] = "%s<tr>%s</tr>\n";
         ssize_t needed = snprintf(NULL, 0, format, array_detail, row_detail) + 1;
@@ -730,13 +815,14 @@ char *array_html_detail(struct array *this_array)
         free(row_detail);
     }
 
-    char format[] = "<table>\n%s</table>\n";
-    ssize_t needed = snprintf(NULL, 0, format, array_detail) + 1;
+    char format[] = "%s\n<table>\n%s</table>\n";
+    ssize_t needed = snprintf(NULL, 0, format, top_detail, array_detail) + 1;
     char *temp = malloc((size_t) needed); //TODO I really should get around to being rigorous about this
     if (temp != NULL)
     {
-        sprintf(temp, format, array_detail);
+        sprintf(temp, format, top_detail, array_detail);
     }
+    free(top_detail);
     free(array_detail);
     return temp;
 }

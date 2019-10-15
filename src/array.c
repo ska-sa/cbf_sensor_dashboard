@@ -130,6 +130,12 @@ void array_destroy(struct array *this_array)
         free(this_array->name);
 
         size_t i;
+        for (i = 0; i < this_array->num_top_level_sensors; i++)
+        {
+            sensor_destroy(this_array->top_level_sensor_list[i]);
+        }
+        free(this_array->top_level_sensor_list);
+
         for (i = 0; i < this_array->number_of_teams; i++)
         {
             team_destroy(this_array->team_list[i]);
@@ -749,14 +755,21 @@ void array_handle_received_katcl_lines(struct array *this_array)
                 {
                     if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 3), "hostname-functional-mapping"))
                     {
+                        char *sensor_value = strdup(arg_string_katcl(this_array->monitor_katcl_line, 5));
+                        syslog(LOG_INFO, "(%s:%s) Received hostname-functional-mapping: %s", this_array->cmc_address, this_array->name, sensor_value);
                         int i;
-                        for (i = 0; i < 2*this_array->n_antennas; i++)
+                        for (i = 0; i < 2*this_array->n_antennas; i++) //hacky.
                         {
-                            char *sensor_value = arg_string_katcl(this_array->monitor_katcl_line, 5);
+                            if (i*30 + 21 > strlen(sensor_value))
+                                    break;
                             char host_type = sensor_value[i*30 + 21];
+                            syslog(LOG_DEBUG, "host type: %c", host_type);
+
                             char *host_number_str = strndup(sensor_value + (i*30 + 26), 2);
                             size_t host_number = (size_t) atoi(host_number_str);
+                            syslog(LOG_DEBUG, "host number: %lu", host_number);
                             char *host_serial = strndup(sensor_value + (i*30 + 8), 6);
+                            syslog(LOG_DEBUG, "host serial: %s", host_serial);
                             switch (host_type)
                             {
                                 //TODO: this should probably check more rigorously against team types.
@@ -773,6 +786,7 @@ void array_handle_received_katcl_lines(struct array *this_array)
                             free(host_serial);
                             free(host_number_str);
                         }
+                        free(sensor_value);
                     }
                 }
                 else if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 0) + 1, "sensor-list"))

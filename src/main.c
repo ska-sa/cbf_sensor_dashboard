@@ -24,6 +24,7 @@
 #include <katcp.h>
 #include <katcl.h>
 #include <netc.h>
+#include <execinfo.h>
 
 #include "cmc_server.h"
 #include "message.h"
@@ -105,11 +106,21 @@ static struct argp argp = { options, parse_opt, args_doc, doc };
 static volatile sig_atomic_t stop = 0;
 static void handler(int signo)
 {
-    //if (signo == SIGINT || signo == SIGTERM)
-    if (signo == SIGINT)
+    if (signo == SIGINT || signo == SIGTERM)
     {
-        syslog(LOG_INFO, "SIGINT caught, exiting cleanly...");
+        syslog(LOG_INFO, "Caught signal to terminate, exiting cleanly...");
         stop = 1;
+    }
+    else if (signo == SIGSEGV)
+    {
+        void *array[10];
+        int size;
+
+        size = backtrace(array, 10);
+
+        fprintf(stderr, "Error: signal %d:\n", signo);
+        backtrace_symbols_fd(array, size, STDERR_FILENO);
+        exit(1);
     }
 }
 
@@ -144,6 +155,13 @@ int main(int argc, char **argv)
     if (r)
     {
         perror("sigaction (sigterm)");
+        return -1;
+    }
+
+    r = sigaction(SIGSEGV, &act, 0);
+    if (r)
+    {
+        perror("sigaction (sigsegv)");
         return -1;
     }
 

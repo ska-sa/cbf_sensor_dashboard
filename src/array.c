@@ -753,7 +753,7 @@ void array_handle_received_katcl_lines(struct array *this_array)
                 }
                 else if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 0) + 1, "sensor-value"))
                 {
-                    if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 3), "hostname-functional-mapping"))
+                    if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 3), "hostname-functional-mapping") && arg_string_katcl(this_array->monitor_katcl_line, 5) != NULL)
                     {
                         char *sensor_value = strdup(arg_string_katcl(this_array->monitor_katcl_line, 5));
                         syslog(LOG_INFO, "(%s:%s) Received hostname-functional-mapping: %s", this_array->cmc_address, this_array->name, sensor_value);

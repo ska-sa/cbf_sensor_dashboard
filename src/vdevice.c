@@ -103,7 +103,7 @@ char *vdevice_get_status(struct vdevice *this_vdevice)
 
 char *vdevice_html_summary(struct vdevice *this_vdevice)
 {
-    char format[] = "<td><button class=\"%s\">%s</button></td>";
+    char format[] = "<td class=\"%s\">%s</td>";
     ssize_t needed = snprintf(NULL, 0, format, vdevice_get_status(this_vdevice), this_vdevice->name) + 1;
     char *html_summary = malloc((size_t) needed);
     sprintf(html_summary, format, vdevice_get_status(this_vdevice), this_vdevice->name);

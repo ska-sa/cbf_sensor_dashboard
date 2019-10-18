@@ -158,12 +158,12 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    r = sigaction(SIGSEGV, &act, 0);
+    /*r = sigaction(SIGSEGV, &act, 0);
     if (r)
     {
         perror("sigaction (sigsegv)");
         return -1;
-    }
+    }*/
 
     sigemptyset(&mask);
     sigaddset(&mask, SIGTERM);

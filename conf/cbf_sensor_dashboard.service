@@ -8,6 +8,7 @@ ExecStart=/usr/local/sbin/cbf_sensor_dashboard 80 -v 6
 ExecStop=/bin/kill $MAINPID
 Restart=on-failure
 RestartSec=10s
+LimitCORE=infinity
 
 [Install]
 WantedBy=multi-user.target

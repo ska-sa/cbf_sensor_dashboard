@@ -711,7 +711,7 @@ void array_handle_received_katcl_lines(struct array *this_array)
                     }
                     else
                     {
-                        syslog(LOG_ERR, "KATCP message from %s:%s for sensor-status %chost%02ld.%s.%s - null value received.", this_array->cmc_address, this_array->name, team, host_no, tokens[1], tokens[2]);
+                        syslog(LOG_ERR, "KATCP message from %s:%s for sensor-status %s - null value received.", this_array->cmc_address, this_array->name, arg_string_katcl(this_array->monitor_katcl_line, 3));
                         new_value = strdup("none");
                     }
 

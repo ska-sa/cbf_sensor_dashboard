@@ -11,6 +11,7 @@ struct host {
     char *host_serial;
     char type;
     int host_number;
+    char *host_input_stream_name;
     struct device **device_list;
     size_t number_of_devices;
     struct vdevice **vdevice_list;
@@ -28,6 +29,7 @@ struct host *host_create(char type, int host_number)
         new_host->host_serial = strdup("unknwn");
         new_host->type = type;
         new_host->host_number = host_number;
+        new_host->host_input_stream_name = NULL;
         new_host->number_of_devices = 0;
         new_host->device_list = NULL;
         new_host->number_of_vdevices = 0;
@@ -44,6 +46,8 @@ void host_destroy(struct host *this_host)
     if (this_host != NULL)
     {
         free(this_host->host_serial);
+        if (this_host->host_input_stream_name)
+            free(this_host->host_input_stream_name);
         unsigned int i;
         for (i = 0; i < this_host->number_of_vdevices; i++)
             vdevice_destroy(this_host->vdevice_list[i]);
@@ -251,12 +255,15 @@ char *host_html_detail(struct host *this_host)
 {
     size_t i;
     char *host_detail = strdup(""); //need it to be zero length but don't want it to be null
-    /*{
-        char format[] = "<!--Host: %s Devices: %u, Engines: %u, Vdevices: %u -->";
-        ssize_t needed = snprintf(NULL, 0, format, this_host->hostname, this_host->number_of_devices, this_host->number_of_engines, this_host->number_of_vdevices) + 1;
-        host_detail = realloc(host_detail, (size_t) needed);
-        sprintf(host_detail, format, this_host->hostname, this_host->number_of_devices, this_host->number_of_engines, this_host->number_of_vdevices);
-    }*/ //No longer needed, was just for debugging.
+
+    if (this_host->host_input_stream_name)
+    {
+        char format[] = "<td>%s</td>";
+        ssize_t needed = snprintf(NULL, 0, format, this_host->host_input_stream_name) + 1;
+        host_detail = realloc(host_detail, (size_t) needed); //TODO checks for errors.
+        sprintf(host_detail, format, this_host->host_input_stream_name);
+    }
+
     {
         char format[] = "<td>%c%d %s</td>";
         ssize_t needed = snprintf(NULL, 0, format, this_host->type, this_host->host_number, this_host->host_serial) + 1;

@@ -758,7 +758,7 @@ void array_handle_received_katcl_lines(struct array *this_array)
                         char *sensor_value = strdup(arg_string_katcl(this_array->monitor_katcl_line, 5));
                         syslog(LOG_INFO, "(%s:%s) Received hostname-functional-mapping: %s", this_array->cmc_address, this_array->name, sensor_value);
                         int i;
-                        for (i = 0; i < 2*this_array->n_antennas; i++) //hacky.
+                        for (i = 0; i < 2*this_array->n_antennas; i++) //hacky. Only works because of fixed-width fields.
                         {
                             if (i*30 + 21 > strlen(sensor_value))
                                     break;
@@ -788,11 +788,19 @@ void array_handle_received_katcl_lines(struct array *this_array)
                         }
                         free(sensor_value);
                     }
+                    else if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 3), "input-labelling") && arg_string_katcl(this_array->monitor_katcl_line, 5) != NULL)
+                    {
+                        char *sensor_value = strdup(arg_string_katcl(this_array->monitor_katcl_line, 5));
+                        syslog(LOG_INFO, "(%s:%s) Received input-lableling: %s", this_array->cmc_address, this_array->name, sensor_value);
+                        
+                        
+
+                    }
                 }
-                else if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 0) + 1, "sensor-list"))
+                /*else if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, -1) + 0, "sensor-list"))
                 {
-                    //TODO
-                }
+                    //TODO -- it looks as though this functionality is no longer required.
+                }*/
                 break;
             default:
                 ; //This shouldn't ever happen.

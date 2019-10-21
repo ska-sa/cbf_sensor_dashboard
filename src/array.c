@@ -822,7 +822,7 @@ char *array_html_detail(struct array *this_array)
         char *tl_sensors_rep = strdup("");
         for (i = 0; i < this_array->num_top_level_sensors; i++)
         {
-            char tl_sensors_format[] = "%s<button class=\"%s\" style=\"width:200px\">%s</button> ";
+            char tl_sensors_format[] = "%s<button class=\"%s\" style=\"width:300px\">%s</button> ";
             ssize_t needed = snprintf(NULL, 0, tl_sensors_format, tl_sensors_rep, sensor_get_status(this_array->top_level_sensor_list[i]), \
                     sensor_get_name(this_array->top_level_sensor_list[i])) + 1;
             tl_sensors_rep = realloc(tl_sensors_rep, (size_t) needed); //TODO check for -1

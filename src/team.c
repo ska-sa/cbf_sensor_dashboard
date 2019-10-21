@@ -99,6 +99,16 @@ char team_get_type(struct team *this_team)
 }
 
 
+int team_set_fhost_input_stream(struct team *this_team, char *input_stream_name, size_t fhost_number)
+{
+    if (this_team != NULL)
+    {
+        return host_update_input_stream(this_team->host_list[fhost_number], input_stream_name);
+    }
+    return -1;
+}
+
+
 int team_update_sensor(struct team *this_team, size_t host_number, char *device_name, char*sensor_name, char *new_sensor_value, char *new_sensor_status)
 {
     if (this_team != NULL)

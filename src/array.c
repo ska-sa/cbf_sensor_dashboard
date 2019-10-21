@@ -510,7 +510,7 @@ static void array_activate(struct array *this_array)
                         {
                             array_add_team_host_device_sensor(this_array, team_type, i, tokens[1], "device-status");
 
-                            char format[] = "%chost%02lu.%s.device-status"; //FOOBAR
+                            char format[] = "%chost%02lu.%s.device-status"; 
                             ssize_t needed = snprintf(NULL, 0, format, team_type, i, tokens[1]) + 1;
                             char *sensor_string = malloc((size_t) needed); //TODO check for errors.
                             sprintf(sensor_string, format, team_type, i, tokens[1]);
@@ -634,7 +634,33 @@ void array_handle_received_katcl_lines(struct array *this_array)
                 }
                 else if (!strcmp(arg_string_katcl(this_array->control_katcl_line, 0) + 1, "sensor-value"))
                 {
-                    //TODO handle input-labelling here
+                    if (!strcmp(arg_string_katcl(this_array->control_katcl_line, 3), "input-labelling") && arg_string_katcl(this_array->control_katcl_line, 5) != NULL)
+                    {
+                        char *sensor_value = strdup(arg_string_katcl(this_array->control_katcl_line, 5));
+                        syslog(LOG_INFO, "(%s:%s) Received input-lableling: %s", this_array->cmc_address, this_array->name, sensor_value);
+                        
+                        //hacky. No fixed width fields, but we can tokenise stuff and get it in the correct order.
+                        size_t i = 0;
+                        char *temp;
+                        char delims[] = "[(' ,)]";
+                        do {
+                            if (i == 0)
+                                temp = strtok(sensor_value, delims);
+                            else 
+                                temp = strtok(NULL, delims);
+                            team_set_fhost_input_stream(this_array->team_list[0], temp, i);
+                            //don't need the next seven values.
+                            strtok(NULL, delims);
+                            strtok(NULL, delims);
+                            strtok(NULL, delims);
+                            strtok(NULL, delims);
+                            strtok(NULL, delims);
+                            strtok(NULL, delims);
+                            strtok(NULL, delims);
+                        } while (i++ < this_array->n_antennas);
+
+                        free(sensor_value);
+                    }
                 }
                 else if (!strcmp(arg_string_katcl(this_array->control_katcl_line, 0) + 1, "sensor-list"))
                 {
@@ -711,7 +737,7 @@ void array_handle_received_katcl_lines(struct array *this_array)
                     }
                     else
                     {
-                        syslog(LOG_ERR, "KATCP message from %s:%s for sensor-status %s - null value received.", this_array->cmc_address, this_array->name, arg_string_katcl(this_array->monitor_katcl_line, 3));
+                        syslog(LOG_DEBUG, "KATCP message from %s:%s for sensor-status %s - null value received.", this_array->cmc_address, this_array->name, arg_string_katcl(this_array->monitor_katcl_line, 3));
                         new_value = strdup("none");
                     }
 
@@ -722,7 +748,7 @@ void array_handle_received_katcl_lines(struct array *this_array)
                     }
                     else
                     {
-                        syslog(LOG_ERR, "KATCP message from %s:%s for sensor-status %chost%02ld.%s.%s - null status received.", this_array->cmc_address, this_array->name, team, host_no, tokens[1], tokens[2]);
+                        syslog(LOG_DEBUG, "KATCP message from %s:%s for sensor-status %chost%02ld.%s.%s - null status received.", this_array->cmc_address, this_array->name, team, host_no, tokens[1], tokens[2]);
                         new_status = strdup("none");
                     }
 
@@ -753,48 +779,47 @@ void array_handle_received_katcl_lines(struct array *this_array)
                 }
                 else if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 0) + 1, "sensor-value"))
                 {
-                    if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 3), "hostname-functional-mapping") && arg_string_katcl(this_array->monitor_katcl_line, 5) != NULL)
+                    if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 3), "hostname-functional-mapping") )
                     {
-                        char *sensor_value = strdup(arg_string_katcl(this_array->monitor_katcl_line, 5));
-                        syslog(LOG_INFO, "(%s:%s) Received hostname-functional-mapping: %s", this_array->cmc_address, this_array->name, sensor_value);
-                        int i;
-                        for (i = 0; i < 2*this_array->n_antennas; i++) //hacky. Only works because of fixed-width fields.
+                        if (arg_string_katcl(this_array->monitor_katcl_line, 5) != NULL)
                         {
-                            if (i*30 + 21 > strlen(sensor_value))
-                                    break;
-                            char host_type = sensor_value[i*30 + 21];
-                            syslog(LOG_DEBUG, "host type: %c", host_type);
-
-                            char *host_number_str = strndup(sensor_value + (i*30 + 26), 2);
-                            size_t host_number = (size_t) atoi(host_number_str);
-                            syslog(LOG_DEBUG, "host number: %lu", host_number);
-                            char *host_serial = strndup(sensor_value + (i*30 + 8), 6);
-                            syslog(LOG_DEBUG, "host serial: %s", host_serial);
-                            switch (host_type)
+                            char *sensor_value = strdup(arg_string_katcl(this_array->monitor_katcl_line, 5));
+                            syslog(LOG_INFO, "(%s:%s) Received hostname-functional-mapping: %s", this_array->cmc_address, this_array->name, sensor_value);
+                            int i;
+                            for (i = 0; i < 2*this_array->n_antennas; i++) //hacky. Only works because of fixed-width fields.
                             {
-                                //TODO: this should probably check more rigorously against team types.
-                                case 'f':
-                                    team_set_host_serial_no(this_array->team_list[0], host_number, host_serial);
-                                    break;
-                                case 'x':
-                                    team_set_host_serial_no(this_array->team_list[1], host_number, host_serial);
-                                    break;
-                                default:
-                                    syslog(LOG_WARNING, "Couldn't properly parse hostname-functional-mapping for %s:%s.", \
-                                            this_array->cmc_address, this_array->name);
-                            }
-                            free(host_serial);
-                            free(host_number_str);
-                        }
-                        free(sensor_value);
-                    }
-                    else if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 3), "input-labelling") && arg_string_katcl(this_array->monitor_katcl_line, 5) != NULL)
-                    {
-                        char *sensor_value = strdup(arg_string_katcl(this_array->monitor_katcl_line, 5));
-                        syslog(LOG_INFO, "(%s:%s) Received input-lableling: %s", this_array->cmc_address, this_array->name, sensor_value);
-                        
-                        
+                                if (i*30 + 21 > strlen(sensor_value))
+                                        break;
+                                char host_type = sensor_value[i*30 + 21];
+                                syslog(LOG_DEBUG, "host type: %c", host_type);
 
+                                char *host_number_str = strndup(sensor_value + (i*30 + 26), 2);
+                                size_t host_number = (size_t) atoi(host_number_str);
+                                syslog(LOG_DEBUG, "host number: %lu", host_number);
+                                char *host_serial = strndup(sensor_value + (i*30 + 8), 6);
+                                syslog(LOG_DEBUG, "host serial: %s", host_serial);
+                                switch (host_type)
+                                {
+                                    //TODO: this should probably check more rigorously against team types.
+                                    case 'f':
+                                        team_set_host_serial_no(this_array->team_list[0], host_number, host_serial);
+                                        break;
+                                    case 'x':
+                                        team_set_host_serial_no(this_array->team_list[1], host_number, host_serial);
+                                        break;
+                                    default:
+                                        syslog(LOG_WARNING, "Couldn't properly parse hostname-functional-mapping for %s:%s.", \
+                                                this_array->cmc_address, this_array->name);
+                                }
+                                free(host_serial);
+                                free(host_number_str);
+                            }
+                            free(sensor_value);
+                        }
+                        else
+                        {
+                            syslog(LOG_ERR, "(%s:%s) Received NULL hostname-functional-mapping!", this_array->cmc_address, this_array->name);
+                        }
                     }
                 }
                 /*else if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, -1) + 0, "sensor-list"))

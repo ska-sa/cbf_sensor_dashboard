@@ -185,6 +185,22 @@ int host_add_sensor_to_engine_device(struct host *this_host, char *engine_name, 
 }
 
 
+int host_update_input_stream(struct host *this_host, char *new_input_stream_name)
+{
+    if (new_input_stream_name != NULL)
+    {
+        //syslog(LOG_INFO, "%chost%02d receiving input %s.", this_host->type, this_host->host_number, new_input_stream_name);
+        this_host->host_input_stream_name = strdup(new_input_stream_name);
+        size_t last_char = strlen(this_host->host_input_stream_name) - 1;
+        //trim the polarisation off the end. We don't need to know that.
+        if (this_host->host_input_stream_name[last_char] == 'h' || this_host->host_input_stream_name[last_char] == 'v')
+            this_host->host_input_stream_name[last_char] = '\0';
+        return 0;
+    }
+    return -1;
+}
+
+
 char *host_get_sensor_value(struct host *this_host, char *device_name, char *sensor_name)
 {
     int i;
@@ -256,19 +272,18 @@ char *host_html_detail(struct host *this_host)
     size_t i;
     char *host_detail = strdup(""); //need it to be zero length but don't want it to be null
 
-    if (this_host->host_input_stream_name)
+    if (this_host->host_input_stream_name != NULL)
     {
-        char format[] = "<td>%s</td>";
+        char format[] = "<td style=\"width: 1\%\">%s</td>";
         ssize_t needed = snprintf(NULL, 0, format, this_host->host_input_stream_name) + 1;
         host_detail = realloc(host_detail, (size_t) needed); //TODO checks for errors.
         sprintf(host_detail, format, this_host->host_input_stream_name);
     }
-
     {
-        char format[] = "<td>%c%d %s</td>";
-        ssize_t needed = snprintf(NULL, 0, format, this_host->type, this_host->host_number, this_host->host_serial) + 1;
+        char format[] = "%s<td>%c%d %s</td>";
+        ssize_t needed = snprintf(NULL, 0, format, host_detail, this_host->type, this_host->host_number, this_host->host_serial) + 1;
         host_detail = realloc(host_detail, (size_t) needed); //TODO checks for errors.
-        sprintf(host_detail, format, this_host->type, this_host->host_number, this_host->host_serial);
+        sprintf(host_detail, format, host_detail, this_host->type, this_host->host_number, this_host->host_serial);
     }
     for (i = 0; i < this_host->number_of_devices; i++)
     {

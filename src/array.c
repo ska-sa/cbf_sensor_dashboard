@@ -634,32 +634,46 @@ void array_handle_received_katcl_lines(struct array *this_array)
                 }
                 else if (!strcmp(arg_string_katcl(this_array->control_katcl_line, 0) + 1, "sensor-value"))
                 {
-                    if (!strcmp(arg_string_katcl(this_array->control_katcl_line, 3), "input-labelling") && arg_string_katcl(this_array->control_katcl_line, 5) != NULL)
+                    if (!strcmp(arg_string_katcl(this_array->control_katcl_line, 3), "input-labelling"))
                     {
-                        char *sensor_value = strdup(arg_string_katcl(this_array->control_katcl_line, 5));
-                        syslog(LOG_INFO, "(%s:%s) Received input-lableling: %s", this_array->cmc_address, this_array->name, sensor_value);
-                        
-                        //hacky. No fixed width fields, but we can tokenise stuff and get it in the correct order.
-                        size_t i = 0;
-                        char *temp;
-                        char delims[] = "[(' ,)]";
-                        do {
-                            if (i == 0)
-                                temp = strtok(sensor_value, delims);
-                            else 
-                                temp = strtok(NULL, delims);
-                            team_set_fhost_input_stream(this_array->team_list[0], temp, i);
-                            //don't need the next seven values.
-                            strtok(NULL, delims);
-                            strtok(NULL, delims);
-                            strtok(NULL, delims);
-                            strtok(NULL, delims);
-                            strtok(NULL, delims);
-                            strtok(NULL, delims);
-                            strtok(NULL, delims);
-                        } while (i++ < this_array->n_antennas);
+                        if (arg_string_katcl(this_array->control_katcl_line, 5) != NULL)
+                        {
+                            char *sensor_value = strdup(arg_string_katcl(this_array->control_katcl_line, 5));
+                            syslog(LOG_INFO, "(%s:%s) Received input-lableling: %s", this_array->cmc_address, this_array->name, sensor_value);
+                            
+                            //hacky. No fixed width fields, but we can tokenise stuff and get it in the correct order.
+                            size_t i = 0;
+                            char *temp;
+                            char delims[] = "[(' ,)]";
+                            do {
+                                if (i == 0)
+                                    temp = strtok(sensor_value, delims);
+                                else 
+                                    temp = strtok(NULL, delims);
+                                team_set_fhost_input_stream(this_array->team_list[0], temp, i);
+                                //don't need the next seven values.
+                                strtok(NULL, delims);
+                                strtok(NULL, delims);
+                                strtok(NULL, delims);
+                                strtok(NULL, delims);
+                                strtok(NULL, delims);
+                                strtok(NULL, delims);
+                                strtok(NULL, delims);
+                            } while (i++ < this_array->n_antennas);
 
-                        free(sensor_value);
+                            free(sensor_value);
+                        }
+                        else
+                        {
+                            syslog(LOG_ERR, "(%s:%s) Received NULL input-labelling! Requesting again.", this_array->cmc_address, this_array->name);
+                            struct message *new_message = message_create('?');
+                            message_add_word(new_message, "sensor-value");
+                            message_add_word(new_message, "input-labelling");
+                            queue_push(this_array->outgoing_control_msg_queue, new_message);
+                            if (this_array->control_state == ARRAY_MONITOR)
+                                this_array->control_state = ARRAY_SEND_FRONT_OF_QUEUE;
+     
+                        }
                     }
                 }
                 else if (!strcmp(arg_string_katcl(this_array->control_katcl_line, 0) + 1, "sensor-list"))
@@ -818,7 +832,13 @@ void array_handle_received_katcl_lines(struct array *this_array)
                         }
                         else
                         {
-                            syslog(LOG_ERR, "(%s:%s) Received NULL hostname-functional-mapping!", this_array->cmc_address, this_array->name);
+                            syslog(LOG_ERR, "(%s:%s) Received NULL hostname-functional-mapping! Requesting again.", this_array->cmc_address, this_array->name);
+                            struct message *new_message = message_create('?');
+                            message_add_word(new_message, "sensor-value");
+                            message_add_word(new_message, "hostname-functional-mapping");
+                            queue_push(this_array->outgoing_monitor_msg_queue, new_message);
+                            if (this_array->monitor_state == ARRAY_MONITOR)
+                                this_array->monitor_state = ARRAY_SEND_FRONT_OF_QUEUE;
                         }
                     }
                 }

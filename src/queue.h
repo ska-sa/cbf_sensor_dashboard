@@ -3,6 +3,13 @@
 
 #include "message.h"
 
+
+/**
+ * \file  queue.h
+ * \brief The queue type stores a list of messages waiting to be sent.
+ */
+
+
 struct queue;
 
 struct queue *queue_create();

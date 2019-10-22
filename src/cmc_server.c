@@ -7,6 +7,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <syslog.h>
+#include <ctype.h>
 
 #include "cmc_server.h"
 #include "queue.h"
@@ -302,6 +303,12 @@ void cmc_server_socket_read_write(struct cmc_server *this_cmc_server, fd_set *rd
 }
 
 
+static int cmpstring(const void *p1, const void *p2)
+{
+    return strcmp( *(char * const *) p1, *(char * const *) p2);
+}
+
+
 static int cmc_server_add_array(struct cmc_server *this_cmc_server, char *array_name, uint16_t control_port, uint16_t monitor_port, size_t number_of_antennas)
 {
     size_t i;
@@ -332,6 +339,8 @@ static int cmc_server_add_array(struct cmc_server *this_cmc_server, char *array_
     }
     syslog(LOG_INFO, "Added array \"%s\" to %s:%hu.", array_name, this_cmc_server->address, this_cmc_server->katcp_port);
     this_cmc_server->no_of_arrays++;
+
+    qsort(this_cmc_server->array_list, this_cmc_server->no_of_arrays, sizeof(*(this_cmc_server->array_list)), cmpstring);
     return 0;
 }
 
@@ -563,7 +572,20 @@ char *cmc_server_html_representation(struct cmc_server *this_cmc_server)
 
 int cmc_server_check_for_array(struct cmc_server *this_cmc_server, char *array_name)
 {
+    //Check whether array_name is a number.
     size_t i;
+    for (i = 0; i < strlen(array_name); i++)
+    {
+        if (!isdigit(array_name[i]))
+            break;
+    }
+    if (i == strlen(array_name)) //i.e. we haven't broken out of the loop, array_name is actually a number.
+    {
+        int r = atoi(array_name);
+        if ( 0 < r && r <= this_cmc_server->no_of_arrays)
+            return r - 1; //minus one because the actual list is zero-indexed... an important thing not to forget!
+    } //if not, perhaps someone stupidly named an array "1234" or some such, in that case this should go through the normal procedure.
+
     for (i = 0; i < this_cmc_server->no_of_arrays; i++)
     {
         if (!strcmp(array_name, array_get_name(this_cmc_server->array_list[i])))

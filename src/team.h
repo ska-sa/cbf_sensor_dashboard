@@ -1,6 +1,12 @@
 #ifndef _TEAM_H_
 #define _TEAM_H_
 
+/**
+ * \file  team.h
+ * \brief The team class is for organising hosts in an array. It has no direct analogue in the actual correlator.
+ *        It's just easier to manage F- and X-hosts in groups separately.
+ */
+
 struct team;
 
 struct team *team_create(char type, size_t number_of_antennas);

@@ -5,13 +5,24 @@
 
 #include "message.h"
 
+/// A struct to hold a list of words to compose a KATCP message with.
 struct message {
-    char message_type; /*?, ! or #, but for the purposes we'll probably just be using ?.*/
+    /// ? (request), ! (reply) or # (inform), but for the purposes we'll probably just be using ?.
+    char message_type; 
+    /// An array of strings which will make up the individual words of the KATCP message to be sent.
     char **word_list;
+    /// The number of words on the list.
     size_t number_of_words;
 };
 
 
+/**
+ * \fn      struct message *message_create(char message_type)
+ * \details Allocate memory for a new message, initialise all the members.
+ * \param   message_type A character indicating what type of KATCP message you'll be sending.
+ *                       In our case this will always be ?, but we generalise here.
+ * \return  A pointer to the newly-created message object.
+ */
 struct message *message_create(char message_type)
 {
     struct message *new_message = malloc(sizeof(*new_message));
@@ -25,6 +36,12 @@ struct message *message_create(char message_type)
 }
 
 
+/**
+ * \fn      void message_destroy(struct message *this_message)
+ * \details Free the memory associated with the message object.
+ * \param   this_message A pointer to the message to be destroyed.
+ * \return  void
+ */
 void message_destroy(struct message *this_message)
 {
     if (this_message != NULL)
@@ -46,12 +63,25 @@ void message_destroy(struct message *this_message)
 }
 
 
+/**
+ * \fn      char message_get_type(struct message *this_message)
+ * \details Get the type of KATCP message.
+ * \param   this_message A pointer to the message in question.
+ * \return  A character indicating what kind of KATCP message it is.
+ */
 char message_get_type(struct message *this_message)
 {
     return this_message->message_type;
 }
 
 
+/**
+ * \fn      int message_add_word(struct message *this_message, char *new_word)
+ * \details Add a word to the end of the message.
+ * \param   this_message A pointer to the message in question.
+ * \param   new_word A string containing the word to be added to the message.
+ * \return  An integer indicating the outcome of the operation.
+ */
 int message_add_word(struct message *this_message, char *new_word)
 {
     if (this_message != NULL && new_word != NULL)
@@ -74,6 +104,13 @@ int message_add_word(struct message *this_message, char *new_word)
 }
 
 
+/**
+ * \fn      char *message_see_word(struct message *this_message, size_t this_word)
+ * \details Check what the contents of the message is.
+ * \param   this_message A pointer to the message in question.
+ * \param   this_word The index of the word in the message.
+ * \return  A pointer to the word in question.
+ */
 char *message_see_word(struct message *this_message, size_t this_word)
 {
     if (this_message == NULL || this_word >= this_message->number_of_words)
@@ -82,14 +119,26 @@ char *message_see_word(struct message *this_message, size_t this_word)
 }
 
 
+/**
+ * \fn      int message_get_number_of_words(struct message *this_message)
+ * \details Get the number of words that a message currently has.
+ * \param   this_message A pointer to the message in question.
+ * \return  An integer with the number of words in the message.
+ */
 int message_get_number_of_words(struct message *this_message)
 {
     if (this_message != NULL)
         return (int) this_message->number_of_words;
-    return -1;
+    return -1; /// \retval -1 Returns -1 in the case of an error.
 }
 
 
+/**
+ * \fn      char *message_compose(struct message *this_message) 
+ * \details Get the entire contents of the message as a string. Mostly useful for debugging.
+ * \param   this_message A pointer to the message in question.
+ * \return  A newly-allocated string containing the contents of the message object.
+ */
 char *message_compose(struct message *this_message)
 {
     if (this_message == NULL || this_message->number_of_words == 0)

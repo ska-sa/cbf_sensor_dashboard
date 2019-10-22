@@ -67,7 +67,7 @@ void device_destroy(struct device *this_device)
  * \fn      char *device_get_name(struct device *this_device)
  * \details Get the name of the given device.
  * \param   this_device A pointer to the device to be queried.
- * \return  A pointer to the name string of the sensor. The char pointer
+ * \return  A pointer to the name string of the device. The char pointer
  *          is not newly allocated and therefore must not be free'd.
  */
 char *device_get_name(struct device *this_device)
@@ -119,7 +119,7 @@ char **device_get_sensor_names(struct device *this_device, unsigned int *number_
 
 
 /**
- * \fn      char *device_sensor_get_value(struct sensor *this_device, char *sensor_name)
+ * \fn      char *device_get_sensor_value(struct sensor *this_device, char *sensor_name)
  * \details Query the device for the value of one of its sensors.
  * \param   this_device A pointer to the device to be queried.
  * \param   sensor_name A char* contianing the name of the sensor to be queried.
@@ -188,10 +188,10 @@ int device_update_sensor(struct device *this_device, char *sensor_name, char *ne
 
 /**
  * \fn      char *device_html_summary(struct device *this_device)
- * \details Get an HTML summary of the device. This is an HTML5 button with the class set to the status of the
+ * \details Get an HTML summary of the device. This is an HTML5 td with the class set to the status of the
  *          "device-status" sensor, so that the higher-level CSS can render the button appropriately.
  * \param   this_device A pointer to the device.
- * \return  A string containing the HTML summary of the device.
+ * \return  A newly allocated string containing the HTML summary of the device.
  */
 char *device_html_summary(struct device *this_device)
 {
@@ -202,13 +202,3 @@ char *device_html_summary(struct device *this_device)
     sprintf(html_summary, format, device_get_sensor_status(this_device, "device-status"), this_device->name);
     return html_summary;
 }
-
-/*void device_print_sensors(struct device *this_device)
-{
-    printf("Device name: %s\n", this_device->name);
-    unsigned int i;
-    for (i = 0; i < this_device->number_of_sensors; i++)
-    {
-        printf("\t%-15s- %-10s- %-10s\n", sensor_get_name(this_device->sensor_list[i]), sensor_get_value(this_device->sensor_list[i]), sensor_get_status(this_device->sensor_list[i]));
-    }
-}*/

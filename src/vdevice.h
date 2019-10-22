@@ -2,6 +2,12 @@
 #define _VDEVICE_H_
 #include "engine.h"
 
+/**
+ * \file  vdevice.h
+ * \brief The vdevice type stores the status of a compound device on the FPGA reported by the corr2_sensor_servelet.
+ *        The vdevice aggregates the "device-status" sensors of identically-named devices on all the engines occupying
+ *        a given host.
+ */
 
 struct vdevice;
 

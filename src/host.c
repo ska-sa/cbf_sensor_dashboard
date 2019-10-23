@@ -7,20 +7,38 @@
 #include "vdevice.h"
 
 
+/// A struct to represent an FPGA host, which has some devices and engines on it.
 struct host {
+    /// The serial number of the FPGA host.
     char *host_serial;
+    /// The type of gateware present on the host (i.e. 'f' or 'x').
     char type;
+    /// The index of the host in its team.
     int host_number;
+    /// The name of the input stream - nominally this should represent which antenna or dummy input is being given to an fhost.
     char *host_input_stream_name;
+    /// The list of devices that are on the host.
     struct device **device_list;
+    /// The number of devices in the list.
     size_t number_of_devices;
+    /// The list of vdevices that are ont he host.
     struct vdevice **vdevice_list;
+    /// The number of vdevices in the list.
     size_t number_of_vdevices;
+    /// The list of engines that are on the device.
     struct engine **engine_list;
+    /// The number of engines in the list.
     size_t number_of_engines;
 };
     
 
+/**
+ * \fn      struct host *host_create(char type, int host_number)
+ * \details Allocate memory for a new host object, initialise members with values indicating that it hasn't got any details yet.
+ * \param   type The type ('f' or 'x') of host to create.
+ * \param   host_number The host's index in its team. It needs to know this.
+ * \return  A pointer to the newly-allocated host.
+ */
 struct host *host_create(char type, int host_number)
 {
     struct host *new_host = malloc(sizeof(*new_host));
@@ -41,6 +59,12 @@ struct host *host_create(char type, int host_number)
 }
 
 
+/**
+ * \fn      void host_destroy(struct host *this_host)
+ * \details Free the memory allocated to this host, and its child objects.
+ * \param   this_host A pointer to the host in question.
+ * \return  void
+ */
 void host_destroy(struct host *this_host)
 {
     if (this_host != NULL)
@@ -64,6 +88,13 @@ void host_destroy(struct host *this_host)
 }
 
 
+/**
+ * \fn      int host_set_serial_no(struct host *this_host, char *host_serial)
+ * \details Set the serial number of the host object.
+ * \param   this_host A pointer to the host in question.
+ * \param   host_serial A string containing the serial number to be set.
+ * \return  At the moment, this function will always return 1 to indicate success. No error checking is performed.
+ */
 int host_set_serial_no(struct host *this_host, char *host_serial)
 {
     free(this_host->host_serial);
@@ -72,6 +103,13 @@ int host_set_serial_no(struct host *this_host, char *host_serial)
 }
 
 
+/**
+ * \fn      int host_add_device(struct host *this_host, char *new_device_name) 
+ * \details Add a device to the host.
+ * \param   this_host A pointer to the host in question.
+ * \param   new_device_name A string containing the name of the device to be created.
+ * \return  An integer indicating the outcome of the operation.
+ */
 int host_add_device(struct host *this_host, char *new_device_name)
 {
     /*First check whether the device already exists.*/
@@ -98,6 +136,14 @@ int host_add_device(struct host *this_host, char *new_device_name)
 }
 
 
+/**
+ * \fn      int host_add_sensor_to_device(struct host *this_host, char *device_name, char *new_sensor_name)
+ * \details Add a sensor to a device on the host.
+ * \param   this_host A pointer to the host in question.
+ * \param   device_name The name of the device which will get a sensor added.
+ * \param   new_sensor_name The name of the new sensor to be added to the device.
+ * \return  An integer indicating the outcome of the operation.
+ */
 int host_add_sensor_to_device(struct host *this_host, char *device_name, char *new_sensor_name)
 {
     int i;
@@ -112,6 +158,13 @@ int host_add_sensor_to_device(struct host *this_host, char *device_name, char *n
 }
 
 
+/**
+ * \fn      int host_add_engine(struct host *this_host, char *new_engine_name)
+ * \details Add an engine to the host.
+ * \param   this_host A pointer to the host in question.
+ * \param   new_engine_name A string containing the intended new name for the engine.
+ * \return  An integer indicating the outcome of the operation.
+ */
 int host_add_engine(struct host *this_host, char *new_engine_name)
 {
     /*First check whether the engine already exists.*/
@@ -137,6 +190,14 @@ int host_add_engine(struct host *this_host, char *new_engine_name)
 }
 
 
+/**
+ * \fn      int host_add_device_to_engine(struct host *this_host, char *engine_name, char *new_device_name)
+ * \details Add a device to an engine on the host.
+ * \param   this_host A pointer to the host in question.
+ * \param   engine_name A string containing the name of the engine which needs a device added.
+ * \param   new_device_name A string containing the intended name for the new device.
+ * \return  An integer indicating the outcome of the operation.
+ */
 int host_add_device_to_engine(struct host *this_host, char *engine_name, char *new_device_name)
 {
     int i;
@@ -151,6 +212,15 @@ int host_add_device_to_engine(struct host *this_host, char *engine_name, char *n
 }
 
 
+/**
+ * \fn      int host_add_sensor_to_engine_device(struct host *this_host, char *engine_name, char *device_name, char *new_sensor_name)
+ * \details Add a sensor to a device on an engine on the host.
+ * \param   this_host A pointer to the host in question.
+ * \param   engine_name A string containing the name of the engine which needs a sensor added to one of its devices.
+ * \param   device_name A string containing the name of the device to which a sensor needs to be added.
+ * \param   new_sensor_name A string contianing the intended name for the new sensor.
+ * \return  An integer indicating the outcome of the operation.
+ */
 int host_add_sensor_to_engine_device(struct host *this_host, char *engine_name, char *device_name, char *new_sensor_name)
 {
     int i;
@@ -185,6 +255,13 @@ int host_add_sensor_to_engine_device(struct host *this_host, char *engine_name, 
 }
 
 
+/**
+ * \fn      int host_update_input_stream(struct host *this_host, char *new_input_stream_name)
+ * \details Set the input stream name for the host.
+ * \param   this_host A pointer to the host in question.
+ * \param   new_input_stream_name A string containing the intended name of the input stream.
+ * \return  An integer indicating the outcome of the operation.
+ */
 int host_update_input_stream(struct host *this_host, char *new_input_stream_name)
 {
     if (new_input_stream_name != NULL)
@@ -201,6 +278,15 @@ int host_update_input_stream(struct host *this_host, char *new_input_stream_name
 }
 
 
+/**
+ * \fn      char *host_get_sensor_value(struct host *this_host, char *device_name, char *sensor_name)
+ * \details Get the value from a sensor on the host.
+ * \param   this_host A pointer to the host in question.
+ * \param   device_name A string with the name of the device which contains the desired sensor.
+ * \param   sensor_name A string contianing the name of the sensor to be retrieved.
+ * \return  A string containing the sensor value for the desired sensor. This is not newly allocated and must
+ *          not be freed. NULL if the process failed.
+ */
 char *host_get_sensor_value(struct host *this_host, char *device_name, char *sensor_name)
 {
     int i;
@@ -215,6 +301,15 @@ char *host_get_sensor_value(struct host *this_host, char *device_name, char *sen
 }
 
 
+/**
+ * \fn      char *host_get_sensor_status(struct host *this_host, char *device_name, char *sensor_name)
+ * \details Get the status from a sensor on the host.
+ * \param   this_host A pointer to the host in question.
+ * \param   device_name A string with the name of the device which contains the desired sensor.
+ * \param   sensor_name A string contianing the name of the sensor to be retrieved.
+ * \return  A string containing the sensor status for the desired sensor. This is not newly allocated and must
+ *          not be freed. NULL if the process failed.
+ */
 char *host_get_sensor_status(struct host *this_host, char *device_name, char *sensor_name)
 {
     int i;
@@ -239,6 +334,16 @@ char *host_get_sensor_status(struct host *this_host, char *device_name, char *se
 }
 
 
+/**
+ * \fn      int host_update_sensor(struct host *this_host, char *device_name, char *sensor_name, char *new_sensor_value, char *new_sensor_status)
+ * \details Update the value and status of one of the sensors on the host.
+ * \param   this_host A pointer to the host in question.
+ * \param   device_name A string with the name of the device which contains the desired sensor.
+ * \param   sensor_name A string contianing the name of the sensor to be updated.
+ * \param   new_sensor_value A string containing the new value to store in the sensor.
+ * \param   new_sensor_status A string containing the new status to store in the sensor.
+ * \return  An integer indicating the outcome of the operation.
+ */
 int host_update_sensor(struct host *this_host, char *device_name, char *sensor_name, char *new_sensor_value, char *new_sensor_status)
 {
     int i;
@@ -253,6 +358,17 @@ int host_update_sensor(struct host *this_host, char *device_name, char *sensor_n
 }
 
 
+/**
+ * \fn      int host_update_engine_sensor(struct host *this_host, char *engine_name, char *device_name, char *sensor_name, char *new_sensor_value, char *new_sensor_status)
+ * \details Update the value and status of one of the sensors in one of the host's engines.
+ * \param   this_host A pointer to the host in question.
+ * \param   engine_name A string with the name of the engine which contains the desired device.
+ * \param   device_name A string with the name of the device which contains the desired sensor.
+ * \param   sensor_name A string contianing the name of the sensor to be updated.
+ * \param   new_sensor_value A string containing the new value to store in the sensor.
+ * \param   new_sensor_status A string containing the new status to store in the sensor.
+ * \return  An integer indicating the outcome of the operation.
+ */
 int host_update_engine_sensor(struct host *this_host, char *engine_name, char *device_name, char *sensor_name, char *new_sensor_value, char *new_sensor_status)
 {
     int i;
@@ -267,6 +383,12 @@ int host_update_engine_sensor(struct host *this_host, char *engine_name, char *d
 }
 
 
+/**
+ * \fn      char *host_html_detail(struct host *this_host)
+ * \details Get an HTML description of the host by concatenating HTML descriptions of the underlying devices and vdevices in the host.
+ * \param   this_host A pointer to the host in question.
+ * \return  A newly allocated string containing the HTML description of the host.
+ */
 char *host_html_detail(struct host *this_host)
 {
     size_t i;

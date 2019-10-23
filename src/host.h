@@ -1,6 +1,11 @@
 #ifndef _HOST_H_
 #define _HOST_H_
 
+/**
+ * \file  host.h
+ * \brief The host type stores lists of devices and engines.
+ */
+
 struct host;
 
 struct host *host_create(char type, int host_number);

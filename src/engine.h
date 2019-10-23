@@ -1,6 +1,13 @@
 #ifndef _ENGINE_H_
 #define _ENGINE_H_
 
+/**
+ * \file  engine.h
+ * \brief The engine type stores devices when there are multiple engines on a host.
+ *        It is a member of a device object, but is also watched by a vdevice object,
+ *        which accesses the underlying devices to report the compound status of the devices.
+ */
+
 struct engine;
 
 struct engine *engine_create(char *new_name);

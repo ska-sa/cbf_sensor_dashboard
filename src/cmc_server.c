@@ -27,19 +27,37 @@ enum cmc_state {
 };
 
 
+/// A struct to manage the connection to a CMC server.
 struct cmc_server {
+    /// The port on which the CMC server is listening for KATCP connections. Usually 7147.
     uint16_t katcp_port;
+    /// The IP address or (resolvable) hostname of the CMC server.
     char *address;
+    /// The file descriptor for the connection.
     int katcp_socket_fd;
+    /// katcl_line object to handle interpreting the incoming katcp messages.
     struct katcl_line *katcl_line;
+    /// The current state of the connection state-machine.
     enum cmc_state state;
+    /// The queue storing messages to be sent. A queue is needed because the CMC server wants you to wait for the ok response before sending another message.
     struct queue *outgoing_msg_queue;
+    /// The most recent message that's been sent, so that we can match it against the response received, to know whether it's failed or not.
     struct message *current_message;
+    /// The list of arrays that the CMC server is currently managing.
     struct array **array_list;
+    /// The number of arrays in the list.
     size_t no_of_arrays;
 };
 
 
+/**
+ * \fn      struct cmc_server *cmc_server_create(char *address, uint16_t katcp_port)
+ * \details Allocate memory for a cmc_server object and initialise its members so that it gets ready to start communicating with the CMC server.
+ *          The object is created with a hard-coded list of initial messages to send: "?log-local off", "?client-config info-all", and "?array-list".
+ * \param   address A string containing the IP address or (resolvable) hostname of the CMC server.
+ * \param   katcp_port The TCP port on which the CMC server is listening for KATCP connections.
+ * \returns A pointer to the newly-allocated cmc_server object.
+ */
 struct cmc_server *cmc_server_create(char *address, uint16_t katcp_port)
 {
     struct cmc_server *new_cmc_server = malloc(sizeof(*new_cmc_server));
@@ -75,6 +93,12 @@ struct cmc_server *cmc_server_create(char *address, uint16_t katcp_port)
 }
 
 
+/**
+ * \fn      void cmc_server_destroy(struct cmc_server *this_cmc_server)
+ * \details Free the memory allocated to the cmc_server object and its children.
+ * \param   this_cmc_server A pointer to the cmc_server in question.
+ * \return  void
+ */
 void cmc_server_destroy(struct cmc_server *this_cmc_server)
 {
     if (this_cmc_server != NULL)
@@ -96,6 +120,13 @@ void cmc_server_destroy(struct cmc_server *this_cmc_server)
 }
 
 
+/**
+ * \fn      void cmc_server_try_reconnect(struct cmc_server *this_cmc_server)
+ * \details If the cmc_server's state indicates that it is disconnected, try to reconnect.
+ *          Honestly, I'm not entirely sure that this actually works properly.
+ * \param   this_cmc_server A pointer to the cmc_server in question.
+ * \return  void
+ */
 void cmc_server_try_reconnect(struct cmc_server *this_cmc_server)
 {
     if (this_cmc_server->state == CMC_DISCONNECTED)
@@ -108,6 +139,14 @@ void cmc_server_try_reconnect(struct cmc_server *this_cmc_server)
 }
 
 
+/**
+ * \fn      void cmc_server_poll_array_list(struct cmc_server *this_cmc_server)
+ * \details This function adds an "?array-list" message to the cmc_server's message queue and sets it up to send (if it's not busy with other things).
+ *          Additionally, each array on the cmc_server's list is marked as "suspect", so that arrays which are not named in the #array-list informs received
+ *          in response to this query can be "garbage-collected".
+ * \param   this_cmc_server A pointer to the cmc_server in question.
+ * \return  void
+ */
 void cmc_server_poll_array_list(struct cmc_server *this_cmc_server)
 {
     if (this_cmc_server->state != CMC_DISCONNECTED && this_cmc_server->state != CMC_WAIT_CONNECT) //no sense if we're not connected yet.
@@ -132,6 +171,12 @@ void cmc_server_poll_array_list(struct cmc_server *this_cmc_server)
 }
 
 
+/**
+ * \fn      struct message *cmc_server_queue_pop(struct cmc_server *this_cmc_server)
+ * \details Remove the cmc_server's current_message (if any), and replaces it with one popped from the outgoing_msg_queue.
+ * \param   this_cmc_server A pointer to the cmc_server in question.
+ * \return  A pointer to the message that was popped from the outgoing_msg_queue.
+ */
 struct message *cmc_server_queue_pop(struct cmc_server *this_cmc_server)
 {
     if (this_cmc_server->current_message != NULL)
@@ -143,15 +188,33 @@ struct message *cmc_server_queue_pop(struct cmc_server *this_cmc_server)
 }
 
 
+/**
+ * \fn      char *cmc_server_get_name(struct cmc_server *this_cmc_server)
+ * \details Get the address of the cmc_server object. Typically this has been in the form of its (resolvable) hostname, so the address doubles
+ *          as a name quite readily.
+ * \param   this_cmc_server A pointer to the cmc_server in question.
+ * \return  A string containing the address of the cmc_server. This is not newly allocated and must not be freed.
+ */
 char *cmc_server_get_name(struct cmc_server *this_cmc_server)
 {
     return this_cmc_server->address;
 }
 
 
+/**
+ * \fn      void cmc_server_set_fds(struct cmc_server *this_cmc_server, fd_set *rd, fd_set *wr, int *nfds)
+ * \details This function sets both read and write file desciptors according to the state that the cmc_server's state machine is in.
+ *          the rd file descriptor will almost always be set if the connection is active, with the wr file descriptor set only if there
+ *          is a message waiting to be sent.
+ * \param   this_cmc_server A pointer to the cmc_server in question.
+ * \param   rd A pointer to the fd_set indicating ready to read.
+ * \param   wr A pointer to the fd_set indicating ready to write.
+ * \param   nfds A pointer to an integer indicating the number of file descriptors in the above sets.
+ * \return  void
+ */
 void cmc_server_set_fds(struct cmc_server *this_cmc_server, fd_set *rd, fd_set *wr, int *nfds)
 {
-    /*
+    /* //I forget why this code is here.
     int so_error;
     socklen_t len = sizeof(so_error);
     getsockopt(this_cmc_server->katcp_socket_fd, SOL_SOCKET, SO_ERROR, &so_error, &len);
@@ -188,6 +251,13 @@ void cmc_server_set_fds(struct cmc_server *this_cmc_server, fd_set *rd, fd_set *
 }
 
 
+/**
+ * \fn      void cmc_server_setup_katcp_writes(struct cmc_server *this_cmc_server)
+ * \details If there is a message waiting to be sent, this function will insert it into the katcl_line, word for word, until it's finished.
+ *          On the next select() loop, the katcl_line will then report that it's ready to write a fully-formed message to the file descriptor.
+ * \param   this_cmc_server A pointer to the cmc_server in question.
+ * \return  void
+ */
 void cmc_server_setup_katcp_writes(struct cmc_server *this_cmc_server)
 {
     if (this_cmc_server->current_message)
@@ -241,6 +311,15 @@ void cmc_server_setup_katcp_writes(struct cmc_server *this_cmc_server)
 }
 
 
+/**
+ * \fn      void cmc_server_socket_read_write(struct cmc_server *this_cmc_server, fd_set *rd, fd_set *wr)
+ * \details Depending on the state that the cmc_server's state machine is in, send all transmissions which are ready, and read
+ *          incoming transmissions, storing them in the katcl_line for processing once a fully-formed message is received.
+ * \param   this_cmc_server A pointer to the cmc_server in question.
+ * \param   rd A pointer to the fd_set indicating ready to read.
+ * \param   wr A pointer to the fd_set indicating ready to write.
+ * \return  void
+ */
 void cmc_server_socket_read_write(struct cmc_server *this_cmc_server, fd_set *rd, fd_set *wr)
 {
     switch (this_cmc_server->state) {
@@ -303,12 +382,26 @@ void cmc_server_socket_read_write(struct cmc_server *this_cmc_server, fd_set *rd
 }
 
 
+/**
+ * \fn      static int cmpstring(const void *p1, const void *p2)
+ * \details Compare two strings, for use with qsort function. Includes casting the pointers appropriately.
+ */
 static int cmpstring(const void *p1, const void *p2)
 {
     return strcmp( *(char * const *) p1, *(char * const *) p2);
 }
 
 
+/**
+ * \fn      static int cmc_server_add_array(struct cmc_server *this_cmc_server, char *array_name, uint16_t control_port, uint16_t monitor_port, size_t number_of_antennas)
+ * \details Add a newly-created array to the cmc_server's array_list.
+ * \param   this_cmc_server A pointer to the cmc_server in question.
+ * \param   array_name A string containing the name of the new array to be created.
+ * \param   control_port The TCP port on which the corr2_servlet of the new array is listening.
+ * \param   monitor_port The TCP port on which the corr2_sensor_servlet of the new array is listening. This is where we'll get most of our useful information.
+ * \param   number_of_antennas The number of antennas of the new array (or more correctly, the size of the new correlator).
+ * \return  An integer indicating the outcome of the operation.
+ */
 static int cmc_server_add_array(struct cmc_server *this_cmc_server, char *array_name, uint16_t control_port, uint16_t monitor_port, size_t number_of_antennas)
 {
     size_t i;
@@ -345,6 +438,13 @@ static int cmc_server_add_array(struct cmc_server *this_cmc_server, char *array_
 }
 
 
+/**
+ * \fn      void cmc_server_handle_received_katcl_lines(struct cmc_server *this_cmc_server)
+ * \details This function checks whether the katcl_line has any messages ready, and then processes the message, in accordance with the logic of the
+ *          built-in state machine.
+ * \param   this_cmc_server A pointer to the cmc_server in question.
+ * \return  void
+ */
 void cmc_server_handle_received_katcl_lines(struct cmc_server *this_cmc_server)
 {
     if (this_cmc_server->state == CMC_WAIT_CONNECT || this_cmc_server->state == CMC_DISCONNECTED)
@@ -502,8 +602,11 @@ void cmc_server_handle_received_katcl_lines(struct cmc_server *this_cmc_server)
 }
 
 
-/* CMC server will be represented as an H1 with a table of the arrays beneath it.
- * for the time being, just its name.
+/**
+ * \fn      char *cmc_server_html_representation(struct cmc_server *this_cmc_server)
+ * \details This funcion generates an HTML representation of the CMC server's current array-list, showing a brief description of each array in a table.
+ * \param   this_cmc_server A pointer to the cmc_server in question.
+ * \return  A newly-allocated string containing the cmc_server's HTML representation.
  */
 char *cmc_server_html_representation(struct cmc_server *this_cmc_server)
 {
@@ -570,6 +673,14 @@ char *cmc_server_html_representation(struct cmc_server *this_cmc_server)
 }
 
 
+/**
+ * \fn      int cmc_server_check_for_array(struct cmc_server *this_cmc_server, char *array_name)
+ * \details This function checks whether a given array is actually on its list.
+ * \param   this_cmc_server A pointer to the cmc_server in question.
+ * \param   array_name A string containing the name of the array to be looked for. If the string is actually a number,
+ *          and the number is lower than or equal to the number of arrays currently present, then the matching array is also valid.
+ * \return  A positive integer corresponding to the array's position in the array_list if found, minus one if the array was not found.
+ */
 int cmc_server_check_for_array(struct cmc_server *this_cmc_server, char *array_name)
 {
     //Check whether array_name is a number.
@@ -597,6 +708,13 @@ int cmc_server_check_for_array(struct cmc_server *this_cmc_server, char *array_n
 }
 
 
+/**
+ * \fn      struct array *cmc_server_get_array(struct cmc_server *this_cmc_server, size_t array_number)
+ * \details Get a pointer to the array on the cmc_server's array_list.
+ * \param   this_cmc_server A pointer to the cmc_server in question.
+ * \param   array_number The index of the array desired.
+ * \return  A pointer to the requested array in the array_list, NULL if the index given is past the end of the list.
+ */
 struct array *cmc_server_get_array(struct cmc_server *this_cmc_server, size_t array_number)
 {
     if (array_number < this_cmc_server->no_of_arrays)

@@ -8,6 +8,11 @@
 #include "message.h"
 #include "array.h"
 
+/**
+ * \file  cmc_server.h
+ * \brief The cmc_server class manages connections to individial CMC servers through KATCP interfaces. It also watches for arrays being created or destroyed.
+ */
+
 struct cmc_server;
 
 struct cmc_server *cmc_server_create(char *address, uint16_t katcp_port);

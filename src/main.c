@@ -43,7 +43,7 @@
  * set up command line options and arguments
  *********************************/
 const char *argp_program_version =
-  "cbf-sensor-dashboard 0.3";
+  "cbf-sensor-dashboard 1.0";
 const char *argp_program_bug_address =
   "<jsmith@ska.ac.za>";
 /* TODO Program documentation. */

@@ -3,6 +3,12 @@
 #include <stdint.h>
 #include "message.h"
 
+/**
+ * \file  array.h
+ * \brief The array class stores a list of teams (which in turn store hosts) to manage the data representing the state of the correlator.
+ *        The class also has members for managing the connection and communication with the corr2_servlet and corr2_sensor_servlet of each array.
+ */
+
 struct array;
 
 struct array *array_create(char *new_array_name, char *cmc_address, uint16_t control_port, uint16_t monitor_port, size_t n_antennas);

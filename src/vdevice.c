@@ -15,9 +15,8 @@ struct vdevice {
     struct engine ***engine_list;
     /// Number of engines that share a host.
     size_t *number_of_engines;
-    /// Status of the vdevice. Note that the vdevice has no (directly) underlying sensors, it only queries the "device-status" sensors for the corresponding
-    /// actual devices in the underlying engines. This is updated each time the vdevice's status is retrieved.
-    char *status; /*virtual sensor doesn't have a value, just a status.*/
+    /// Status of the vdevice. Note that the vdevice has no (directly) underlying sensors, it only queries the "device-status" sensors for the corresponding actual devices in the underlying engines. This is updated each time the vdevice's status is retrieved. The virtual sensor doesn't have a value, just a status.
+    char *status; 
 };
 
 

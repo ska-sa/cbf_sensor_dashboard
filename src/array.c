@@ -30,40 +30,74 @@ enum array_state {
 };
 
 
+/// A struct representing all the info you need to store data from an array and communicate with the correlator itself.
 struct array {
+    /// The name of the array.
     char *name;
+    /// An indicator of whether the array is active or not, whether it's in need of garbage collection.
     int array_is_active;
 
+    /// A list of top-level sensors, which do not belong to any host.
     struct sensor **top_level_sensor_list;
+    /// The number of top-level sensors in the list.
     size_t num_top_level_sensors;
 
+    /// A list of teams of *hosts. Currently there are only 'f' and 'x'.
     struct team **team_list;
+    /// The number of teams in the list, currently this will always be 2.
     size_t number_of_teams;
+    /// The number of antennas to which this array can connect (i.e. the size of the correlator).
     size_t n_antennas;
 
+    /// The IP address or (resolvable) hostname of the CMC which is controlling the correlator.
     char *cmc_address;
 
+    /// The time at which the most recent information was received from the array. Useful as a debug indicator of whether the connection is still alive.
     time_t last_updated;
 
+    /// The TCP port at which the correlator's corr2_servlet is listening for KATCP connections.
     uint16_t control_port;
+    /// A file descriptor to handle the connection to the corr2_servlet.
     int control_fd;
+    /// A katcl_line to handle the KATCP communication through this connection.
     struct katcl_line *control_katcl_line;
+    /// The current state of the state machine for this communication.
     enum array_state control_state;
+    /// The queue for messages waiting to be sent to the corr2_servlet.
     struct queue *outgoing_control_msg_queue;
+    /// The most recently sent message.
     struct message *current_control_message;
 
+    /// The overall instrument status.
     char *instrument_state;
+    /// The config file from which the instrument was launched. Indicates what specific configuration the correlator is in.
     char *config_file;
 
+    /// The TCP port at which the correlator's corr2_sensor_servlet is listening for KATCP connections.
     uint16_t monitor_port;
+    /// A file descriptor to handle the connection to the corr2_sensor_servlet.
     int monitor_fd;
+    /// A katcl_line to handle the KATCP communication through this connection.
     struct katcl_line *monitor_katcl_line;
+    /// The current state of the state machine for this communication.
     enum array_state monitor_state;
+    /// The queue for messages waiting to be sent to the corr2_sensor_servlet.
     struct queue *outgoing_monitor_msg_queue;
+    /// The most recently sent message.
     struct message *current_monitor_message;
 };
 
 
+/**
+ * \fn      struct array *array_create(char *new_array_name, char *cmc_address, uint16_t control_port, uint16_t monitor_port, size_t n_antennas)
+ * \details Allocate memory for a new array object, create teams with hosts, queue up a few messages to send.
+ * \param   new_array_name A string containing the name for the new array.
+ * \param   cmc_address A string containing the IP or (resolvable) hostname of the CMC server.
+ * \param   control_port The TCP port that the correlator's corr2_servlet is listening to.
+ * \param   monitor_port The TCP port that the correlator's corr2_sensor_servlet is listening to.
+ * \param   n_antennas The number of antennas, or the size of the correlator.
+ * \return  A pointer to the newly-allocated array object.
+ */
 struct array *array_create(char *new_array_name, char *cmc_address, uint16_t control_port, uint16_t monitor_port, size_t n_antennas)
 {
    struct array *new_array = malloc(sizeof(*new_array));
@@ -122,6 +156,12 @@ struct array *array_create(char *new_array_name, char *cmc_address, uint16_t con
 }
 
 
+/**
+ * \fn      void array_destroy(struct array *this_array)
+ * \details Free the memory associated with the array and all its children.
+ * \param   this_array A pointer to the array to be destroyed.
+ * \return  void
+ */
 void array_destroy(struct array *this_array)
 {
     if (this_array != NULL)
@@ -161,12 +201,28 @@ void array_destroy(struct array *this_array)
 }
 
 
+/**
+ * \fn      char *array_get_name(struct array *this_array)
+ * \details Get the name of the array.
+ * \param   this_array A pointer to the array in question.
+ * \return  A string containing the name of the array. This string is not newly-allocated, and must not be freed.
+ */
 char *array_get_name(struct array *this_array)
 {
     return this_array->name;
 }
 
 
+/**
+ * \fn      int array_add_team_host_device_sensor(struct array *this_array, char team_type, size_t host_number, char *device_name, char *sensor_name)
+ * \details Add a sensor to the array. Parent structures will be created if necessary.
+ * \param   this_array A pointer to the array in question.
+ * \param   team_type The type of host that the sensor will be on ('f' or 'x').
+ * \param   host_number The index of the host in the team.
+ * \param   device_name A string containing the name of the device that will contain the sensor.
+ * \param   sensor_name A string containing the name of the sensor to be created.
+ * \return  An integer indicating the outcome of the operation.
+ */
 int array_add_team_host_device_sensor(struct array *this_array, char team_type, size_t host_number, char *device_name, char *sensor_name)
 {
     if (this_array != NULL)
@@ -193,6 +249,17 @@ int array_add_team_host_device_sensor(struct array *this_array, char team_type, 
 }
 
 
+/**
+ * \fn      int array_add_team_host_engine_device_sensor(struct array *this_array, char team_type, size_t host_number, char *engine_name, char *device_name, char *sensor_name)
+ * \details Add a sensor to the array. Parent structures will be created if necessary.
+ * \param   this_array A pointer to the array in question.
+ * \param   team_type The type of host that the sensor will be on ('f' or 'x').
+ * \param   host_number The index of the host in the team.
+ * \param   engine_name A string containing the name of the engine that will contain the device.
+ * \param   device_name A string containing the name of the device that will contain the sensor.
+ * \param   sensor_name A string containing the name of the sensor to be created.
+ * \return  An integer indicating the outcome of the operation.
+ */
 int array_add_team_host_engine_device_sensor(struct array *this_array, char team_type, size_t host_number, char *engine_name, char *device_name, char *sensor_name)
 {
     if (this_array != NULL)
@@ -219,6 +286,13 @@ int array_add_team_host_engine_device_sensor(struct array *this_array, char team
 }
 
 
+/**
+ * \fn      int array_add_top_level_sensor(struct array *this_array, char *sensor_name)
+ * \details Add a top-level sensor to the array.
+ * \param   this_array A pointer to the array in question.
+ * \param   sensor_name A string with the intended name for the new sensor.
+ * \return  An integer indicating the outcome, at the moment this is coded always to return 0.
+ */
 int array_add_top_level_sensor(struct array *this_array, char *sensor_name)
 {
     this_array->top_level_sensor_list = realloc(this_array->top_level_sensor_list, \
@@ -229,6 +303,15 @@ int array_add_top_level_sensor(struct array *this_array, char *sensor_name)
 }
 
 
+/**
+ * \fn      int array_update_top_level_sensor(struct array *this_array, char *sensor_name, char *new_value, char *new_status)
+ * \details Update the value and status of a top-level sensor in the array.
+ * \param   this_array A pointer to the array in question.
+ * \param   sensor_name A string containing the name of the sensor to update.
+ * \param   new_value A string containing the new value to write to the sensor.
+ * \param   new_status A string containing the new status to write to the sensor.
+ * \return  An integer indicating the outcome of the operation.
+ */
 int array_update_top_level_sensor(struct array *this_array, char *sensor_name, char *new_value, char *new_status)
 {
     size_t i;
@@ -244,12 +327,25 @@ int array_update_top_level_sensor(struct array *this_array, char *sensor_name, c
 }
 
 
+/**
+ * \fn      void array_mark_suspect(struct array *this_array)
+ * \details Mark the array as possibly dead. If its name comes back in an #array-list, then it'll be cleared, otherwise it'll be presumed dead
+ *          and garbage-collected.
+ * \param   this_array A pointer to the array in question.
+ * \return  void
+ */
 void array_mark_suspect(struct array *this_array)
 {
     this_array->array_is_active = 0;
 }
 
 
+/**
+ * \fn      int array_check_suspect(struct array *this_array)
+ * \details Check whether the array is suspect.
+ * \param   this_array A pointer to the array in question.
+ * \return  0 if it's okay, 1 if it's suspect, -1 if the pointer is null.
+ */
 int array_check_suspect(struct array *this_array)
 {
     if (this_array != NULL)
@@ -259,12 +355,24 @@ int array_check_suspect(struct array *this_array)
 }
 
 
+/**
+ * \fn      void array_mark_fine(struct array *this_array)
+ * \details Mark the array as fine.
+ * \param   this_array A pointer to the array in question.
+ * \return  void
+ */
 void array_mark_fine(struct array *this_array)
 {
     this_array->array_is_active = 1;
 }
 
 
+/**
+ * \fn      int array_functional(struct array *this_array)
+ * \details Check whether the array is functional. An array is not functional if either of the KATCP connections is disconnected.
+ * \param   this_array A pointer to the array in question.
+ * \return  1 if both connections are active, -1 if either isn't active.
+ */
 int array_functional(struct array *this_array)
 {
     if (this_array->control_state == ARRAY_DISCONNECTED || this_array->monitor_state == ARRAY_DISCONNECTED)
@@ -274,6 +382,16 @@ int array_functional(struct array *this_array)
 }
 
 
+/**
+ * \fn      char *array_get_sensor_value(struct array *this_array, char team_type, size_t host_number, char *device_name, char *sensor_name)
+ * \details Get the value of a sensor from the array.
+ * \param   this_array A pointer to the array in question.
+ * \param   team_type The type of host which holds the sensor.
+ * \param   host_number The index of the host in the team.
+ * \param   device_name A string containing the name of the device which contains the sensor.
+ * \param   sensor_name A string containing the name of the sensor to be queried.
+ * \return  A string containing the value of the queried sensor.
+ */
 char *array_get_sensor_value(struct array *this_array, char team_type, size_t host_number, char *device_name, char *sensor_name)
 {
     if (this_array != NULL)
@@ -289,7 +407,16 @@ char *array_get_sensor_value(struct array *this_array, char team_type, size_t ho
 }
 
 
-char *array_get_sensor_status(struct array *this_array, char team_type, size_t host_number, char *device_name, char *sensor_name)
+/**
+ * \fn      char *array_get_sensor_status(struct array *this_array, char team_type, size_t host_number, char *device_name, char *sensor_name)
+ * \details Get the value of a sensor from the array.
+ * \param   this_array A pointer to the array in question.
+ * \param   team_type The type of host which holds the sensor.
+ * \param   host_number The index of the host in the team.
+ * \param   device_name A string containing the name of the device which contains the sensor.
+ * \param   sensor_name A string containing the name of the sensor to be queried.
+ * \return  A string containing the status of the queried sensor.
+ */char *array_get_sensor_status(struct array *this_array, char team_type, size_t host_number, char *device_name, char *sensor_name)
 {
     if (this_array != NULL)
     {
@@ -305,6 +432,17 @@ char *array_get_sensor_status(struct array *this_array, char team_type, size_t h
 }
 
 
+/**
+ * \fn      void array_set_fds(struct array *this_array, fd_set *rd, fd_set *wr, int *nfds)
+ * \details This function sets both read and write file desciptors according to the state that the array's state machines are in.
+ *          the rd file descriptor will almost always be set if the connection is active, with the wr file descriptor set only if there
+ *          is a message waiting to be sent.
+ * \param   this_array A pointer to the array in question.
+ * \param   rd A pointer to the fd_set indicating ready to read.
+ * \param   wr A pointer to the fd_set indicating ready to write.
+ * \param   nfds A pointer to an integer indicating the number of file descriptors in the above sets.
+ * \return  void
+ */
 void array_set_fds(struct array *this_array, fd_set *rd, fd_set *wr, int *nfds)
 {
     FD_SET(this_array->control_fd, rd);
@@ -323,6 +461,13 @@ void array_set_fds(struct array *this_array, fd_set *rd, fd_set *wr, int *nfds)
 }
 
 
+/**
+ * \fn      void array_setup_katcp_writes(struct array *this_array)
+ * \details If there is a message waiting to be sent, this function will insert it into the katcl_line, word for word, until it's finished.
+ *          On the next select() loop, the katcl_line will then report that it's ready to write a fully-formed message to the file descriptor.
+ * \param   this_array pointer to the array in question.
+ * \return  void
+ */
 void array_setup_katcp_writes(struct array *this_array)
 {
     if (this_array->current_control_message)
@@ -403,6 +548,15 @@ void array_setup_katcp_writes(struct array *this_array)
 }
 
 
+/**
+ * \fn      void array_socket_read_write(struct array *this_array, fd_set *rd, fd_set *wr)
+ * \details Depending on the state that the array's state machines are in, send all transmissions which are ready, and read
+ *          incoming transmissions, storing them in the katcl_line for processing once a fully-formed message is received.
+ * \param   this_array A pointer to the array in question.
+ * \param   rd A pointer to the fd_set indicating ready to read.
+ * \param   wr A pointer to the fd_set indicating ready to write.
+ * \return  void
+ */
 void array_socket_read_write(struct array *this_array, fd_set *rd, fd_set *wr)
 {
     int r;
@@ -448,6 +602,13 @@ void array_socket_read_write(struct array *this_array, fd_set *rd, fd_set *wr)
 }
 
 
+/**
+ * \fn      static void array_activate(struct array *this_array)
+ * \details Activate the array. The array will appear on the array-list before it's ready to be connected and probed for all its sensor data.
+ *          Once the array is ready, this function makes all the connections, sets the state-machines up, and gets things going.
+ * \param   this_array A pointer to the array in question.
+ * \return  void
+ */
 static void array_activate(struct array *this_array)
 {
     syslog(LOG_NOTICE, "Detected %s:%s in nominal state, subscribing to sensors.", this_array->cmc_address, this_array->name);
@@ -572,6 +733,13 @@ static void array_activate(struct array *this_array)
 }
 
 
+/**
+ * \fn      void array_handle_received_katcl_lines(struct array *this_array)
+ * \details This function checks whether the katcl_line has any messages ready, and then processes the message, in accordance with the logic of the
+ *          built-in state machine.
+ * \param   this_array A pointer to the array in question.
+ * \return  void
+ */
 void array_handle_received_katcl_lines(struct array *this_array)
 {
     while (have_katcl(this_array->control_katcl_line) > 0)
@@ -854,6 +1022,13 @@ void array_handle_received_katcl_lines(struct array *this_array)
 }
 
 
+/**
+ * \fn      char *array_html_summary(struct array *this_array, char *cmc_name)
+ * \details Generate an HTML summary representation of the array, for when the array is on the main, CMC-list page.
+ * \param   this_array A pointer to the array in question.
+ * \param   cmc_name A string containing the name of the cmc_server that is the array's parent.
+ * \return  A string containing the summary HTML representation of the array.
+ */
 char *array_html_summary(struct array *this_array, char *cmc_name)
 {
     char format[] = "<tr><td><a href=\"%s/%s\">%s</a></td><td>%hu</td><td>%hu</td><td>%lu</td><td>%s</td><td>%s</td>";
@@ -865,6 +1040,12 @@ char *array_html_summary(struct array *this_array, char *cmc_name)
 }
 
 
+/**
+ * \fn      char *array_html_detail(struct array *this_array)
+ * \details Generate an HTML detailed representation of the array, for when the array is the focus.
+ * \param   this_array A pointer to the array in question.
+ * \return  A string with a detailed HTML representation of the array and its children.
+ */
 char *array_html_detail(struct array *this_array)
 {
 
@@ -926,6 +1107,12 @@ char *array_html_detail(struct array *this_array)
 }
 
 
+/**
+ * \fn      struct message *array_control_queue_pop(struct array *this_array)
+ * \details Remove the array's current_control_message (if any), and replaces it with one popped from the outgoing_control_msg_queue.
+ * \param   this_array A pointer to the array in question.
+ * \return  A pointer to the message that was popped from the outgoing_control_msg_queue.
+ */
 struct message *array_control_queue_pop(struct array *this_array)
 {
     if (this_array->current_control_message != NULL)
@@ -937,6 +1124,12 @@ struct message *array_control_queue_pop(struct array *this_array)
 }
 
 
+/**
+ * \fn      struct message *array_monitor_queue_pop(struct array *this_array)
+ * \details Remove the array's current_monitor_message (if any), and replaces it with one popped from the outgoing_monitor_msg_queue.
+ * \param   this_array A pointer to the array in question.
+ * \return  A pointer to the message that was popped from the outgoing_monitor_msg_queue.
+ */
 struct message *array_monitor_queue_pop(struct array *this_array)
 {
     if (this_array->current_monitor_message != NULL)

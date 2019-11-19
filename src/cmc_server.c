@@ -383,12 +383,25 @@ void cmc_server_socket_read_write(struct cmc_server *this_cmc_server, fd_set *rd
 
 
 /**
- * \fn      static int cmpstring(const void *p1, const void *p2)
- * \details Compare two strings, for use with qsort function. Includes casting the pointers appropriately.
+ * \fn      static int cmp_array_by_name(const void *p1, const void *p2)
+ * \details Compare two arrays by their name, for use with qsort function. Includes casting the pointers appropriately and getting their names.
  */
-static int cmpstring(const void *p1, const void *p2)
+static int cmp_array_by_name(const void *p1, const void *p2)
 {
-    return strcmp( *(char * const *) p1, *(char * const *) p2);
+    /* This one was tricky.
+     * qsort passes the compare function, a pointer to the element of the array that it's sorting.
+     * In this case, it's another pointer. So p1 is a pointer to a pointer to a struct array.
+     *
+     * So we create a1 and a2 which are struct array *, like the array_get_name() function expects.
+     * We then need to cast p1 and p2 to struct array **, and dereference once, to get struct array *.
+     */
+    struct array *a1 = *(struct array **) p1;
+    struct array *a2 = *(struct array **) p2;
+
+    char *s1 = array_get_name(a1);
+    char *s2 = array_get_name(a2);
+
+    return strcmp(s1, s2);
 }
 
 
@@ -433,7 +446,7 @@ static int cmc_server_add_array(struct cmc_server *this_cmc_server, char *array_
     syslog(LOG_INFO, "Added array \"%s\" to %s:%hu.", array_name, this_cmc_server->address, this_cmc_server->katcp_port);
     this_cmc_server->no_of_arrays++;
 
-    qsort(this_cmc_server->array_list, this_cmc_server->no_of_arrays, sizeof(*(this_cmc_server->array_list)), cmpstring);
+    qsort(this_cmc_server->array_list, this_cmc_server->no_of_arrays, sizeof(struct array *), cmp_array_by_name);
     return 0;
 }
 

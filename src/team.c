@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
+#include <syslog.h>
 
 #include "team.h"
 #include "host.h"
@@ -167,6 +168,7 @@ int team_set_fhost_input_stream(struct team *this_team, char *input_stream_name,
 {
     if (this_team != NULL)
     {
+        syslog(LOG_INFO, "Setting fhost %lu input stream to %s.", fhost_number, input_stream_name);
         return host_update_input_stream(this_team->host_list[fhost_number], input_stream_name);
     }
     return -1;

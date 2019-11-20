@@ -63,7 +63,7 @@ struct cmc_server *cmc_server_create(char *address, uint16_t katcp_port)
     struct cmc_server *new_cmc_server = malloc(sizeof(*new_cmc_server));
     new_cmc_server->address = strdup(address);
     new_cmc_server->katcp_port = katcp_port;
-    new_cmc_server->katcp_socket_fd = net_connect(address, katcp_port, NETC_VERBOSE_ERRORS | NETC_VERBOSE_STATS | NETC_ASYNC | NETC_TCP_KEEP_ALIVE );
+    new_cmc_server->katcp_socket_fd = net_connect(address, katcp_port, NETC_VERBOSE_ERRORS | NETC_VERBOSE_STATS | NETC_ASYNC | NETC_TCP_KEEP_ALIVE | NETC_TCP_USR_TIMEOUT );
     new_cmc_server->katcl_line = NULL;
     new_cmc_server->outgoing_msg_queue = queue_create();
 
@@ -129,11 +129,11 @@ void cmc_server_destroy(struct cmc_server *this_cmc_server)
  */
 void cmc_server_try_reconnect(struct cmc_server *this_cmc_server)
 {
-    if (this_cmc_server->state == CMC_DISCONNECTED)
+    if (this_cmc_server->state == CMC_DISCONNECTED || this_cmc_server->state == CMC_WAIT_CONNECT)
     {
         close(this_cmc_server->katcp_socket_fd);
         //TODO destroy all the arrays underneath as well?
-        this_cmc_server->katcp_socket_fd = net_connect(this_cmc_server->address, this_cmc_server->katcp_port, NETC_VERBOSE_ERRORS | NETC_VERBOSE_STATS | NETC_ASYNC | NETC_TCP_KEEP_ALIVE);
+        this_cmc_server->katcp_socket_fd = net_connect(this_cmc_server->address, this_cmc_server->katcp_port, NETC_VERBOSE_ERRORS | NETC_VERBOSE_STATS | NETC_ASYNC | NETC_TCP_KEEP_ALIVE | NETC_TCP_USR_TIMEOUT);
         this_cmc_server->state = CMC_WAIT_CONNECT;
     }
 }
@@ -166,7 +166,11 @@ void cmc_server_poll_array_list(struct cmc_server *this_cmc_server)
             cmc_server_queue_pop(this_cmc_server);
         free(message_exists);
         //syslog(LOG_DEBUG, "%s:%hu pushed an array-list poll onto its message queue.", this_cmc_server->address, this_cmc_server->katcp_port);
-        this_cmc_server->state = CMC_SEND_FRONT_OF_QUEUE;
+        if (this_cmc_server->state == CMC_MONITOR)
+        {
+            // If not in monitor state, it's probably still working through some sort of a queue.
+            this_cmc_server->state = CMC_SEND_FRONT_OF_QUEUE;
+        }
     }
 }
 
@@ -358,7 +362,7 @@ void cmc_server_socket_read_write(struct cmc_server *this_cmc_server, fd_set *rd
                 r = read_katcl(this_cmc_server->katcl_line);
                 if (r)
                 {
-                    fprintf(stderr, "read from %s:%hu on fd %d failed\n", this_cmc_server->address, this_cmc_server->katcp_port, this_cmc_server->katcp_socket_fd);
+                    syslog(LOG_ERR, "read from %s:%hu on fd %d failed\n", this_cmc_server->address, this_cmc_server->katcp_port, this_cmc_server->katcp_socket_fd);
                     /*TODO some kind of error checking, what to do if the CMC doesn't connect.*/
                     this_cmc_server->state = CMC_DISCONNECTED;
                 }
@@ -370,6 +374,7 @@ void cmc_server_socket_read_write(struct cmc_server *this_cmc_server, fd_set *rd
                 if (r < 0)
                 {
                     /*TODO some other kind of error checking.*/
+                    syslog(LOG_ERR, "write to %s:%hu on fd %d failed\n", this_cmc_server->address, this_cmc_server->katcp_port, this_cmc_server->katcp_socket_fd);
                     this_cmc_server->state = CMC_DISCONNECTED;
                 }
             }

@@ -262,6 +262,9 @@ int main(int argc, char **argv)
      *********************************/
 
     time_t last_array_list_poll = time(0);
+    struct timespec timeout;
+    timeout.tv_sec = 1;
+    timeout.tv_nsec = 0;
 
     while (!stop)
     {
@@ -293,20 +296,28 @@ int main(int argc, char **argv)
             web_client_set_fds(client_list[i], &rd, &wr, &nfds);
         }
         
-        r = pselect(nfds + 1, &rd, &wr, NULL, NULL, &orig_mask);
+        r = pselect(nfds + 1, &rd, &wr, NULL, &timeout, &orig_mask);
 
-        /*if (r == 0) //timeout
+        if (r == -1 && errno == EINTR)
+            continue; // Just interrupted, not a problem.
+
+        if (r < 0)
+        {
+            syslog(LOG_CRIT, "pselect() error! Must exit now.");
+            perror("pselect()");
+            exit(EXIT_FAILURE);
+        }
+
+        if (r == 0) //timeout
         {
             for (i = 0; i < num_cmcs; i++)
             {
                 //This will only do something if it has disconnected.
                 cmc_server_try_reconnect(cmc_list[i]);
-                
-                //re-request array list
             }
-        }*/
+        }
 
-        if (r > 0) //==0 means timeout, <0 means error. TODO Could possibly be interrupt, which can just be ignored.
+        if (r > 0) 
         {
             //handle reads and writes from the CMC servers, to let them update anything that they need to.
             for (i = 0; i < num_cmcs; i++)

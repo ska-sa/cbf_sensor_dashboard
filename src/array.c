@@ -807,7 +807,7 @@ void array_handle_received_katcl_lines(struct array *this_array)
                         if (arg_string_katcl(this_array->control_katcl_line, 5) != NULL)
                         {
                             char *sensor_value = strdup(arg_string_katcl(this_array->control_katcl_line, 5));
-                            syslog(LOG_INFO, "(%s:%s) Received input-lableling: %s", this_array->cmc_address, this_array->name, sensor_value);
+                            syslog(LOG_INFO, "(%s:%s) Received input-labelling: %s", this_array->cmc_address, this_array->name, sensor_value);
                             
                             //hacky. No fixed width fields, but we can tokenise stuff and get it in the correct order.
                             size_t i = 0;
@@ -827,7 +827,7 @@ void array_handle_received_katcl_lines(struct array *this_array)
                                 strtok(NULL, delims);
                                 strtok(NULL, delims);
                                 strtok(NULL, delims);
-                            } while (i++ < this_array->n_antennas);
+                            } while (++i < this_array->n_antennas);
 
                             free(sensor_value);
                         }

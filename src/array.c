@@ -1065,13 +1065,13 @@ char *array_html_detail(struct array *this_array)
             sprintf(tl_sensors_rep, tl_sensors_format, tl_sensors_rep, sensor_get_status(this_array->top_level_sensor_list[i]), \
                     sensor_get_name(this_array->top_level_sensor_list[i]));
         }
-        char format[] = "<p align=\"right\">%s Last updated: %s (%d seconds ago).</p>";
+        char format[] = "<p align=\"right\">%s - %s %s Last updated: %s (%d seconds ago).</p>";
         char time_str[20];
         struct tm *last_updated_tm = localtime(&this_array->last_updated);
         strftime(time_str, 20, "%F %T", last_updated_tm);
-        ssize_t needed = snprintf(NULL, 0, format, tl_sensors_rep, time_str, (int)(time(0) - this_array->last_updated)) + 1;
+        ssize_t needed = snprintf(NULL, 0, format, this_array->cmc_address, this_array->name, tl_sensors_rep, time_str, (int)(time(0) - this_array->last_updated)) + 1;
         top_detail = realloc(top_detail, (size_t) needed);
-        sprintf(top_detail, format, tl_sensors_rep, time_str, (int)(time(0) - this_array->last_updated));
+        sprintf(top_detail, format, this_array->cmc_address, this_array->name, tl_sensors_rep, time_str, (int)(time(0) - this_array->last_updated));
         free(tl_sensors_rep);
     }
     

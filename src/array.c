@@ -904,6 +904,8 @@ void array_handle_received_katcl_lines(struct array *this_array)
                                   break;
                         case 'x': team_no = 1;
                                   break;
+                        case 'd': // This happens when it's the top-level "device-status" sensor. Expected behaviour.
+                                  break;
                         default:  syslog(LOG_WARNING, "Received unknown team type %c from sensor-status message: %s", team, arg_string_katcl(this_array->monitor_katcl_line, 1));
                     }
                     char *host_no_str = strndup(tokens[0] + 5, 2);

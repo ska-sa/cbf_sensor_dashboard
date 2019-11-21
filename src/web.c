@@ -9,6 +9,7 @@
 
 #include "web.h"
 #include "html.h"
+#include "tokenise.h"
 
 //TODO think about moving these definitions to some central place. Could introduce bugs if not modified properly.
 #define BUF_SIZE 1024
@@ -312,13 +313,20 @@ int web_client_handle_requests(struct web_client *client, struct cmc_server **cm
         }
         else
         {
-            char *requested_cmc = strtok(client->requested_resource + 1, "/"); 
-            //+1 because we aren't interested in the leading /
-            char *requested_array = strtok(NULL, "/");
-            //TODO need to think about accessing the individual devices in the arrays here.
-            if (strtok(NULL, ""))
-            {
-                syslog(LOG_WARNING, "Requested URL too long. Expect <cmc>/<array_name> only.");
+            char **tokens = NULL;
+            size_t n_tokens = tokenise_string(client->requested_resource, '/', &tokens);
+
+            char *requested_cmc;
+            char *requested_array = strdup("");
+
+            switch (n_tokens) {
+                default:
+                syslog(LOG_WARNING, "Requested URL (%s) too long. Expect <cmc>/<array_name> only. Ignoring everything else.", client->requested_resource);
+                case 2: // This means, we're requesting an array that's in one of the CMCs.
+                    free(requested_array);
+                    requested_array = strdup(tokens[1]);
+                case 1: // This means we're just requesting an array directly.
+                    requested_cmc = strdup(tokens[0]);
             }
 
             {
@@ -341,36 +349,56 @@ int web_client_handle_requests(struct web_client *client, struct cmc_server **cm
 
             web_client_buffer_add(client, html_body_open());
 
-            size_t i;
-            for (i = 0; i < num_cmcs; i++)
+            if (strcmp("", requested_array)) //will return a true value if they are not equal, i.e. an array has been requested.
             {
-                if (!strcmp(requested_cmc, cmc_server_get_name(cmc_list[i])))
-                    break;
-            }
-            if (i == num_cmcs)
-            {
-                char format[] = "<p>No cmc named %s.</p>";
-                ssize_t needed = snprintf(NULL, 0, format, requested_cmc) + 1;
-                char *message = malloc((size_t) needed);
-                sprintf(message, format, requested_cmc);
-                web_client_buffer_add(client, message);
-                free(message);
-            }
-            else
-            {
-                int r = cmc_server_check_for_array(cmc_list[i], requested_array);
-                if (r >= 0)
+                size_t i;
+                for (i = 0; i < num_cmcs; i++)
                 {
-                    char *array_detail = array_html_detail(cmc_server_get_array(cmc_list[i], (size_t) r));
-                    web_client_buffer_add(client, array_detail);
-                    free(array_detail);
+                    if (!strcmp(requested_cmc, cmc_server_get_name(cmc_list[i])))
+                        break;
+                }
+                if (i == num_cmcs)
+                {
+                    char format[] = "<p>No cmc named %s.</p>";
+                    ssize_t needed = snprintf(NULL, 0, format, requested_cmc) + 1;
+                    char *message = malloc((size_t) needed);
+                    sprintf(message, format, requested_cmc);
+                    web_client_buffer_add(client, message);
+                    free(message);
                 }
                 else
                 {
-                    char format[] = "<p>%s does not have an array named %s.</p>";
-                    ssize_t needed = snprintf(NULL, 0, format, requested_cmc, requested_array) + 1;
+                    int r = cmc_server_check_for_array(cmc_list[i], requested_array);
+                    if (r >= 0)
+                    {
+                        char *array_detail = array_html_detail(cmc_server_get_array(cmc_list[i], (size_t) r));
+                        web_client_buffer_add(client, array_detail);
+                        free(array_detail);
+                    }
+                    else
+                    {
+                        char format[] = "<p>%s does not have an array named %s.</p>";
+                        ssize_t needed = snprintf(NULL, 0, format, requested_cmc, requested_array) + 1;
+                        char *message = malloc((size_t) needed);
+                        sprintf(message, format, requested_cmc, requested_array);
+                        web_client_buffer_add(client, message);
+                        free(message);
+                    }
+                }
+
+                for (i = 0; i < n_tokens; i++)
+                    free(tokens[i]);
+                free(tokens);
+                free(requested_cmc);
+                free(requested_array);
+            }
+            else // i.e. only one "token" in the requested resource, client has asked for an array directly.
+            {
+                {
+                    char format[] = "<p>Requsted array no %s, direct access to individual arrays not yet supported.</p>";
+                    ssize_t needed = snprintf(NULL, 0, format, requested_cmc) + 1;
                     char *message = malloc((size_t) needed);
-                    sprintf(message, format, requested_cmc, requested_array);
+                    sprintf(message, format, requested_cmc);
                     web_client_buffer_add(client, message);
                     free(message);
                 }
@@ -383,6 +411,7 @@ int web_client_handle_requests(struct web_client *client, struct cmc_server **cm
         client->get_received = 0;
         free(client->requested_resource);
         client->requested_resource = NULL;
+
     }
     //otherwise ignore
     return 0;

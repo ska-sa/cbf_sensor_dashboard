@@ -320,6 +320,7 @@ int main(int argc, char **argv)
         if (r > 0) 
         {
             //handle reads and writes from the CMC servers, to let them update anything that they need to.
+            //This will include the underlying arrays, which are on separate FDs (and ports) but at the same IP address.
             for (i = 0; i < num_cmcs; i++)
             {
                 cmc_server_socket_read_write(cmc_list[i], &rd, &wr);
@@ -357,6 +358,7 @@ int main(int argc, char **argv)
                 }
             }
 
+            //Handle the web clients that have sent us stuff.
             for (i = 0; i < num_web_clients; i++)
             {
                 r = web_client_socket_read(client_list[i], &rd);
@@ -389,7 +391,8 @@ int main(int argc, char **argv)
                 }
            }
 
-           //Doing this a second time because number may have changed, some of them may have disconnected.
+           //Handle web clients that we want to write to.
+           //Looping through list a second time because number may have changed, some of them may have disconnected.
            //Prevents segfaults.
            for (i = 0; i < num_web_clients; i++)
            {

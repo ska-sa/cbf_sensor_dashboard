@@ -214,6 +214,18 @@ char *array_get_name(struct array *this_array)
 
 
 /**
+ * \fn      int array_get_size(struct array *this_array)
+ * \details Get the size (i.e. number of antennas) of the array.
+ * \param   this_array A pointer to the array in question.
+ * \return  The (size_t) number of antennas in the array.
+ */
+size_t array_get_size(struct array *this_array)
+{
+    return this_array->n_antennas;
+}
+
+
+/**
  * \fn      int array_add_team_host_device_sensor(struct array *this_array, char team_type, size_t host_number, char *device_name, char *sensor_name)
  * \details Add a sensor to the array. Parent structures will be created if necessary.
  * \param   this_array A pointer to the array in question.

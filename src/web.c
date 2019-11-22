@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <ctype.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -264,15 +265,16 @@ int web_client_socket_write(struct web_client *client, fd_set *wr)
 
 
 /**
- * \fn      int web_client_handle_requests(struct web_client *client, struct cmc_server **cmc_list, size_t num_cmcs)
+ * \fn      int web_client_handle_requests(struct web_client *client, struct cmc_server **cmc_list, size_t num_cmcs, struct cmc_aggregator *cmc_agg)
  * \details Compose a response to the client based on the requested resource, and the current state of stored data. Push the composed response onto the
  *          web_client's buffer for sending when it's ready.
  * \param   client A pointer to the web_client in question.
  * \param   cmc_list A pointer to the program's list of cmc_server objects, to be able to retrieve the data needed to compose a response.
  * \param   num_cmcs The number of cmc_server objects in the list.
+ * \param   cmc_agg The aggregator of all the arrays in all the cmc_server objects, so that we can access the array objects directly if need be.
  * \return  At present, this function always returns zero to indicate success. Chances of failure are pretty low on modern systems...
  */
-int web_client_handle_requests(struct web_client *client, struct cmc_server **cmc_list, size_t num_cmcs)
+int web_client_handle_requests(struct web_client *client, struct cmc_server **cmc_list, size_t num_cmcs, struct cmc_aggregator *cmc_agg)
 {
     //TODO: check requested resource before sending anything. Probably the correct thing to do is to
     //send a 404 in that case.
@@ -385,17 +387,33 @@ int web_client_handle_requests(struct web_client *client, struct cmc_server **cm
                         free(message);
                     }
                 }
-
-                for (i = 0; i < n_tokens; i++)
-                    free(tokens[i]);
-                free(tokens);
-                free(requested_cmc);
-                free(requested_array);
             }
             else // i.e. only one "token" in the requested resource, client has asked for an array directly.
             {
+
+                int i;
+                struct array *nth_array = NULL;
+
+                //check that the token given is a number.
+                for (i = 0; i < strlen(requested_cmc); i++)
                 {
-                    char format[] = "<p>Requsted array no %s, direct access to individual arrays not yet supported.</p>";
+                    if (!isdigit(requested_cmc[i]))
+                        break;
+                }
+                if (i == strlen(requested_cmc)) //i.e. no breaks out of loop, all elements are digits.
+                {
+                    size_t r = (size_t) atoi(requested_cmc);
+                    nth_array = cmc_aggregator_get_array(cmc_agg, r - 1); // minus one so that we can start indexing at 1.
+                }
+                if (nth_array != NULL)
+                {
+                    char *array_detail = array_html_detail(nth_array);
+                    web_client_buffer_add(client, array_detail);
+                    free(array_detail);
+                }
+                else
+                {
+                    char format[] = "<p>Requsted array %s not accessible! Are you sure it's there?";
                     ssize_t needed = snprintf(NULL, 0, format, requested_cmc) + 1;
                     char *message = malloc((size_t) needed);
                     sprintf(message, format, requested_cmc);
@@ -403,6 +421,13 @@ int web_client_handle_requests(struct web_client *client, struct cmc_server **cm
                     free(message);
                 }
             }
+
+            int i;
+            for (i = 0; i < n_tokens; i++)
+                free(tokens[i]);
+            free(tokens);
+            free(requested_cmc);
+            free(requested_array);
         }
 
         web_client_buffer_add(client, html_body_close());

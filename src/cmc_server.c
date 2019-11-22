@@ -690,6 +690,18 @@ char *cmc_server_html_representation(struct cmc_server *this_cmc_server)
     return cmc_html_rep;
 }
 
+/**
+ * \fn      size_t cmc_server_get_n_arrays(struct cmc_server *this_cmc_server)
+ * \details Return the number of arrays currently being hosted by the CMC server.
+ */
+size_t cmc_server_get_n_arrays(struct cmc_server *this_cmc_server)
+{
+    if (this_cmc_server != NULL)
+        return this_cmc_server->no_of_arrays;
+    else
+        return 0;
+}
+
 
 /**
  * \fn      int cmc_server_check_for_array(struct cmc_server *this_cmc_server, char *array_name)

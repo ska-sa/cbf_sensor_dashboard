@@ -5,6 +5,7 @@
 #include <stddef.h>
 
 #include "cmc_server.h"
+#include "cmc_aggregator.h"
 
 /**
  * \file  web.h
@@ -22,6 +23,6 @@ void web_client_set_fds(struct web_client *client, fd_set *rd, fd_set *wr, int *
 int web_client_socket_read(struct web_client *client, fd_set *rd);
 int web_client_socket_write(struct web_client *client, fd_set *wr);
 
-int web_client_handle_requests(struct web_client *client, struct cmc_server **cmc_list, size_t num_cmcs);
+int web_client_handle_requests(struct web_client *client, struct cmc_server **cmc_list, size_t num_cmcs, struct cmc_aggregator *cmc_agg);
 
 #endif

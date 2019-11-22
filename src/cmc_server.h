@@ -32,6 +32,7 @@ struct message *cmc_server_queue_pop(struct cmc_server *this_cmc_server);
 
 char *cmc_server_html_representation(struct cmc_server *this_cmc_server);
 
+size_t cmc_server_get_n_arrays(struct cmc_server *this_cmc_server);
 int cmc_server_check_for_array(struct cmc_server *this_cmc_server, char *array_name);
 struct array *cmc_server_get_array(struct cmc_server *this_cmc_server, size_t array_number);
 #endif

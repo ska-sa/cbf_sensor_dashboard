@@ -27,6 +27,7 @@
 #include <execinfo.h>
 
 #include "cmc_server.h"
+#include "cmc_aggregator.h"
 #include "message.h"
 #include "tokenise.h"
 #include "utils.h"
@@ -43,7 +44,7 @@
  * set up command line options and arguments
  *********************************/
 const char *argp_program_version =
-  "cbf-sensor-dashboard 1.0";
+  "cbf-sensor-dashboard 1.1";
 const char *argp_program_bug_address =
   "<jsmith@ska.ac.za>";
 /* TODO Program documentation. */
@@ -326,6 +327,9 @@ int main(int argc, char **argv)
                 cmc_server_socket_read_write(cmc_list[i], &rd, &wr);
                 cmc_server_handle_received_katcl_lines(cmc_list[i]);
             }
+
+            //CMCs have been polled for their arrays at this point, set up the aggregator
+            struct cmc_aggregator* cmc_agg = cmc_aggregator_create(cmc_list, num_cmcs);
             
             //Check with the web server to see if a new client wants to connect.
             if (FD_ISSET(server_fd, &rd))
@@ -387,9 +391,11 @@ int main(int argc, char **argv)
                 else
                 {
                     //TODO handle requests.
-                    web_client_handle_requests(client_list[i], cmc_list, num_cmcs);
+                    web_client_handle_requests(client_list[i], cmc_list, num_cmcs, cmc_agg);
                 }
-           }
+            }
+            
+            cmc_aggregator_destroy(cmc_agg);
 
            //Handle web clients that we want to write to.
            //Looping through list a second time because number may have changed, some of them may have disconnected.

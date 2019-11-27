@@ -631,13 +631,15 @@ static void array_activate(struct array *this_array)
 
     {
         struct message *new_message = message_create('?');
-        message_add_word(new_message, "sensor-value");
+        message_add_word(new_message, "sensor-sampling");
         message_add_word(new_message, "hostname-functional-mapping");
+        message_add_word(new_message, "auto");
         queue_push(this_array->outgoing_monitor_msg_queue, new_message);
 
         new_message = message_create('?');
-        message_add_word(new_message, "sensor-value");
+        message_add_word(new_message, "sensor-sampling");
         message_add_word(new_message, "input-labelling");
+        message_add_word(new_message, "auto");
         queue_push(this_array->outgoing_control_msg_queue, new_message);
      } ///TODO figure out some way to deal with this!
 
@@ -811,10 +813,7 @@ void array_handle_received_katcl_lines(struct array *this_array)
                             this_array->config_file = strdup(arg_string_katcl(this_array->control_katcl_line, 5));
                         }
                     }
-                }
-                else if (!strcmp(arg_string_katcl(this_array->control_katcl_line, 0) + 1, "sensor-value"))
-                {
-                    if (!strcmp(arg_string_katcl(this_array->control_katcl_line, 3), "input-labelling"))
+                    else if (!strcmp(arg_string_katcl(this_array->control_katcl_line, 3), "input-labelling"))
                     {
                         if (arg_string_katcl(this_array->control_katcl_line, 5) != NULL)
                         {
@@ -845,14 +844,7 @@ void array_handle_received_katcl_lines(struct array *this_array)
                         }
                         else
                         {
-                            syslog(LOG_ERR, "(%s:%s) Received NULL input-labelling! Requesting again.", this_array->cmc_address, this_array->name);
-                            struct message *new_message = message_create('?');
-                            message_add_word(new_message, "sensor-value");
-                            message_add_word(new_message, "input-labelling");
-                            queue_push(this_array->outgoing_control_msg_queue, new_message);
-                            if (this_array->control_state == ARRAY_MONITOR)
-                                this_array->control_state = ARRAY_SEND_FRONT_OF_QUEUE;
-     
+                            syslog(LOG_WARNING, "(%s:%s) Received NULL input-labelling!", this_array->cmc_address, this_array->name);
                         }
                     }
                 }
@@ -907,74 +899,6 @@ void array_handle_received_katcl_lines(struct array *this_array)
             case '#': // it's a katcp inform
                 if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 0) + 1, "sensor-status"))
                 {
-                    char **tokens = NULL;
-                    size_t n_tokens = tokenise_string(arg_string_katcl(this_array->monitor_katcl_line, 3), '.', &tokens);
-                    char team = tokens[0][0];
-                    size_t team_no;
-                    switch (team) {
-                        case 'f': team_no = 0;
-                                  break;
-                        case 'x': team_no = 1;
-                                  break;
-                        case 'd': // This happens when it's the top-level "device-status" sensor. Expected behaviour.
-                                  break;
-                        default:  syslog(LOG_WARNING, "Received unknown team type %c from sensor-status message: %s", team, arg_string_katcl(this_array->monitor_katcl_line, 1));
-                    }
-                    char *host_no_str = strndup(tokens[0] + 5, 2);
-                    size_t host_no = (size_t) atoi(host_no_str);
-                    free(host_no_str);
-                    host_no_str = NULL;
-
-                    //Sanitise the katcl strings. Nulls cause strdup to segfault.
-                    char *new_value;
-                    if (arg_string_katcl(this_array->monitor_katcl_line, 5) != NULL) //I guess the "!= NULL" is redundant, but I want this to be explicit and readable
-                    {
-                        new_value = strdup(arg_string_katcl(this_array->monitor_katcl_line, 5));
-                    }
-                    else
-                    {
-                        syslog(LOG_DEBUG, "KATCP message from %s:%s for sensor-status %s - null value received.", this_array->cmc_address, this_array->name, arg_string_katcl(this_array->monitor_katcl_line, 3));
-                        new_value = strdup("none");
-                    }
-
-                    char *new_status;
-                    if (arg_string_katcl(this_array->monitor_katcl_line, 4) != NULL) 
-                    {
-                        new_status = strdup(arg_string_katcl(this_array->monitor_katcl_line, 4));
-                    }
-                    else
-                    {
-                        syslog(LOG_DEBUG, "KATCP message from %s:%s for sensor-status %chost%02ld.%s.%s - null status received.", this_array->cmc_address, this_array->name, team, host_no, tokens[1], tokens[2]);
-                        new_status = strdup("none");
-                    }
-
-                    switch (n_tokens) {
-                        case 1:
-                            array_update_top_level_sensor(this_array, tokens[0], new_value, new_status);
-                            break;
-                        case 3:
-                            team_update_sensor(this_array->team_list[team_no], host_no, tokens[1], tokens[2], new_value, new_status);
-                            break;
-                        case 4:
-                            team_update_engine_sensor(this_array->team_list[team_no], host_no, tokens[1], tokens[2], tokens[3], new_value, new_status);
-                            break;
-                        default:
-                            //TODO make this error message a bit more reasonable so that I'd be able to find it if I needed to.
-                            syslog(LOG_ERR, "There was an unexpected number of tokens (%ld) in the message: %s", n_tokens, arg_string_katcl(this_array->monitor_katcl_line, 3)); 
-                    }
-
-                    //Update the time
-                    this_array->last_updated = time(0);
-
-                    size_t i;
-                    for (i = 0; i < n_tokens; i++)
-                        free(tokens[i]);
-                    free(tokens);
-                    free(new_value);
-                    free(new_status);
-                }
-                else if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 0) + 1, "sensor-value"))
-                {
                     if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 3), "hostname-functional-mapping") )
                     {
                         if (arg_string_katcl(this_array->monitor_katcl_line, 5) != NULL)
@@ -1014,14 +938,76 @@ void array_handle_received_katcl_lines(struct array *this_array)
                         }
                         else
                         {
-                            syslog(LOG_ERR, "(%s:%s) Received NULL hostname-functional-mapping! Requesting again.", this_array->cmc_address, this_array->name);
-                            struct message *new_message = message_create('?');
-                            message_add_word(new_message, "sensor-value");
-                            message_add_word(new_message, "hostname-functional-mapping");
-                            queue_push(this_array->outgoing_monitor_msg_queue, new_message);
-                            if (this_array->monitor_state == ARRAY_MONITOR)
-                                this_array->monitor_state = ARRAY_SEND_FRONT_OF_QUEUE;
+                            syslog(LOG_WARNING, "(%s:%s) Received NULL hostname-functional-mapping!", this_array->cmc_address, this_array->name);
                         }
+                    }
+                    else
+                    {
+                        char **tokens = NULL;
+                        size_t n_tokens = tokenise_string(arg_string_katcl(this_array->monitor_katcl_line, 3), '.', &tokens);
+                        char team = tokens[0][0];
+                        size_t team_no;
+                        switch (team) {
+                            case 'f': team_no = 0;
+                                      break;
+                            case 'x': team_no = 1;
+                                      break;
+                            case 'd': // This happens when it's the top-level "device-status" sensor. Expected behaviour.
+                                      break;
+                            default:  syslog(LOG_WARNING, "Received unknown team type %c from sensor-status message: %s", team, arg_string_katcl(this_array->monitor_katcl_line, 1));
+                        }
+                        char *host_no_str = strndup(tokens[0] + 5, 2);
+                        size_t host_no = (size_t) atoi(host_no_str);
+                        free(host_no_str);
+                        host_no_str = NULL;
+
+                        //Sanitise the katcl strings. Nulls cause strdup to segfault.
+                        char *new_value;
+                        if (arg_string_katcl(this_array->monitor_katcl_line, 5) != NULL) //I guess the "!= NULL" is redundant, but I want this to be explicit and readable
+                        {
+                            new_value = strdup(arg_string_katcl(this_array->monitor_katcl_line, 5));
+                        }
+                        else
+                        {
+                            syslog(LOG_DEBUG, "KATCP message from %s:%s for sensor-status %s - null value received.", this_array->cmc_address, this_array->name, arg_string_katcl(this_array->monitor_katcl_line, 3));
+                            new_value = strdup("none");
+                        }
+
+                        char *new_status;
+                        if (arg_string_katcl(this_array->monitor_katcl_line, 4) != NULL) 
+                        {
+                            new_status = strdup(arg_string_katcl(this_array->monitor_katcl_line, 4));
+                        }
+                        else
+                        {
+                            syslog(LOG_DEBUG, "KATCP message from %s:%s for sensor-status %chost%02ld.%s.%s - null status received.", this_array->cmc_address, this_array->name, team, host_no, tokens[1], tokens[2]);
+                            new_status = strdup("none");
+                        }
+
+                        switch (n_tokens) {
+                            case 1:
+                                array_update_top_level_sensor(this_array, tokens[0], new_value, new_status);
+                                break;
+                            case 3:
+                                team_update_sensor(this_array->team_list[team_no], host_no, tokens[1], tokens[2], new_value, new_status);
+                                break;
+                            case 4:
+                                team_update_engine_sensor(this_array->team_list[team_no], host_no, tokens[1], tokens[2], tokens[3], new_value, new_status);
+                                break;
+                            default:
+                                //TODO make this error message a bit more reasonable so that I'd be able to find it if I needed to.
+                                syslog(LOG_ERR, "There was an unexpected number of tokens (%ld) in the message: %s", n_tokens, arg_string_katcl(this_array->monitor_katcl_line, 3)); 
+                        }
+
+                        //Update the time
+                        this_array->last_updated = time(0);
+
+                        size_t i;
+                        for (i = 0; i < n_tokens; i++)
+                            free(tokens[i]);
+                        free(tokens);
+                        free(new_value);
+                        free(new_status);
                     }
                 }
                 /*else if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, -1) + 0, "sensor-list"))
@@ -1077,13 +1063,13 @@ char *array_html_detail(struct array *this_array)
             sprintf(tl_sensors_rep, tl_sensors_format, tl_sensors_rep, sensor_get_status(this_array->top_level_sensor_list[i]), \
                     sensor_get_name(this_array->top_level_sensor_list[i]));
         }
-        char format[] = "<p align=\"right\">%s - %s %s Last updated: %s (%d seconds ago).</p>";
+        char format[] = "<p align=\"right\">CMC: %s | Array name: %s | Config: %s | %s Last updated: %s (%d seconds ago).</p>";
         char time_str[20];
         struct tm *last_updated_tm = localtime(&this_array->last_updated);
         strftime(time_str, 20, "%F %T", last_updated_tm);
-        ssize_t needed = snprintf(NULL, 0, format, this_array->cmc_address, this_array->name, tl_sensors_rep, time_str, (int)(time(0) - this_array->last_updated)) + 1;
+        ssize_t needed = snprintf(NULL, 0, format, this_array->cmc_address, this_array->name, this_array->config_file, tl_sensors_rep, time_str, (int)(time(0) - this_array->last_updated)) + 1;
         top_detail = realloc(top_detail, (size_t) needed);
-        sprintf(top_detail, format, this_array->cmc_address, this_array->name, tl_sensors_rep, time_str, (int)(time(0) - this_array->last_updated));
+        sprintf(top_detail, format, this_array->cmc_address, this_array->name, this_array->config_file, tl_sensors_rep, time_str, (int)(time(0) - this_array->last_updated));
         free(tl_sensors_rep);
     }
     

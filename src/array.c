@@ -311,6 +311,7 @@ int array_add_top_level_sensor(struct array *this_array, char *sensor_name)
             sizeof(*(this_array->top_level_sensor_list))*(this_array->num_top_level_sensors + 1));
     this_array->top_level_sensor_list[this_array->num_top_level_sensors] = sensor_create(sensor_name);
     this_array->num_top_level_sensors++;
+    syslog(LOG_DEBUG, "Adding top-level sensor to array %s:%s, %s. Now have %lu.", this_array->cmc_address, this_array->name, sensor_name, this_array->num_top_level_sensors);
     return 0; //TODO indicate failure somehow.
 }
 
@@ -641,6 +642,7 @@ static void array_activate(struct array *this_array)
         message_add_word(new_message, "input-labelling");
         message_add_word(new_message, "auto");
         queue_push(this_array->outgoing_control_msg_queue, new_message);
+        syslog(LOG_INFO, "Queued a message to subscribe to input-labelling on %s:%s.", this_array->cmc_address, this_array->name);
      } ///TODO figure out some way to deal with this!
 
     //This needs to be hardcoded unfortunately.
@@ -766,6 +768,8 @@ void array_handle_received_katcl_lines(struct array *this_array)
                     if (!strcmp(arg_string_katcl(this_array->control_katcl_line, 1), "ok"))
                     {
                         //Don't actually need to do anything here, the inform processing code should handle.
+                        if (!strcmp(arg_string_katcl(this_array->control_katcl_line, 2), "input-labelling"))
+                            syslog(LOG_INFO, "Received !sensor-sampling input-labelling ok from %s:%s", this_array->cmc_address, this_array->name);
                     }
                     else
                     {
@@ -803,7 +807,9 @@ void array_handle_received_katcl_lines(struct array *this_array)
                              strcmp(this_array->config_file, arg_string_katcl(this_array->control_katcl_line, 5))  ) //without ! in front, i.e. if they are different.
                                                                         //4 is the state, 5 is the config file, so if either one changes the stuff should update.
                         {
-                            if (!strcmp(arg_string_katcl(this_array->control_katcl_line, 4), "nominal")) 
+                            if (!strcmp(arg_string_katcl(this_array->control_katcl_line, 4), "nominal") && strcmp(arg_string_katcl(this_array->control_katcl_line, 5), "none"))
+                                                                                                            //i.e. the config file is not none. Otherwise array_activate potentially
+                                                                                                            //gets run twice.
                             {
                                 array_activate(this_array); 
                             }

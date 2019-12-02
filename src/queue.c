@@ -81,6 +81,10 @@ int queue_push(struct queue *this_queue, struct message *new_message)
     struct message **temp = realloc(this_queue->message_queue, sizeof(*(this_queue->message_queue))*(this_queue->queue_length + 1));
     if (temp != NULL)
     {
+        char *composed_message = message_compose(new_message);
+        syslog(LOG_DEBUG, "Pushing message %s onto queue.", composed_message);
+        free(composed_message);
+        composed_message = NULL;
         temp[this_queue->queue_length] = new_message;
         this_queue->message_queue = temp;
         this_queue->queue_length++;
@@ -114,7 +118,11 @@ struct message *queue_pop(struct queue *this_queue)
         return NULL;
     }
 
-    //copy first word in queue over.
+    char *composed_message = message_compose(this_queue->message_queue[0]);
+    syslog(LOG_DEBUG, "Popping message %s from queue.", composed_message);
+    free(composed_message);
+    composed_message = NULL;
+
     struct message *front_message = message_create(message_get_type(this_queue->message_queue[0]));
     size_t i;
     for (i = 0; i < message_get_number_of_words(this_queue->message_queue[0]); i++)

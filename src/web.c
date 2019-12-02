@@ -233,7 +233,7 @@ int web_client_socket_read(struct web_client *client, fd_set *rd)
         {
             client->get_received = 1;
             client->requested_resource = strdup(strtok(NULL, " "));
-            syslog(LOG_DEBUG, "Client on FD %d requested %s.", client->fd, client->requested_resource);
+            //syslog(LOG_DEBUG, "Client on FD %d requested %s.", client->fd, client->requested_resource);
             return 1; /// \retval 1 Read successful, GET request identified.
         }
         //We're basically ignoring everything except GET requests. We don't even really care about the other stuff.

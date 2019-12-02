@@ -237,6 +237,7 @@ size_t array_get_size(struct array *this_array)
  */
 int array_add_team_host_device_sensor(struct array *this_array, char team_type, size_t host_number, char *device_name, char *sensor_name)
 {
+    syslog(LOG_DEBUG, "Adding sensor %chost%lu.%s.%s to %s:%s.", team_type, host_number, device_name, sensor_name, this_array->cmc_address, this_array->name);
     if (this_array != NULL)
     {
        size_t i;
@@ -274,6 +275,7 @@ int array_add_team_host_device_sensor(struct array *this_array, char team_type, 
  */
 int array_add_team_host_engine_device_sensor(struct array *this_array, char team_type, size_t host_number, char *engine_name, char *device_name, char *sensor_name)
 {
+    syslog(LOG_DEBUG, "Adding sensor %chost%lu.%s.%s.%s to %s:%s.", team_type, host_number, engine_name, device_name, sensor_name, this_array->cmc_address, this_array->name);
     if (this_array != NULL)
     {
         size_t i;
@@ -307,11 +309,11 @@ int array_add_team_host_engine_device_sensor(struct array *this_array, char team
  */
 int array_add_top_level_sensor(struct array *this_array, char *sensor_name)
 {
+    syslog(LOG_DEBUG, "Top-level sensor %s added to %s:%s.", sensor_name, this_array->cmc_address, this_array->name);
     this_array->top_level_sensor_list = realloc(this_array->top_level_sensor_list, \
             sizeof(*(this_array->top_level_sensor_list))*(this_array->num_top_level_sensors + 1));
     this_array->top_level_sensor_list[this_array->num_top_level_sensors] = sensor_create(sensor_name);
     this_array->num_top_level_sensors++;
-    syslog(LOG_DEBUG, "Adding top-level sensor to array %s:%s, %s. Now have %lu.", this_array->cmc_address, this_array->name, sensor_name, this_array->num_top_level_sensors);
     return 0; //TODO indicate failure somehow.
 }
 
@@ -327,6 +329,7 @@ int array_add_top_level_sensor(struct array *this_array, char *sensor_name)
  */
 int array_update_top_level_sensor(struct array *this_array, char *sensor_name, char *new_value, char *new_status)
 {
+    syslog(LOG_DEBUG, "Top-level sensor %s in %s:%s updated with %s - %s", sensor_name, this_array->cmc_address, this_array->name, new_value, new_status);
     size_t i;
     for (i = 0; i < this_array->num_top_level_sensors; i++)
     {
@@ -642,7 +645,6 @@ static void array_activate(struct array *this_array)
         message_add_word(new_message, "input-labelling");
         message_add_word(new_message, "auto");
         queue_push(this_array->outgoing_control_msg_queue, new_message);
-        syslog(LOG_INFO, "Queued a message to subscribe to input-labelling on %s:%s.", this_array->cmc_address, this_array->name);
      } ///TODO figure out some way to deal with this!
 
     //This needs to be hardcoded unfortunately.
@@ -760,6 +762,13 @@ void array_handle_received_katcl_lines(struct array *this_array)
 {
     while (have_katcl(this_array->control_katcl_line) > 0)
     {
+	syslog(LOG_DEBUG, "Receved katcp message on %s:%s (control) - %s %s %s %s %s", this_array->cmc_address, this_array->name,
+			arg_string_katcl(this_array->control_katcl_line, 0),
+			arg_string_katcl(this_array->control_katcl_line, 1),
+			arg_string_katcl(this_array->control_katcl_line, 2),
+			arg_string_katcl(this_array->control_katcl_line, 3),
+			arg_string_katcl(this_array->control_katcl_line, 4));
+
         char received_message_type = arg_string_katcl(this_array->control_katcl_line, 0)[0];
         switch (received_message_type) {
             case '!': // it's a katcp response
@@ -768,8 +777,9 @@ void array_handle_received_katcl_lines(struct array *this_array)
                     if (!strcmp(arg_string_katcl(this_array->control_katcl_line, 1), "ok"))
                     {
                         //Don't actually need to do anything here, the inform processing code should handle.
-                        if (!strcmp(arg_string_katcl(this_array->control_katcl_line, 2), "input-labelling"))
-                            syslog(LOG_INFO, "Received !sensor-sampling input-labelling ok from %s:%s", this_array->cmc_address, this_array->name);
+			char *composed_message = message_compose(this_array->current_control_message);
+			syslog(LOG_DEBUG, "Waiting message was: %s", composed_message);
+			free(composed_message);
                     }
                     else
                     {
@@ -866,6 +876,14 @@ void array_handle_received_katcl_lines(struct array *this_array)
     while (have_katcl(this_array->monitor_katcl_line) > 0)
     {
         char received_message_type = arg_string_katcl(this_array->monitor_katcl_line, 0)[0];
+
+	syslog(LOG_DEBUG, "Receved katcp message on %s:%s (monitor) - %s %s %s %s %s", this_array->cmc_address, this_array->name,
+			arg_string_katcl(this_array->monitor_katcl_line, 0),
+			arg_string_katcl(this_array->monitor_katcl_line, 1),
+			arg_string_katcl(this_array->monitor_katcl_line, 2),
+			arg_string_katcl(this_array->monitor_katcl_line, 3),
+			arg_string_katcl(this_array->monitor_katcl_line, 4));
+
         switch (received_message_type) {
             case '!': // it's a katcp response
                 if (this_array->current_monitor_message)
@@ -875,6 +893,9 @@ void array_handle_received_katcl_lines(struct array *this_array)
                         if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 1), "ok"))
                         {
                             //Don't actually need to do anything here, the inform processing code should handle.
+		            char *composed_message = message_compose(this_array->current_control_message);
+			    syslog(LOG_DEBUG, "Waiting message was: %s", composed_message);
+			    free(composed_message);
                         }
                         else
                         {

@@ -52,8 +52,6 @@ struct array {
     /// The IP address or (resolvable) hostname of the CMC which is controlling the correlator.
     char *cmc_address;
 
-    /// The time at which the array should be activated. Give new arrays a bit of a breather so that we don't get funny conditions happening.
-    time_t activate_after;
     /// The time at which the most recent information was received from the array. Useful as a debug indicator of whether the connection is still alive.
     time_t last_updated;
 
@@ -372,8 +370,6 @@ int array_check_suspect(struct array *this_array)
         return -1;
 }
 
-//Need this here so that the function below can use it.
-static void array_activate(struct array *this_array);
 
 /**
  * \fn      void array_mark_fine(struct array *this_array)
@@ -384,13 +380,6 @@ static void array_activate(struct array *this_array);
 void array_mark_fine(struct array *this_array)
 {
     this_array->array_is_active = 1;
-    if (this_array->activate_after)
-    {
-        if (time(0) >= this_array->activate_after)
-        {
-            array_activate(this_array);
-        }
-    }
 }
 
 
@@ -639,8 +628,6 @@ void array_socket_read_write(struct array *this_array, fd_set *rd, fd_set *wr)
 static void array_activate(struct array *this_array)
 {
     syslog(LOG_NOTICE, "Detected %s:%s in nominal state, subscribing to sensors.", this_array->cmc_address, this_array->name);
-    //Don't activate it again.
-    this_array->activate_after = 0;
     FILE *config_file = fopen(SENSOR_LIST_CONFIG_FILE, "r");
 
     char buffer[BUF_SIZE];
@@ -760,8 +747,12 @@ static void array_activate(struct array *this_array)
     }
     array_monitor_queue_pop(this_array);
     this_array->monitor_state = ARRAY_SEND_FRONT_OF_QUEUE;
-    array_control_queue_pop(this_array);
-    this_array->control_state = ARRAY_SEND_FRONT_OF_QUEUE;
+    if (this_array->control_state == ARRAY_MONITOR)
+    {
+        array_control_queue_pop(this_array); 
+        this_array->control_state = ARRAY_SEND_FRONT_OF_QUEUE;
+    } //If it's not in ARRAY_MONITOR state, it means that we're probably activating the array straight away on starting the server.
+      //but if we've been waiting around for a while, we need to get things ticking over a bit.
     fclose(config_file);
 }
 
@@ -789,24 +780,25 @@ void array_handle_received_katcl_lines(struct array *this_array)
             case '!': // it's a katcp response
                 if (!strcmp(arg_string_katcl(this_array->control_katcl_line, 0) + 1, message_see_word(this_array->current_control_message, 0)))
                 {
+                    char *composed_message = message_compose(this_array->current_control_message);
                     if (!strcmp(arg_string_katcl(this_array->control_katcl_line, 1), "ok"))
                     {
                         //Don't actually need to do anything here, the inform processing code should handle.
-                        char *composed_message = message_compose(this_array->current_control_message);
                         syslog(LOG_DEBUG, "Waiting message was: %s", composed_message);
-                        free(composed_message);
                     }
                     else
                     {
-                        //sensor obviously doesn't exist.
-                        //sensor_mark_absent(); // TODO somehow. How will this propagate down? -- this is needed to indicate that there's something wrong in the config file.
+                        //re-request. We'll put a warning message, just in case, but we'll assume config files are correct.
+                        syslog(LOG_WARNING, "(%s:%s) Fail response to '%s' received. Queue resending...", this_array->cmc_address, this_array->name, composed_message);
+                        queue_push(this_array->outgoing_control_msg_queue, this_array->current_control_message);
+                        this_array->current_control_message = NULL; //null the pointer, but don't destroy it, because the actual object is now on the queue again.
                     }
-
-                    this_array->control_state = ARRAY_SEND_FRONT_OF_QUEUE;
+                    free(composed_message);
 
                     if (queue_sizeof(this_array->outgoing_control_msg_queue))
                     {
                         array_control_queue_pop(this_array);
+                        this_array->control_state = ARRAY_SEND_FRONT_OF_QUEUE;
                     }
                     else
                     {
@@ -836,8 +828,7 @@ void array_handle_received_katcl_lines(struct array *this_array)
                                                                                                             //i.e. the config file is not none. Otherwise array_activate potentially
                                                                                                             //gets run twice.
                             {
-                                //array_activate(this_array); 
-                                this_array->activate_after = time(0) + 60;
+                                array_activate(this_array); 
                             }
                             free(this_array->instrument_state);
                             this_array->instrument_state = strdup(arg_string_katcl(this_array->control_katcl_line, 4));
@@ -906,24 +897,25 @@ void array_handle_received_katcl_lines(struct array *this_array)
                 {
                     if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 0) + 1, message_see_word(this_array->current_monitor_message, 0)))
                     {
+                        char *composed_message = message_compose(this_array->current_monitor_message);
                         if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 1), "ok"))
                         {
                             //Don't actually need to do anything here, the inform processing code should handle.
-                            char *composed_message = message_compose(this_array->current_monitor_message);
                             syslog(LOG_DEBUG, "Waiting message was: %s", composed_message);
-                            free(composed_message);
                         }
                         else
                         {
-                            //sensor obviously doesn't exist.
-                            //sensor_mark_absent(); // somehow. How will this propagate down?
+                            //re-request. We'll put a warning message, just in case, but we'll assume config files are correct.
+                            syslog(LOG_WARNING, "(%s:%s) Fail response to '%s' received. Queue resending...", this_array->cmc_address, this_array->name, composed_message);
+                            queue_push(this_array->outgoing_monitor_msg_queue, this_array->current_monitor_message);
+                            this_array->current_monitor_message = NULL; //null the pointer, but don't destroy it, because the actual object is now on the queue again.
                         }
-
-                        this_array->monitor_state = ARRAY_SEND_FRONT_OF_QUEUE;
+                        free(composed_message);
 
                         if (queue_sizeof(this_array->outgoing_monitor_msg_queue))
                         {
                             array_monitor_queue_pop(this_array);
+                            this_array->monitor_state = ARRAY_SEND_FRONT_OF_QUEUE;
                         }
                         else
                         {

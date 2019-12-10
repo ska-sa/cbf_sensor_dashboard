@@ -161,7 +161,7 @@ void cmc_server_poll_array_list(struct cmc_server *this_cmc_server)
         message_add_word(new_message, "array-list");
         queue_push(this_cmc_server->outgoing_msg_queue, new_message);
         char *message_exists = message_compose(this_cmc_server->current_message);
-       	// Don't just check for null, because a message might exists with zero words in it somehow. If it composes to a usable string, then it's legit.
+       	// Don't just check for null, because a message might exist with zero words in it somehow. If it composes to a usable string, then it's legit.
         if (!message_exists)
             cmc_server_queue_pop(this_cmc_server);
         free(message_exists);

@@ -15,7 +15,3 @@ that are running.
 
 If there were no errors, the softare is now installed as a systemd service, and should run more or less continuously. Point a browser to `localhost`, or the IP or hostname of the computer on which the software is installed, if from another machine.
 
-### Known issues:
-
-* If connection to the CMC servers is lost, it is unlikely to recover by itself. The software may need to be restarted.
-    * `sudo systemctl restart cbf_sensor_dashboard` will do the trick.

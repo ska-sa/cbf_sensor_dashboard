@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
@@ -262,6 +263,42 @@ char *team_get_sensor_status(struct team *this_team, size_t host_number, char *d
     }
     return NULL;
 
+}
+
+
+/**
+ * \fn      char** team_get_stagnant_sensor_names(struct team *this_team, time_t stagnant_time, size_t *number_of_sensors)
+ * \details Get a list of names of the team's sensors (via its child hosts) which haven't been updated for a specified amount of time.
+ * \param   this_team A pointer to the team.
+ * \param   stagnant_time The time in seconds above which sensors should be reported stagnant.
+ * \param   number_of_sensors A pointer to an integer so that the function can return the number of sensors in the list.
+ * \return  A pointer to an array of strings containing the names of the team's stagnant sensors.
+ */
+char** team_get_stagnant_sensor_names(struct team *this_team, time_t stagnant_time, size_t *number_of_sensors)
+{
+    *number_of_sensors = 0;
+
+    char **sensor_names = NULL;
+    int i;
+    for (i = 0; i < this_team->number_of_antennas; i++)
+    {
+        size_t batch_n_sensors;
+        char **batch_sensor_names = host_get_stagnant_sensor_names(this_team->host_list[i], stagnant_time, &batch_n_sensors);
+        sensor_names = realloc(sensor_names, sizeof(*sensor_names)*(*number_of_sensors + batch_n_sensors));
+        int j;
+        for (j = 0; j < batch_n_sensors; j++)
+        {
+            ssize_t needed = snprintf(NULL, 0, "%c%s", this_team->host_type, batch_sensor_names[j]) + 1;
+            sensor_names[*number_of_sensors + (size_t) j] = malloc((size_t) needed);
+            sprintf(sensor_names[*number_of_sensors + (size_t) j], "%c%s", this_team->host_type, batch_sensor_names[j]);
+            free(batch_sensor_names[j]);
+        }
+        free(batch_sensor_names);
+        *number_of_sensors += batch_n_sensors;
+    }
+    if (*number_of_sensors)
+        syslog(LOG_DEBUG, "%chosts reported %ld stagnant sensor%s.", this_team->host_type, *number_of_sensors, *number_of_sensors == 1 ? "" : "s");
+    return sensor_names;
 }
 
 

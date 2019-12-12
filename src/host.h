@@ -24,8 +24,11 @@ int host_update_input_stream(struct host *this_host, char *new_input_stream_name
 
 char *host_get_sensor_value(struct host *this_host, char *device_name, char *sensor_name);
 char *host_get_sensor_status(struct host *this_host, char *device_name, char *sensor_name);
+time_t host_get_sensor_time(struct host *this_host, char *device_name, char *sensor_name);
 int host_update_sensor(struct host *this_host, char *device_name, char *sensor_name, char *new_sensor_value, char *new_sensor_status);
 int host_update_engine_sensor(struct host *this_host, char *engine_name, char *device_name, char *sensor_name, char *new_sensor_value, char *new_sensor_status);
+
+char **host_get_stagnant_sensor_names(struct host *this_host, time_t stagnant_time, size_t *number_of_sensors);
 
 char *host_html_detail(struct host *this_host);
 #endif

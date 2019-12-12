@@ -41,4 +41,6 @@ struct message *array_monitor_queue_pop(struct array *this_array);
 char *array_html_summary(struct array *this_array, char *cmc_name);
 char *array_html_detail(struct array *this_array);
 
+char** array_get_stagnant_sensor_names(struct array *this_array, time_t stagnant_time, size_t *number_of_sensors);
+
 #endif

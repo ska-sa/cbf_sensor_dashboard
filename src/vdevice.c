@@ -2,9 +2,13 @@
 #include <string.h>
 #include <stdio.h>
 #include <syslog.h>
+#include <time.h>
 
 #include "vdevice.h"
 #include "engine.h"
+
+#undef max
+#define max(x,y) ((x) > (y) ? (x) : (y))
 
 /// A struct to represent a "virtual" (compound) device - consisting of a number of identical devices in 
 /// engines co-existing on the same host.
@@ -136,6 +140,7 @@ char *vdevice_get_name(struct vdevice *this_vdevice)
  */
 char *vdevice_get_status(struct vdevice *this_vdevice)
 {
+    //TODO: vdevice_update_status can probably be merged with vdevice_get_status - there's not really any reason not to at this point. Either that or, update_status any time the sensor-value is updated. That's going to be a bit more tricky though.
     vdevice_update_status(this_vdevice);
     return this_vdevice->status;
 }
@@ -150,9 +155,17 @@ char *vdevice_get_status(struct vdevice *this_vdevice)
  */
 char *vdevice_html_summary(struct vdevice *this_vdevice)
 {
-    char format[] = "<td class=\"%s\">%s</td>";
-    ssize_t needed = snprintf(NULL, 0, format, vdevice_get_status(this_vdevice), this_vdevice->name) + 1;
+    char format[] = "<td class=\"%s\">%s (%u)</td>";
+    time_t last_updated = 0;
+    int i;
+    for (i = 0; i < *(this_vdevice->number_of_engines); i++)
+    {
+        time_t temp_time = engine_get_sensor_time((*this_vdevice->engine_list)[i], this_vdevice->name, "device-status");
+        last_updated = max(last_updated, temp_time);
+    }
+    last_updated = time(0) - last_updated; // to get the time since last updated, instead of absolute time.
+    ssize_t needed = snprintf(NULL, 0, format, vdevice_get_status(this_vdevice), this_vdevice->name, last_updated) + 1;
     char *html_summary = malloc((size_t) needed);
-    sprintf(html_summary, format, vdevice_get_status(this_vdevice), this_vdevice->name);
+    sprintf(html_summary, format, vdevice_get_status(this_vdevice), this_vdevice->name, last_updated);
     return html_summary;
 }

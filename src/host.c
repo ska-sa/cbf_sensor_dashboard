@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <syslog.h>
 
 #include "host.h"
 #include "device.h"
@@ -335,6 +336,30 @@ char *host_get_sensor_status(struct host *this_host, char *device_name, char *se
 
 
 /**
+ * \fn      time_t host_get_sensor_time(struct host *this_host, char *device_name, char *sensor_name)
+ * \details Get the last updated time from a sensor on the host.
+ * \param   this_host A pointer to the host in question.
+ * \param   device_name A string with the name of the device which contains the desired sensor.
+ * \param   sensor_name A string contianing the name of the sensor to be retrieved.
+ * \return  A string containing the sensor time for the desired sensor. This is not newly allocated and must
+ *          not be freed. NULL if the process failed.
+ */
+time_t host_get_sensor_time(struct host *this_host, char *device_name, char *sensor_name)
+{
+    int i;
+    for (i = 0; i < this_host->number_of_devices; i++)
+    {
+        if (!strcmp(device_name, device_get_name(this_host->device_list[i])))
+        {
+            return device_get_sensor_time(this_host->device_list[i], sensor_name);
+        }
+    }
+
+    return 0;
+}
+
+
+/**
  * \fn      int host_update_sensor(struct host *this_host, char *device_name, char *sensor_name, char *new_sensor_value, char *new_sensor_status)
  * \details Update the value and status of one of the sensors on the host.
  * \param   this_host A pointer to the host in question.
@@ -380,6 +405,60 @@ int host_update_engine_sensor(struct host *this_host, char *engine_name, char *d
         }
     }
     return -1;
+}
+
+
+/**
+ * \fn      char **host_get_stagnant_sensor_names(struct host *this_host, time_t stagnant_time, size_t *number_of_sensors);
+ * \details Get a list of names of the host's sensors (via its devices and engines) which haven't been updated for a specified amount of time.
+ * \param   this_host A pointer to the host.
+ * \param   stagnant_time The time in seconds above which sensors should be reported stagnant.
+ * \param   number_of_sensors A pointer to an integer so that the function can return the number of sensors in the list.
+ * \return  A pointer to an array of strings containing the names of the host's stagnant sensors.
+ */
+char **host_get_stagnant_sensor_names(struct host *this_host, time_t stagnant_time, size_t *number_of_sensors)
+{
+    *number_of_sensors = 0;
+
+    char **sensor_names = NULL;
+    int i;
+    for (i = 0; i < this_host->number_of_devices; i++)
+    {
+        size_t batch_n_sensors;
+        char **batch_sensor_names = device_get_stagnant_sensor_names(this_host->device_list[i], stagnant_time, &batch_n_sensors);
+        sensor_names = realloc(sensor_names, sizeof(*sensor_names)*(*number_of_sensors + batch_n_sensors));
+        int j;
+        for (j = 0; j < batch_n_sensors; j++)
+        {
+            ssize_t needed = snprintf(NULL, 0, "host%02d.%s", this_host->host_number, batch_sensor_names[j]) + 1;
+            sensor_names[*number_of_sensors + (size_t) j] = malloc((size_t) needed);
+            sprintf(sensor_names[*number_of_sensors + (size_t) j], "host%02d.%s", this_host->host_number, batch_sensor_names[j]);
+            free(batch_sensor_names[j]);
+        }
+        free(batch_sensor_names);
+        *number_of_sensors += batch_n_sensors;
+    }
+
+    for (i = 0; i < this_host->number_of_engines; i++)
+    {
+        size_t batch_n_sensors;
+        char **batch_sensor_names = engine_get_stagnant_sensor_names(this_host->engine_list[i], stagnant_time, &batch_n_sensors);
+        sensor_names = realloc(sensor_names, sizeof(*sensor_names)*(*number_of_sensors + batch_n_sensors));
+        int j;
+        for (j = 0; j < batch_n_sensors; j++)
+        {
+            ssize_t needed = snprintf(NULL, 0, "host%02d.%s", this_host->host_number, batch_sensor_names[j]) + 1;
+            sensor_names[*number_of_sensors + (size_t) j] = malloc((size_t) needed);
+            sprintf(sensor_names[*number_of_sensors + (size_t) j], "host%02d.%s", this_host->host_number, batch_sensor_names[j]);
+            free(batch_sensor_names[j]);
+        }
+        free(batch_sensor_names);
+        *number_of_sensors += batch_n_sensors;
+    }
+
+    if (*number_of_sensors)
+        syslog(LOG_DEBUG, "host%d reported %ld stagnant sensor%s.", this_host->host_number, *number_of_sensors, *number_of_sensors == 1 ? "" : "s");
+    return sensor_names;
 }
 
 

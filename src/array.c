@@ -373,13 +373,39 @@ int array_check_suspect(struct array *this_array)
 
 /**
  * \fn      void array_mark_fine(struct array *this_array)
- * \details Mark the array as fine.
+ * \details Mark the array as fine. Also check whether there are any stagnant sensors under the array, and
+ *          re-request them as necessary.
  * \param   this_array A pointer to the array in question.
  * \return  void
  */
 void array_mark_fine(struct array *this_array)
 {
     this_array->array_is_active = 1;
+    //request sensor-value stagnant sensors just in case we missed something.
+    size_t n_stagnant_sensors = 0;
+    char **stagnant_sensors = array_get_stagnant_sensor_names(this_array, 60, &n_stagnant_sensors);
+
+    size_t i;
+    for (i = 0; i < n_stagnant_sensors; i++)
+    {
+        struct message *new_message = message_create('?');
+        message_add_word(new_message, "sensor-value");
+        message_add_word(new_message, stagnant_sensors[i]);
+        queue_push(this_array->outgoing_monitor_msg_queue, new_message);
+    }
+
+    for (i = 0; i < n_stagnant_sensors; i++)
+        free(stagnant_sensors[i]);
+    free(stagnant_sensors);
+
+    if (n_stagnant_sensors)
+    {
+        if (this_array->monitor_state == ARRAY_MONITOR)
+        {
+            array_monitor_queue_pop(this_array);
+            this_array->monitor_state = ARRAY_SEND_FRONT_OF_QUEUE;
+        }
+    }
 }
 
 
@@ -1091,12 +1117,13 @@ char *array_html_detail(struct array *this_array)
         char *tl_sensors_rep = strdup("");
         for (i = 0; i < this_array->num_top_level_sensors; i++)
         {
-            char tl_sensors_format[] = "%s<button class=\"%s\" style=\"width:300px\">%s</button> ";
+            char tl_sensors_format[] = "%s<button class=\"%s\" style=\"width:300px\">%s (%u)</button> ";
+            time_t last_updated = time(0) - sensor_get_last_updated(this_array->top_level_sensor_list[i]);
             ssize_t needed = snprintf(NULL, 0, tl_sensors_format, tl_sensors_rep, sensor_get_status(this_array->top_level_sensor_list[i]), \
-                    sensor_get_name(this_array->top_level_sensor_list[i])) + 1;
+                    sensor_get_name(this_array->top_level_sensor_list[i]), last_updated) + 1;
             tl_sensors_rep = realloc(tl_sensors_rep, (size_t) needed); //TODO check for -1
             sprintf(tl_sensors_rep, tl_sensors_format, tl_sensors_rep, sensor_get_status(this_array->top_level_sensor_list[i]), \
-                    sensor_get_name(this_array->top_level_sensor_list[i]));
+                    sensor_get_name(this_array->top_level_sensor_list[i]), last_updated);
         }
         char format[] = "<p align=\"right\">CMC: %s | Array name: %s | Config: %s | %s Last updated: %s (%d seconds ago).</p>";
         char time_str[20];
@@ -1174,3 +1201,48 @@ struct message *array_monitor_queue_pop(struct array *this_array)
     this_array->current_monitor_message = queue_pop(this_array->outgoing_monitor_msg_queue);
     return this_array->current_monitor_message;
 }
+
+/**
+ * \fn      char** array_get_stagnant_sensor_names(struct array *this_array, time_t stagnant_time, size_t *number_of_sensors)
+ * \details Get a list of names of the array's sensors (via its child teams) which haven't been updated for a specified amount of time.
+ * \param   this_array A pointer to the array.
+ * \param   stagnant_time The time in seconds above which sensors should be reported stagnant.
+ * \param   number_of_sensors A pointer to an integer so that the function can return the number of sensors in the list.
+ * \return  A pointer to an array of strings containing the names of the array's stagnant sensors.
+ */
+char** array_get_stagnant_sensor_names(struct array *this_array, time_t stagnant_time, size_t *number_of_sensors)
+{
+    *number_of_sensors = 0;
+    char **sensor_names = NULL;
+    int i;
+    for (i = 0; i < this_array->num_top_level_sensors; i++)
+    {
+        if (time(0) >= sensor_get_last_updated(this_array->top_level_sensor_list[i]) + stagnant_time)
+        {
+            sensor_names = realloc(sensor_names, sizeof(*sensor_names)*(*number_of_sensors + 1));
+            sensor_names[(*number_of_sensors)++] = strdup(sensor_get_name(this_array->top_level_sensor_list[i]));
+        }
+    }
+
+    for (i = 0; i < this_array->number_of_teams; i++)
+    {
+        size_t batch_n_sensors;
+        char **batch_sensor_names = team_get_stagnant_sensor_names(this_array->team_list[i], stagnant_time, &batch_n_sensors);
+        sensor_names = realloc(sensor_names, sizeof(*sensor_names)*(*number_of_sensors + batch_n_sensors));
+        int j;
+        for (j = 0; j < batch_n_sensors; j++)
+        {
+            sensor_names[*number_of_sensors + (size_t) j] = strdup(batch_sensor_names[j]);
+            free(batch_sensor_names[j]); //can do it here I guess, no need to through another loop?
+        }
+        free(batch_sensor_names);
+        *number_of_sensors += batch_n_sensors;
+    }
+
+    if (*number_of_sensors)
+        syslog(LOG_DEBUG, "Array %s reported %ld stagnant sensor%s.", this_array->name, *number_of_sensors, *number_of_sensors == 1 ? "" : "s");
+    return sensor_names;
+
+} 
+
+

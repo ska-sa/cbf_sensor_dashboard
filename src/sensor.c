@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "sensor.h"
 
@@ -11,6 +12,8 @@ struct sensor {
     char *value;
     /// The sensor's status - this could be one of [nominal, warn, error, failure, unknown, unreachable, inactive] according to the KATCP spec.
     char *status;
+    /// The time at which the most recent information about the sensor was received.
+    time_t last_updated;
 };
 
 
@@ -112,9 +115,27 @@ int sensor_update(struct sensor *this_sensor, char *new_value, char *new_status)
     this_sensor->status = strdup(new_status);
 
     if (this_sensor->value != NULL && this_sensor->status != NULL)
+    {
+        this_sensor->last_updated = time(0);
         return 0; /// \retval 0 The update was successful.
+    }
     else
         return -1; /// \retval -1 The sensor object exists but its member strings weren't successfully updated.
 }
 
+
+/**
+ * \fn      time_t sensor_get_last_updated(struct sensor *this_sensor)
+ * \details Get the last time that the sensor was updated.
+ * \param   this_sensor A pointer to the sensor in question.
+ * \return   The time in seconds of the sensor's last update.
+ */
+time_t sensor_get_last_updated(struct sensor *this_sensor)
+{
+    if (this_sensor != NULL)
+    {
+        return this_sensor->last_updated;
+    }
+    return 0;
+}
 

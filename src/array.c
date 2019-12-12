@@ -1117,13 +1117,17 @@ char *array_html_detail(struct array *this_array)
         char *tl_sensors_rep = strdup("");
         for (i = 0; i < this_array->num_top_level_sensors; i++)
         {
-            char tl_sensors_format[] = "%s<button class=\"%s\" style=\"width:300px\">%s (%u)</button> ";
-            time_t last_updated = time(0) - sensor_get_last_updated(this_array->top_level_sensor_list[i]);
+            //leaving these lines in, in case I want to bring this (debug) feature back
+            //char tl_sensors_format[] = "%s<button class=\"%s\" style=\"width:300px\">%s (%u)</button> ";
+            char tl_sensors_format[] = "%s<button class=\"%s\" style=\"width:300px\">%s</button> ";
+            //time_t last_updated = time(0) - sensor_get_last_updated(this_array->top_level_sensor_list[i]);
             ssize_t needed = snprintf(NULL, 0, tl_sensors_format, tl_sensors_rep, sensor_get_status(this_array->top_level_sensor_list[i]), \
-                    sensor_get_name(this_array->top_level_sensor_list[i]), last_updated) + 1;
+                    //sensor_get_name(this_array->top_level_sensor_list[i]), last_updated) + 1;
+                    sensor_get_name(this_array->top_level_sensor_list[i])) + 1;
             tl_sensors_rep = realloc(tl_sensors_rep, (size_t) needed); //TODO check for -1
             sprintf(tl_sensors_rep, tl_sensors_format, tl_sensors_rep, sensor_get_status(this_array->top_level_sensor_list[i]), \
-                    sensor_get_name(this_array->top_level_sensor_list[i]), last_updated);
+                    //sensor_get_name(this_array->top_level_sensor_list[i]), last_updated);
+                    sensor_get_name(this_array->top_level_sensor_list[i]));
         }
         char format[] = "<p align=\"right\">CMC: %s | Array name: %s | Config: %s | %s Last updated: %s (%d seconds ago).</p>";
         char time_str[20];

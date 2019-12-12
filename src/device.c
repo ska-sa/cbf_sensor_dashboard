@@ -226,11 +226,15 @@ int device_update_sensor(struct device *this_device, char *sensor_name, char *ne
  */
 char *device_html_summary(struct device *this_device)
 {
-    char format[] = "<td class=\"%s\">%s (%u)</td>";
-    /// TODO some kind of check in case the device doens't have a "device-status" sensor.
-    time_t last_updated = time(0) - device_get_sensor_time(this_device, "device-status");
-    ssize_t needed = snprintf(NULL, 0, format, device_get_sensor_status(this_device, "device-status"), this_device->name, last_updated) + 1;
+    //leaving these lines in, in case I want to bring this feature back.
+    //char format[] = "<td class=\"%s\">%s (%u)</td>";
+    char format[] = "<td class=\"%s\">%s</td>";
+    // TODO some kind of check in case the device doens't have a "device-status" sensor.
+    //time_t last_updated = time(0) - device_get_sensor_time(this_device, "device-status");
+    //ssize_t needed = snprintf(NULL, 0, format, device_get_sensor_status(this_device, "device-status"), this_device->name, last_updated) + 1;
+    ssize_t needed = snprintf(NULL, 0, format, device_get_sensor_status(this_device, "device-status"), this_device->name) + 1;
     char *html_summary = malloc((size_t) needed);
-    sprintf(html_summary, format, device_get_sensor_status(this_device, "device-status"), this_device->name, last_updated);
+    //sprintf(html_summary, format, device_get_sensor_status(this_device, "device-status"), this_device->name, last_updated);
+    sprintf(html_summary, format, device_get_sensor_status(this_device, "device-status"), this_device->name);
     return html_summary;
 }

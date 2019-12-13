@@ -631,16 +631,16 @@ char *cmc_server_html_representation(struct cmc_server *this_cmc_server)
          case CMC_DISCONNECTED:
             {
                 char format[] = "<h1>%s</h1>\n<p>Could not connect to CMC server...</p>\n";
-                ssize_t needed = snprintf(NULL, 0, format, this_cmc_server->address) + 1;
+                ssize_t needed = snprintf(NULL, 0, format, this_cmc_server->address, this_cmc_server->allocated_skarabs, this_cmc_server->up_skarabs, this_cmc_server->standby_skarabs) + 1;
                 cmc_html_rep = malloc((size_t) needed);
-                sprintf(cmc_html_rep, format, this_cmc_server->address);
+                sprintf(cmc_html_rep, format, this_cmc_server->address, this_cmc_server->allocated_skarabs, this_cmc_server->up_skarabs, this_cmc_server->standby_skarabs);
                 return cmc_html_rep;
             }
             break;
         default:
             if (this_cmc_server->no_of_arrays < 1)
             {
-                char format[] = "<h1>%s</h1>\n<p>No arrays currently running.</p>\n";
+                char format[] = "<h1>%s</h1>\n<p>No arrays currently running.</p><p>Allocated SKARABS: %lu</p><p>Up SKARABS: %lu</p><p>Standby SKARABs: %lu</p>";
                 ssize_t needed = snprintf(NULL, 0, format, this_cmc_server->address) + 1;
                 cmc_html_rep = malloc((size_t) needed);
                 sprintf(cmc_html_rep, format, this_cmc_server->address);

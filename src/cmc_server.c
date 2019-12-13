@@ -47,6 +47,12 @@ struct cmc_server {
     struct array **array_list;
     /// The number of arrays in the list.
     size_t no_of_arrays;
+    /// The number of skarabs marked as "standby".
+    size_t standby_skarabs;
+    /// The number of skarabs marked "up" but not in arrays.
+    size_t up_skarabs;
+    /// The number of skarabs allocated to an array.
+    size_t allocated_skarabs;
 };
 
 
@@ -85,6 +91,14 @@ struct cmc_server *cmc_server_create(char *address, uint16_t katcp_port)
     new_message = message_create('?');
     message_add_word(new_message, "array-list");
     queue_push(new_cmc_server->outgoing_msg_queue, new_message);
+
+    new_message = message_create('?');
+    message_add_word(new_message, "resource-list");
+    queue_push(new_cmc_server->outgoing_msg_queue, new_message);
+
+    new_cmc_server->standby_skarabs = 0;
+    new_cmc_server->up_skarabs = 0;
+    new_cmc_server->allocated_skarabs = 0;
 
     new_cmc_server->current_message = NULL;
     cmc_server_queue_pop(new_cmc_server);
@@ -160,6 +174,15 @@ void cmc_server_poll_array_list(struct cmc_server *this_cmc_server)
         struct message *new_message = message_create('?');
         message_add_word(new_message, "array-list");
         queue_push(this_cmc_server->outgoing_msg_queue, new_message);
+        //Ask about the current resources.
+        new_message = message_create('?');
+        message_add_word(new_message, "resource-list");
+        queue_push(this_cmc_server->outgoing_msg_queue, new_message);
+        //reset counters to zero so we can count them again when the responses come.
+        this_cmc_server->standby_skarabs = 0;
+        this_cmc_server->up_skarabs = 0;
+        this_cmc_server->allocated_skarabs = 0;
+
         char *message_exists = message_compose(this_cmc_server->current_message);
        	// Don't just check for null, because a message might exist with zero words in it somehow. If it composes to a usable string, then it's legit.
         if (!message_exists)
@@ -525,7 +548,6 @@ void cmc_server_handle_received_katcl_lines(struct cmc_server *this_cmc_server)
                 }
                 break;
             case '#': // it's a katcp inform
-                /*TODO handle the array-list stuff. code should be easy enough to copy from previous attempt.*/
                 if (!strcmp(arg_string_katcl(this_cmc_server->katcl_line, 0) + 1, "array-list"))
                 {
                     char* array_name = arg_string_katcl(this_cmc_server->katcl_line, 1);
@@ -561,57 +583,24 @@ void cmc_server_handle_received_katcl_lines(struct cmc_server *this_cmc_server)
                     cmc_server_add_array(this_cmc_server, array_name, control_port, monitor_port, number_of_antennas);
                     //TODO check if return is proper.
                 }
-                /* //going to ignore these for the time being.
-                else if (!strcmp(arg_string_katcl(this_cmc_server->katcl_line, 0) + 1, "group-created"))
+                else if (!strcmp(arg_string_katcl(this_cmc_server->katcl_line, 0) + 1, "resource-list"))
                 {
-                    char *temp = arg_string_katcl(this_cmc_server->katcl_line, 1);
-                    char *new_array_name = malloc(strlen(temp)); //This is bigger than it strictly needs to be, but I'm lazy at the moment.
-                    sprintf(new_array_name, "%s", strtok(temp, "."));
-                    temp = strtok(NULL, ".");
-                    if (!strcmp(temp, "monitor")) //i.e. ignore otherwise. Not interested in the "control" group.
+                    if (!strcmp(arg_string_katcl(this_cmc_server->katcl_line, 2), "standby"))
                     {
-                        verbose_message(INFO, "Noticed new array: %s\n", new_array_name);
-                        //The #group-created message doesn't tell us the port that the new array is on,
-                        //or the number of antennas. So we'll request the array-list again. Exisitng arrays
-                        //will not be modified (checks for them by name as in above function) but the new one
-                        //will be added to the end of the list.
-                        struct message *new_message = message_create('?');
-                        message_add_word(new_message, "array-list");
-                        int r = queue_push(this_cmc_server->outgoing_msg_queue, new_message);
-                        if (r<0)
-                            verbose_message(ERROR, "Couldn't push message onto the queue.\n");
-                        if (!this_cmc_server->current_message)
-                            cmc_server_queue_pop(this_cmc_server);
-                        this_cmc_server->state = CMC_SEND_FRONT_OF_QUEUE;
+                        this_cmc_server->standby_skarabs++;
                     }
-                    free(new_array_name);
-                }
-                else if (!strcmp(arg_string_katcl(this_cmc_server->katcl_line, 0) + 1, "group-destroyed"))
-                {
-                    char *name_of_removed_array = strtok(arg_string_katcl(this_cmc_server->katcl_line, 1), ".");
-                    if (!strcmp(strtok(NULL, "."), "monitor")) //again, not concerned about the control one.
+                    else if (!strcmp(arg_string_katcl(this_cmc_server->katcl_line, 2), "up"))
                     {
-                        size_t j;
-                        for (j = 0; j < this_cmc_server->no_of_arrays; j++)
+                        if (arg_string_katcl(this_cmc_server->katcl_line, 3)) //i.e. if it's not NULL
                         {
-                            if (!strcmp(name_of_removed_array, array_get_name(this_cmc_server->array_list[j])))
-                                break;
-                        }
-                        if (j == this_cmc_server->no_of_arrays)
-                        {
-                            verbose_message(WARNING, "%s:%hu has indicated that array %s is being destroyed, but we weren't aware of it.\n", this_cmc_server->address, this_cmc_server->katcp_port, name_of_removed_array);
+                            this_cmc_server->allocated_skarabs++;
                         }
                         else
                         {
-                            verbose_message(INFO, "%s:%hu destroying array %s.\n", this_cmc_server->address, this_cmc_server->katcp_port, name_of_removed_array);
-                            array_destroy(this_cmc_server->array_list[j]);
-                            memmove(&this_cmc_server->array_list[j], &this_cmc_server->array_list[j+1], sizeof(*(this_cmc_server->array_list))*(this_cmc_server->no_of_arrays - j - 1));
-                            this_cmc_server->array_list = realloc(this_cmc_server->array_list, sizeof(*(this_cmc_server->array_list))*(this_cmc_server->no_of_arrays - 1));
-                            //TODO should probably do the sanitary thing here and use a temp variable. Lazy right now.
-                            this_cmc_server->no_of_arrays--;
+                            this_cmc_server->up_skarabs++;
                         }
                     }
-                }*/
+                }
                 break;
             default:
                 syslog(LOG_NOTICE, "Unexpected KATCP message received, starting with %c", received_message_type);
@@ -680,11 +669,11 @@ char *cmc_server_html_representation(struct cmc_server *this_cmc_server)
             }
 
             {
-                char *format = "%s</table>\n";
-                ssize_t needed = snprintf(NULL, 0, format, cmc_html_rep) + 1;
+                char *format = "%s</table><p>Allocated SKARABS: %lu</p><p>Up SKARABS: %lu</p><p>Standby SKARABs: %lu</p>";
+                ssize_t needed = snprintf(NULL, 0, format, cmc_html_rep, this_cmc_server->allocated_skarabs, this_cmc_server->up_skarabs, this_cmc_server->standby_skarabs) + 1;
                 //TODO checks
                 cmc_html_rep = realloc(cmc_html_rep, (size_t) needed);
-                sprintf(cmc_html_rep, format, cmc_html_rep);
+                sprintf(cmc_html_rep, format, cmc_html_rep, this_cmc_server->allocated_skarabs, this_cmc_server->up_skarabs, this_cmc_server->standby_skarabs);
             }
     }
     return cmc_html_rep;

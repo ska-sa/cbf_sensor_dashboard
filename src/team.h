@@ -20,6 +20,7 @@ int team_set_host_serial_no(struct team *this_team, size_t host_number, char *ho
 char team_get_type(struct team *this_team);
 
 int team_set_fhost_input_stream(struct team *this_team, char *input_stream_name, size_t fhost_number);
+char *team_get_fhost_input_stream(struct team *this_team, size_t fhost_number);
 int team_update_sensor(struct team *this_team, size_t host_number, char *device_name, char*sensor_name, char *new_sensor_value, char *new_sensor_status);
 int team_update_engine_sensor(struct team *this_team, size_t host_number, char *engine_name, char *device_name, char *sensor_name, char *new_sensor_value, char *new_sensor_status);
 

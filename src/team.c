@@ -177,6 +177,19 @@ int team_set_fhost_input_stream(struct team *this_team, char *input_stream_name,
 
 
 /**
+ * \fn      char *team_get_fhost_input_stream(struct team *this_team, size_t fhost_number)
+ * \details Get the fhost's input stream name.
+ * \param   this_team A pointer to the team in question.
+ * \param   fhost_number The index of the fhost which you want.
+ * \return  A string containing the relevant name. This MUST NOT be free()d elsewhere.
+ */
+char *team_get_fhost_input_stream(struct team *this_team, size_t fhost_number)
+{
+    return host_get_input_stream(this_team->host_list[fhost_number]);
+}
+
+
+/**
  * \fn      int team_update_sensor(struct team *this_team, size_t host_number, char *device_name, char*sensor_name, char *new_sensor_value, char *new_sensor_status)
  * \details Update a sensor on one of the hosts in the team.
  * \param   this_team A pointer to the team in question.

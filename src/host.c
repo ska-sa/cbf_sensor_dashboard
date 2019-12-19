@@ -280,6 +280,19 @@ int host_update_input_stream(struct host *this_host, char *new_input_stream_name
 
 
 /**
+ * \fn      char *host_get_input_stream(struct host *this_host)
+ * \details Get the input-stream name (normally the MeerKAT antenna name) going to the host.
+ *          Mostly applicable to fhosts.
+ * \param   this_host A pointer to the host in question.
+ * \return  A string containing the name of the host's input stream. This MUST NOT be free()'d elsewhere.
+ */
+char *host_get_input_stream(struct host *this_host)
+{
+    return this_host->host_input_stream_name;
+}
+
+
+/**
  * \fn      char *host_get_sensor_value(struct host *this_host, char *device_name, char *sensor_name)
  * \details Get the value from a sensor on the host.
  * \param   this_host A pointer to the host in question.

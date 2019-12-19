@@ -1158,7 +1158,7 @@ char *array_html_detail(struct array *this_array)
                     //sensor_get_name(this_array->top_level_sensor_list[i]), last_updated);
                     sensor_get_name(this_array->top_level_sensor_list[i]));
         }
-        char format[] = "<p align=\"right\">CMC: %s | Array name: %s | Config: %s | %s Last updated: %s (%d seconds ago). <a href=\"%s/%s/missing-pkts\">mpkts</a></p>";
+        char format[] = "<p align=\"right\">CMC: %s | Array name: %s | Config: %s | %s Last updated: %s (%d seconds ago). <button style=\"width:7%\"><a href=\"/%s/%s/missing-pkts\">missing-pkts</a></button></p>";
         char time_str[20];
         struct tm *last_updated_tm = localtime(&this_array->last_updated);
         strftime(time_str, 20, "%F %T", last_updated_tm);
@@ -1212,15 +1212,21 @@ char *array_html_detail(struct array *this_array)
 char *array_html_missing_pkt_view(struct array *this_array)
 {
     char *top_row_html = strdup("<tr><td> </td>");
+    char *second_row_html = strdup("<tr><td> </td>");
     char *array_html = strdup("");
     int i, j;
     for (i = 0; i < this_array->n_antennas; i++)
     {
-        char top_row_format[] = "%s<td>fhost%02d</td>";
+        char top_row_format[] = "%s<td>f%02d</td>";
+        char second_row_format[] = "%s<td>%s</td>";
         ssize_t needed = snprintf(NULL, 0, top_row_format, top_row_html, i) + 1; //using vertical axis to build column headings,
                                                                         //which should be okay because we assume a square array.
         top_row_html = realloc(top_row_html, (size_t) needed);
         sprintf(top_row_html, top_row_format, top_row_html, i);
+
+        needed = snprintf(NULL, 0, second_row_format, second_row_html, team_get_fhost_input_stream(this_array->team_list[0], (size_t) i)) + 1;
+        second_row_html = realloc(second_row_html, (size_t) needed);
+        sprintf(second_row_html, second_row_format, second_row_html, team_get_fhost_input_stream(this_array->team_list[0], (size_t) i));
 
         char *host_html = strdup("");
         for (j = 0; j < this_array->n_antennas; j++)
@@ -1241,7 +1247,7 @@ char *array_html_missing_pkt_view(struct array *this_array)
             free(sensor_name);
         }
         //syslog(LOG_DEBUG, "Generated host html: %s", host_html);
-        char array_format[] = "%s<tr><td>xhost%02d</td>%s</tr>\n";
+        char array_format[] = "%s<tr><td>x%02d</td>%s</tr>\n";
         needed = snprintf(NULL, 0, array_format, array_html, i, host_html) + 1;
         array_html = realloc(array_html, (size_t) needed);
         sprintf(array_html, array_format, array_html, i, host_html);
@@ -1253,12 +1259,13 @@ char *array_html_missing_pkt_view(struct array *this_array)
     top_row_html = realloc(top_row_html, (size_t) needed);
     sprintf(top_row_html, top_row_format, top_row_html);
 
-    char final_format[] = "<table>%s%s</table>";
-    needed = snprintf(NULL, 0, final_format, top_row_html, array_html) + 1;
+    char final_format[] = "<table>%s%s%s</table>";
+    needed = snprintf(NULL, 0, final_format, top_row_html, second_row_html, array_html) + 1;
     char *final_html = malloc((size_t) needed);
-    sprintf(final_html, final_format, top_row_html, array_html);
+    sprintf(final_html, final_format, top_row_html, second_row_html, array_html);
     free(array_html);
     free(top_row_html);
+    free(second_row_html);
     return final_html;
 }
 

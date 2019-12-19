@@ -320,10 +320,13 @@ int web_client_handle_requests(struct web_client *client, struct cmc_server **cm
 
             char *requested_cmc;
             char *requested_array = strdup("");
+            int requested_missing_pkts = 0;
 
             switch (n_tokens) {
                 default:
                 syslog(LOG_WARNING, "Requested URL (%s) too long. Expect <cmc>/<array_name> only. Ignoring everything else.", client->requested_resource);
+                case 3: // we're ignoring the actual content of the third token, but if it's there, we'll show missing-pkts.
+                    requested_missing_pkts = 1;
                 case 2: // This means, we're requesting an array that's in one of the CMCs.
                     free(requested_array);
                     requested_array = strdup(tokens[1]);
@@ -373,9 +376,18 @@ int web_client_handle_requests(struct web_client *client, struct cmc_server **cm
                     int r = cmc_server_check_for_array(cmc_list[i], requested_array);
                     if (r >= 0)
                     {
-                        char *array_detail = array_html_detail(cmc_server_get_array(cmc_list[i], (size_t) r));
-                        web_client_buffer_add(client, array_detail);
-                        free(array_detail);
+                        if (requested_missing_pkts)
+                        {
+                            char *missing_pkts_detail = array_html_missing_pkt_view(cmc_server_get_array(cmc_list[i], (size_t) r));
+                            web_client_buffer_add(client, missing_pkts_detail);
+                            free(missing_pkts_detail);
+                        }
+                        else
+                        {
+                            char *array_detail = array_html_detail(cmc_server_get_array(cmc_list[i], (size_t) r));
+                            web_client_buffer_add(client, array_detail);
+                            free(array_detail);
+                        }
                     }
                     else
                     {

@@ -44,10 +44,9 @@
  * set up command line options and arguments
  *********************************/
 const char *argp_program_version =
-  "cbf_sensor_dashboard 1.2";
+  "cbf_sensor_dashboard 1.3";
 const char *argp_program_bug_address =
   "<jsmith@ska.ac.za>";
-/* TODO Program documentation. */
 static char doc[] =
   "CBF Sensor Dashboard server";
 static char args_doc[] = "LISTEN_PORT";

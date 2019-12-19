@@ -458,7 +458,8 @@ char *array_get_sensor_value(struct array *this_array, char team_type, size_t ho
  * \param   device_name A string containing the name of the device which contains the sensor.
  * \param   sensor_name A string containing the name of the sensor to be queried.
  * \return  A string containing the status of the queried sensor.
- */char *array_get_sensor_status(struct array *this_array, char team_type, size_t host_number, char *device_name, char *sensor_name)
+ */
+char *array_get_sensor_status(struct array *this_array, char team_type, size_t host_number, char *device_name, char *sensor_name)
 {
     if (this_array != NULL)
     {
@@ -730,13 +731,13 @@ static void array_activate(struct array *this_array)
                     }
                     break;
                 case 3:
-                    {
+                    if (strstr(tokens[1], "eng")) //i.e. the second token contains the word "eng" - so we assume host.eng.device.device-status
+                    {                             // with the "device-status" part being implicit.
                         for (i = 0; i < this_array->n_antennas; i++)
                         {
                             size_t j;
                             for (j = 0; j < 4; j++)
                             {
-                                //TODO formulate engine name.
                                 char *engine_name;
                                 char format[] = "%s%u";
                                 ssize_t needed = snprintf(NULL, 0, format, tokens[1], j) + 1;
@@ -758,6 +759,35 @@ static void array_activate(struct array *this_array)
                                     queue_push(this_array->outgoing_monitor_msg_queue, new_message);
                                 }
                                 free(engine_name);
+                            }
+                        }
+                    }
+                    else //i.e. we assume host.device.sensor
+                         //NB! For the time being, the only case of this is xhost.missing-pkts.fhost%02d-cnt.
+                         //so I'm going to semi-hardcode for that. If another case is required, I'm going to have to format this somewhat differently.
+                    {
+                        for (i = 0; i < this_array->n_antennas; i++)
+                        {
+                            int j;
+                            for (j = 0; j < this_array->n_antennas; j++) //each xengine gets packets from each fengine
+                            {
+                                ssize_t needed = snprintf(NULL, 0, tokens[2], j) + 1;
+                                char *sensor_name = malloc((size_t) needed);
+                                sprintf(sensor_name, tokens[2], j);
+
+                                array_add_team_host_device_sensor(this_array, team_type, i, tokens[1], sensor_name);
+
+                                char format[] = "%chost%02lu.%s.%s";
+                                needed = snprintf(NULL, 0, format, team_type, i, tokens[1], sensor_name) + 1;
+                                char *sensor_string = malloc((size_t) needed);
+                                sprintf(sensor_string, format, team_type, i, tokens[1], sensor_name);
+                                free(sensor_name);
+                                struct message *new_message = message_create('?');
+                                message_add_word(new_message, "sensor-sampling");
+                                message_add_word(new_message, sensor_string);
+                                message_add_word(new_message, "auto");
+                                free(sensor_string);
+                                queue_push(this_array->outgoing_monitor_msg_queue, new_message);
                             }
                         }
                     }
@@ -1109,7 +1139,6 @@ char *array_html_summary(struct array *this_array, char *cmc_name)
  */
 char *array_html_detail(struct array *this_array)
 {
-
     char *top_detail = strdup("");
     {
         //collect the top-level sensors first.
@@ -1129,13 +1158,13 @@ char *array_html_detail(struct array *this_array)
                     //sensor_get_name(this_array->top_level_sensor_list[i]), last_updated);
                     sensor_get_name(this_array->top_level_sensor_list[i]));
         }
-        char format[] = "<p align=\"right\">CMC: %s | Array name: %s | Config: %s | %s Last updated: %s (%d seconds ago).</p>";
+        char format[] = "<p align=\"right\">CMC: %s | Array name: %s | Config: %s | %s Last updated: %s (%d seconds ago). <a href=\"%s/%s/missing-pkts\">mpkts</a></p>";
         char time_str[20];
         struct tm *last_updated_tm = localtime(&this_array->last_updated);
         strftime(time_str, 20, "%F %T", last_updated_tm);
-        ssize_t needed = snprintf(NULL, 0, format, this_array->cmc_address, this_array->name, this_array->config_file, tl_sensors_rep, time_str, (int)(time(0) - this_array->last_updated)) + 1;
+        ssize_t needed = snprintf(NULL, 0, format, this_array->cmc_address, this_array->name, this_array->config_file, tl_sensors_rep, time_str, (int)(time(0) - this_array->last_updated), this_array->cmc_address, this_array->name) + 1;
         top_detail = realloc(top_detail, (size_t) needed);
-        sprintf(top_detail, format, this_array->cmc_address, this_array->name, this_array->config_file, tl_sensors_rep, time_str, (int)(time(0) - this_array->last_updated));
+        sprintf(top_detail, format, this_array->cmc_address, this_array->name, this_array->config_file, tl_sensors_rep, time_str, (int)(time(0) - this_array->last_updated), this_array->cmc_address, this_array->name);
         free(tl_sensors_rep);
     }
     
@@ -1170,6 +1199,67 @@ char *array_html_detail(struct array *this_array)
     free(top_detail);
     free(array_detail);
     return temp;
+}
+
+
+
+/**
+ * \fn      char *array_html_missing_pkt_view(struct array *this_array)
+ * \details Generate an HTML representation of the array's missing-pkt sensors on the xhosts.
+ * \param   this_array A pointer to the array in question.
+ * \return  A string with an HTML representation of the array's missing-pkt sensors.
+ */
+char *array_html_missing_pkt_view(struct array *this_array)
+{
+    char *top_row_html = strdup("<tr><td> </td>");
+    char *array_html = strdup("");
+    int i, j;
+    for (i = 0; i < this_array->n_antennas; i++)
+    {
+        char top_row_format[] = "%s<td>fhost%02d</td>";
+        ssize_t needed = snprintf(NULL, 0, top_row_format, top_row_html, i) + 1; //using vertical axis to build column headings,
+                                                                        //which should be okay because we assume a square array.
+        top_row_html = realloc(top_row_html, (size_t) needed);
+        sprintf(top_row_html, top_row_format, top_row_html, i);
+
+        char *host_html = strdup("");
+        for (j = 0; j < this_array->n_antennas; j++)
+        {
+            //need to know which sensor to ask for
+            char sensor_name_format[] = "fhost%02d-cnt"; 
+            ssize_t needed = snprintf(NULL, 0, sensor_name_format, j) + 1;
+            char *sensor_name = malloc((size_t) needed);
+            sprintf(sensor_name, sensor_name_format, j);
+
+            char html_format[] = "%s<td class=\"%s\">%s</td>";
+            char *sensor_status = array_get_sensor_status(this_array, 'x', i, "missing-pkts", sensor_name);
+            char *sensor_value = array_get_sensor_value(this_array, 'x', i, "missing-pkts", sensor_name);
+            needed = snprintf(NULL, 0, html_format, host_html, sensor_status, sensor_value) + 1;
+            host_html = realloc(host_html, (size_t) needed);
+            sprintf(host_html, html_format, host_html, sensor_status, sensor_value);
+            
+            free(sensor_name);
+        }
+        //syslog(LOG_DEBUG, "Generated host html: %s", host_html);
+        char array_format[] = "%s<tr><td>xhost%02d</td>%s</tr>\n";
+        needed = snprintf(NULL, 0, array_format, array_html, i, host_html) + 1;
+        array_html = realloc(array_html, (size_t) needed);
+        sprintf(array_html, array_format, array_html, i, host_html);
+        free(host_html);
+    }
+
+    char top_row_format[] = "%s</tr>\n";
+    ssize_t needed = snprintf(NULL, 0, top_row_format, top_row_html) + 1;
+    top_row_html = realloc(top_row_html, (size_t) needed);
+    sprintf(top_row_html, top_row_format, top_row_html);
+
+    char final_format[] = "<table>%s%s</table>";
+    needed = snprintf(NULL, 0, final_format, top_row_html, array_html) + 1;
+    char *final_html = malloc((size_t) needed);
+    sprintf(final_html, final_format, top_row_html, array_html);
+    free(array_html);
+    free(top_row_html);
+    return final_html;
 }
 
 

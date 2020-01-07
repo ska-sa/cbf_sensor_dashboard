@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <syslog.h>
+#include <stddef.h>
 
 #include "host.h"
 #include "device.h"
@@ -470,7 +471,7 @@ char **host_get_stagnant_sensor_names(struct host *this_host, time_t stagnant_ti
     }
 
     if (*number_of_sensors)
-        syslog(LOG_DEBUG, "host%d reported %ld stagnant sensor%s.", this_host->host_number, *number_of_sensors, *number_of_sensors == 1 ? "" : "s");
+        syslog(LOG_DEBUG, "%chost%d reported %ld stagnant sensor%s.", this_host->type, this_host->host_number, *number_of_sensors, *number_of_sensors == 1 ? "" : "s");
     return sensor_names;
 }
 

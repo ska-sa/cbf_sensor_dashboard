@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <syslog.h>
+#include <stddef.h>
 
 #include "device.h"
 #include "sensor.h"
@@ -114,7 +115,7 @@ char **device_get_stagnant_sensor_names(struct device *this_device, time_t stagn
     int i;
     for (i = 0; i < this_device->number_of_sensors; i++)
     {
-        if (time(0) >= sensor_get_last_updated(this_device->sensor_list[i]) + stagnant_time)
+        if ((time(0) - stagnant_time) >= sensor_get_last_updated(this_device->sensor_list[i]))
         {
             sensor_names = realloc(sensor_names, sizeof(*sensor_names)*(*number_of_sensors + 1));
             ssize_t needed = snprintf(NULL, 0, "%s.%s", this_device->name, sensor_get_name(this_device->sensor_list[i])) + 1;

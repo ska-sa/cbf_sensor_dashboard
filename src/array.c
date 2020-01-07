@@ -383,7 +383,7 @@ void array_mark_fine(struct array *this_array)
     this_array->array_is_active = 1;
     //request sensor-value stagnant sensors just in case we missed something.
     size_t n_stagnant_sensors = 0;
-    char **stagnant_sensors = array_get_stagnant_sensor_names(this_array, 60, &n_stagnant_sensors);
+    char **stagnant_sensors = array_get_stagnant_sensor_names(this_array, 120, &n_stagnant_sensors);
 
     size_t i;
     for (i = 0; i < n_stagnant_sensors; i++)
@@ -392,20 +392,17 @@ void array_mark_fine(struct array *this_array)
         message_add_word(new_message, "sensor-value");
         message_add_word(new_message, stagnant_sensors[i]);
         queue_push(this_array->outgoing_monitor_msg_queue, new_message);
-    }
 
-    for (i = 0; i < n_stagnant_sensors; i++)
-        free(stagnant_sensors[i]);
-    free(stagnant_sensors);
-
-    if (n_stagnant_sensors)
-    {
         if (this_array->monitor_state == ARRAY_MONITOR)
         {
             array_monitor_queue_pop(this_array);
             this_array->monitor_state = ARRAY_SEND_FRONT_OF_QUEUE;
         }
     }
+
+    for (i = 0; i < n_stagnant_sensors; i++)
+        free(stagnant_sensors[i]);
+    free(stagnant_sensors);
 }
 
 

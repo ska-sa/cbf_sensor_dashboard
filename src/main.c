@@ -106,21 +106,25 @@ static struct argp argp = { options, parse_opt, args_doc, doc };
 static volatile sig_atomic_t stop = 0;
 static void handler(int signo)
 {
-    if (signo == SIGINT || signo == SIGTERM)
-    {
-        syslog(LOG_INFO, "Caught signal to terminate, exiting cleanly...");
-        stop = 1;
-    }
-    else if (signo == SIGSEGV)
-    {
-        void *array[10];
-        int size;
-
-        size = backtrace(array, 10);
-
-        fprintf(stderr, "Error: signal %d:\n", signo);
-        backtrace_symbols_fd(array, size, STDERR_FILENO);
-        exit(1);
+    switch (signo) {
+        case SIGINT:
+        case SIGTERM:
+            syslog(LOG_INFO, "Caught signal to terminate, exiting cleanly...");
+            stop = 1;
+            break;
+        case SIGSEGV:
+            ; //Need this because ... a label can only be part of a statement and a declaration isn't a statement?
+            void *array[10];
+            int size;
+            size = backtrace(array, 10);
+            fprintf(stderr, "Error: signal %d:\n", signo);
+            backtrace_symbols_fd(array, size, STDERR_FILENO);
+            exit(1);
+            break;
+        case SIGPIPE:
+            ; //ignore, nothing to see here...
+        default:
+            ;
     }
 }
 
@@ -378,13 +382,9 @@ int main(int argc, char **argv)
                     else
                     {
                         memmove(&client_list[i], &client_list[i+1], sizeof(*client_list)*(num_web_clients - i - 1));
-                        struct web_client **temp = realloc(client_list, sizeof(*client_list)*(num_web_clients - 1));
-                        if (temp)
-                        {
-                            client_list = temp;
-                            num_web_clients--;
-                            i--;
-                        }
+                        client_list = realloc(client_list, sizeof(*client_list)*(num_web_clients - 1));
+                        num_web_clients--;
+                        i--;
                     }
                 }
                 else

@@ -33,6 +33,7 @@ struct sensor *sensor_create(char *new_name)
         new_sensor->name = strdup(new_name);
         new_sensor->value = strdup("unused");
         new_sensor->status = strdup("unknown");
+        new_sensor->last_updated = 0;
     }
     return new_sensor;
 }

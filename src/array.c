@@ -48,6 +48,8 @@ struct array {
     size_t number_of_teams;
     /// The number of antennas to which this array can connect (i.e. the size of the correlator).
     size_t n_antennas;
+    /// The number of xhosts. This may be different from the number of antennas in the narrowband case.
+    size_t n_xhosts;
 
     /// The IP address or (resolvable) hostname of the CMC which is controlling the correlator.
     char *cmc_address;
@@ -106,6 +108,7 @@ struct array *array_create(char *new_array_name, char *cmc_address, uint16_t con
         new_array->name = strdup(new_array_name);
         new_array->array_is_active = 1;
         new_array->n_antennas = n_antennas;
+        new_array->n_xhosts = 0; // We don't know this in advance.
         new_array->cmc_address = strdup(cmc_address);
 
         new_array->last_updated = time(0);
@@ -393,6 +396,9 @@ void array_mark_fine(struct array *this_array)
         message_add_word(new_message, stagnant_sensors[i]);
         queue_push(this_array->outgoing_monitor_msg_queue, new_message);
 
+        syslog(LOG_DEBUG, "%s:%s monitor queue now has %zd messages waiting.",
+                this_array->cmc_address, this_array->name, queue_sizeof(this_array->outgoing_monitor_msg_queue)));
+
         if (this_array->monitor_state == ARRAY_MONITOR)
         {
             array_monitor_queue_pop(this_array);
@@ -651,6 +657,8 @@ void array_socket_read_write(struct array *this_array, fd_set *rd, fd_set *wr)
  */
 static void array_activate(struct array *this_array)
 {
+    //if (strstr(this_array->name, "narrow"))
+    //    return;
     syslog(LOG_NOTICE, "Detected %s:%s in nominal state, subscribing to sensors.", this_array->cmc_address, this_array->name);
     FILE *config_file = fopen(SENSOR_LIST_CONFIG_FILE, "r");
 
@@ -669,7 +677,12 @@ static void array_activate(struct array *this_array)
         message_add_word(new_message, "input-labelling");
         message_add_word(new_message, "auto");
         queue_push(this_array->outgoing_control_msg_queue, new_message);
-     } ///TODO figure out some way to deal with this!
+
+        new_message = message_create('?');
+        message_add_word(new_message, "sensor-value");
+        message_add_word(new_message, "n-xeng-hosts");
+        queue_push(this_array->outgoing_control_msg_queue, new_message);
+     }
 
     //This needs to be hardcoded unfortunately.
     array_add_top_level_sensor(this_array, "device-status");
@@ -843,8 +856,25 @@ void array_handle_received_katcl_lines(struct array *this_array)
                     {
                         //re-request. We'll put a warning message, just in case, but we'll assume config files are correct.
                         syslog(LOG_WARNING, "(%s:%s) Fail response to '%s' received. Queue resending...", this_array->cmc_address, this_array->name, composed_message);
-                        queue_push(this_array->outgoing_control_msg_queue, this_array->current_control_message);
-                        this_array->current_control_message = NULL; //null the pointer, but don't destroy it, because the actual object is now on the queue again.
+                        //If sensor value requests are failing, it could be that we are looking for xhosts that don't exist.
+                        char *r;
+                        if ((r = strstr(composed_message, "xhost")))
+                        {
+                            char *xhost_n_chr = strndup(r, 2);
+                            int xhost_n = atoi(xhost_n_chr);
+                            free(xhost_n_chr);
+                            if (xhost_n < this_array->n_xhosts)
+                            {
+                                queue_push(this_array->outgoing_control_msg_queue, this_array->current_control_message);
+                            }
+                            else
+                            {
+                                message_destroy(this_array->current_control_message);
+                            }
+                        }
+                        else
+                            queue_push(this_array->outgoing_control_msg_queue, this_array->current_control_message);
+                        this_array->current_control_message = NULL;
                     }
                     free(composed_message);
 
@@ -924,8 +954,19 @@ void array_handle_received_katcl_lines(struct array *this_array)
                         }
                     }
                 }
-                else if (!strcmp(arg_string_katcl(this_array->control_katcl_line, 0) + 1, "sensor-list"))
+                else if (!strcmp(arg_string_katcl(this_array->control_katcl_line, 0) + 1, "sensor-value"))
                 {
+                    if (arg_string_katcl(this_array->control_katcl_line, 5) != NULL)
+                    {
+                        if (!strcmp(arg_string_katcl(this_array->control_katcl_line, 3), "n-xeng-hosts"))
+                        {
+                            this_array->n_xhosts = (size_t) atoi(arg_string_katcl(this_array->control_katcl_line, 5));
+                        }
+                    }
+                    else
+                    {
+                        syslog(LOG_WARNING, "(%s:%s) Received NULL sensor-value!", this_array->cmc_address, this_array->name);
+                    }
                 }
                 break;
             default:
@@ -1211,7 +1252,7 @@ char *array_html_missing_pkt_view(struct array *this_array)
     char *top_row_html = strdup("<tr><td> </td>");
     char *second_row_html = strdup("<tr><td> </td>");
     char *array_html = strdup("");
-    int i, j;
+    size_t i, j;
     for (i = 0; i < this_array->n_antennas; i++)
     {
         char top_row_format[] = "%s<td>f%02d</td>";

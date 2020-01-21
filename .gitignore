@@ -2,3 +2,4 @@
 *.swp
 scratchpad/**
 obj/**
+bin/cbf_sensor_dashboard

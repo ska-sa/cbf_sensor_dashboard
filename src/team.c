@@ -202,7 +202,7 @@ char *team_get_fhost_input_stream(struct team *this_team, size_t fhost_number)
  */
 int team_update_sensor(struct team *this_team, size_t host_number, char *device_name, char *sensor_name, char *new_sensor_value, char *new_sensor_status)
 {
-    syslog(LOG_DEBUG, "Updating %chost%lu.%s.%s with %s - %s.", this_team->host_type, host_number, device_name, sensor_name, new_sensor_value, new_sensor_status);
+    //syslog(LOG_DEBUG, "Updating %chost%lu.%s.%s with %s - %s.", this_team->host_type, host_number, device_name, sensor_name, new_sensor_value, new_sensor_status);
     if (this_team != NULL)
     {
         if (host_number >= this_team->number_of_antennas)

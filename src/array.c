@@ -87,6 +87,9 @@ struct array {
     struct queue *outgoing_monitor_msg_queue;
     /// The most recently sent message.
     struct message *current_monitor_message;
+
+    /// Stores whether or not we have received the hostname-functional-mapping for the array, helps save time.
+    int hostname_functional_mapping_received;
 };
 
 
@@ -154,6 +157,8 @@ struct array *array_create(char *new_array_name, char *cmc_address, uint16_t con
         new_array->team_list = malloc(sizeof(new_array->team_list)*(new_array->number_of_teams));
         new_array->team_list[0] = team_create('f', new_array->n_antennas);
         new_array->team_list[1] = team_create('x', new_array->n_antennas);
+
+        new_array->hostname_functional_mapping_received = 0;
    }
    return new_array;
 }
@@ -240,7 +245,7 @@ size_t array_get_size(struct array *this_array)
  */
 int array_add_team_host_device_sensor(struct array *this_array, char team_type, size_t host_number, char *device_name, char *sensor_name)
 {
-    syslog(LOG_DEBUG, "Adding sensor %chost%lu.%s.%s to %s:%s.", team_type, host_number, device_name, sensor_name, this_array->cmc_address, this_array->name);
+    //syslog(LOG_DEBUG, "Adding sensor %chost%lu.%s.%s to %s:%s.", team_type, host_number, device_name, sensor_name, this_array->cmc_address, this_array->name);
     if (this_array != NULL)
     {
        size_t i;
@@ -278,7 +283,7 @@ int array_add_team_host_device_sensor(struct array *this_array, char team_type, 
  */
 int array_add_team_host_engine_device_sensor(struct array *this_array, char team_type, size_t host_number, char *engine_name, char *device_name, char *sensor_name)
 {
-    syslog(LOG_DEBUG, "Adding sensor %chost%lu.%s.%s.%s to %s:%s.", team_type, host_number, engine_name, device_name, sensor_name, this_array->cmc_address, this_array->name);
+    //syslog(LOG_DEBUG, "Adding sensor %chost%lu.%s.%s.%s to %s:%s.", team_type, host_number, engine_name, device_name, sensor_name, this_array->cmc_address, this_array->name);
     if (this_array != NULL)
     {
         size_t i;
@@ -384,20 +389,12 @@ int array_check_suspect(struct array *this_array)
 void array_mark_fine(struct array *this_array)
 {
     this_array->array_is_active = 1;
-    //request sensor-value stagnant sensors just in case we missed something.
-    size_t n_stagnant_sensors = 0;
-    char **stagnant_sensors = array_get_stagnant_sensor_names(this_array, 120, &n_stagnant_sensors);
 
-    size_t i;
-    for (i = 0; i < n_stagnant_sensors; i++)
+    if (this_array->last_updated + 60 > time(0))
     {
         struct message *new_message = message_create('?');
         message_add_word(new_message, "sensor-value");
-        message_add_word(new_message, stagnant_sensors[i]);
         queue_push(this_array->outgoing_monitor_msg_queue, new_message);
-
-        syslog(LOG_DEBUG, "%s:%s monitor queue now has %zd messages waiting.",
-                this_array->cmc_address, this_array->name, queue_sizeof(this_array->outgoing_monitor_msg_queue)));
 
         if (this_array->monitor_state == ARRAY_MONITOR)
         {
@@ -406,9 +403,39 @@ void array_mark_fine(struct array *this_array)
         }
     }
 
+    //request sensor-value stagnant sensors just in case we missed something.
+    /*size_t n_stagnant_sensors = 0;
+    char **stagnant_sensors = array_get_stagnant_sensor_names(this_array, 120, &n_stagnant_sensors);
+
+    size_t i;
+    for (i = 0; i < n_stagnant_sensors; i++)
+    {
+        if (queue_sizeof(this_array->outgoing_monitor_msg_queue) > MESSAGE_BUFFER_MAX_LENGTH)
+        {
+            struct message *new_message = message_create('?');
+            message_add_word(new_message, "sensor-value");
+            message_add_word(new_message, stagnant_sensors[i]);
+            queue_push(this_array->outgoing_monitor_msg_queue, new_message);
+
+            //syslog(LOG_DEBUG, "%s:%s monitor queue now has %zd messages waiting.",
+            //        this_array->cmc_address, this_array->name, queue_sizeof(this_array->outgoing_monitor_msg_queue));
+
+            if (this_array->monitor_state == ARRAY_MONITOR)
+            {
+                array_monitor_queue_pop(this_array);
+                this_array->monitor_state = ARRAY_SEND_FRONT_OF_QUEUE;
+            }
+        }
+        else
+        {
+            syslog(LOG_DEBUG, "Too many stagnant sensors on %s:%s monitor queue, dropping the remaining %zd.",
+                    this_array->cmc_address, this_array->name, n_stagnant_sensors - i);
+        }
+    }
+
     for (i = 0; i < n_stagnant_sensors; i++)
         free(stagnant_sensors[i]);
-    free(stagnant_sensors);
+    free(stagnant_sensors);*/
 }
 
 
@@ -834,12 +861,12 @@ void array_handle_received_katcl_lines(struct array *this_array)
 {
     while (have_katcl(this_array->control_katcl_line) > 0)
     {
-	syslog(LOG_DEBUG, "Receved katcp message on %s:%s (control) - %s %s %s %s %s", this_array->cmc_address, this_array->name,
-			arg_string_katcl(this_array->control_katcl_line, 0),
-			arg_string_katcl(this_array->control_katcl_line, 1),
-			arg_string_katcl(this_array->control_katcl_line, 2),
-			arg_string_katcl(this_array->control_katcl_line, 3),
-			arg_string_katcl(this_array->control_katcl_line, 4));
+	//syslog(LOG_DEBUG, "Receved katcp message on %s:%s (control) - %s %s %s %s %s", this_array->cmc_address, this_array->name,
+	//		arg_string_katcl(this_array->control_katcl_line, 0),
+	//		arg_string_katcl(this_array->control_katcl_line, 1),
+	//		arg_string_katcl(this_array->control_katcl_line, 2),
+	//		arg_string_katcl(this_array->control_katcl_line, 3),
+	//		arg_string_katcl(this_array->control_katcl_line, 4));
 
         char received_message_type = arg_string_katcl(this_array->control_katcl_line, 0)[0];
         switch (received_message_type) {
@@ -850,12 +877,10 @@ void array_handle_received_katcl_lines(struct array *this_array)
                     if (!strcmp(arg_string_katcl(this_array->control_katcl_line, 1), "ok"))
                     {
                         //Don't actually need to do anything here, the inform processing code should handle.
-                        syslog(LOG_DEBUG, "Waiting message was: %s", composed_message);
+                        //syslog(LOG_DEBUG, "Waiting message was: %s", composed_message);
                     }
                     else
                     {
-                        //re-request. We'll put a warning message, just in case, but we'll assume config files are correct.
-                        syslog(LOG_WARNING, "(%s:%s) Fail response to '%s' received. Queue resending...", this_array->cmc_address, this_array->name, composed_message);
                         //If sensor value requests are failing, it could be that we are looking for xhosts that don't exist.
                         char *r;
                         if ((r = strstr(composed_message, "xhost")))
@@ -865,10 +890,13 @@ void array_handle_received_katcl_lines(struct array *this_array)
                             free(xhost_n_chr);
                             if (xhost_n < this_array->n_xhosts)
                             {
+                                //If we get too many of these, there is something wrong.
+                                syslog(LOG_WARNING, "(%s:%s) Fail response to [%s] received. Queue resending...", this_array->cmc_address, this_array->name, composed_message);
                                 queue_push(this_array->outgoing_control_msg_queue, this_array->current_control_message);
                             }
                             else
                             {
+                                syslog(LOG_INFO, "(%s:%s) Fail response to [%s] received. NOT resending, probably narrowband.", this_array->cmc_address, this_array->name, composed_message);
                                 message_destroy(this_array->current_control_message);
                             }
                         }
@@ -950,7 +978,8 @@ void array_handle_received_katcl_lines(struct array *this_array)
                         }
                         else
                         {
-                            syslog(LOG_WARNING, "(%s:%s) Received NULL input-labelling!", this_array->cmc_address, this_array->name);
+                            //we get quite a few of these, not even worried about them anymore.
+                            syslog(LOG_DEBUG, "(%s:%s) Received NULL input-labelling!", this_array->cmc_address, this_array->name);
                         }
                     }
                 }
@@ -965,7 +994,8 @@ void array_handle_received_katcl_lines(struct array *this_array)
                     }
                     else
                     {
-                        syslog(LOG_WARNING, "(%s:%s) Received NULL sensor-value!", this_array->cmc_address, this_array->name);
+                        //not even a warning, apparently this is expected behaviour. Thanks CAM.
+                        syslog(LOG_DEBUG, "(%s:%s) Received NULL sensor-value!", this_array->cmc_address, this_array->name);
                     }
                 }
                 break;
@@ -978,57 +1008,72 @@ void array_handle_received_katcl_lines(struct array *this_array)
     {
         char received_message_type = arg_string_katcl(this_array->monitor_katcl_line, 0)[0];
 
-	syslog(LOG_DEBUG, "Receved katcp message on %s:%s (monitor) - %s %s %s %s %s", this_array->cmc_address, this_array->name,
-			arg_string_katcl(this_array->monitor_katcl_line, 0),
-			arg_string_katcl(this_array->monitor_katcl_line, 1),
-			arg_string_katcl(this_array->monitor_katcl_line, 2),
-			arg_string_katcl(this_array->monitor_katcl_line, 3),
-			arg_string_katcl(this_array->monitor_katcl_line, 4));
+	//syslog(LOG_DEBUG, "Receved katcp message on %s:%s (monitor) - %s %s %s %s %s", this_array->cmc_address, this_array->name,
+	//		arg_string_katcl(this_array->monitor_katcl_line, 0),
+	//		arg_string_katcl(this_array->monitor_katcl_line, 1),
+	//		arg_string_katcl(this_array->monitor_katcl_line, 2),
+	//		arg_string_katcl(this_array->monitor_katcl_line, 3),
+	//		arg_string_katcl(this_array->monitor_katcl_line, 4));
 
         switch (received_message_type) {
             case '!': // it's a katcp response
-                if (this_array->current_monitor_message)
+                if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 0) + 1, message_see_word(this_array->current_monitor_message, 0)))
                 {
-                    if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 0) + 1, message_see_word(this_array->current_monitor_message, 0)))
+                    char *composed_message = message_compose(this_array->current_monitor_message);
+                    if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 1), "ok"))
                     {
-                        char *composed_message = message_compose(this_array->current_monitor_message);
-                        if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 1), "ok"))
-                        {
-                            //Don't actually need to do anything here, the inform processing code should handle.
-                            syslog(LOG_DEBUG, "Waiting message was: %s", composed_message);
-                        }
-                        else
-                        {
-                            //re-request. We'll put a warning message, just in case, but we'll assume config files are correct.
-                            syslog(LOG_WARNING, "(%s:%s) Fail response to '%s' received. Queue resending...", this_array->cmc_address, this_array->name, composed_message);
-                            queue_push(this_array->outgoing_monitor_msg_queue, this_array->current_monitor_message);
-                            this_array->current_monitor_message = NULL; //null the pointer, but don't destroy it, because the actual object is now on the queue again.
-                        }
-                        free(composed_message);
-
-                        if (queue_sizeof(this_array->outgoing_monitor_msg_queue))
-                        {
-                            array_monitor_queue_pop(this_array);
-                            this_array->monitor_state = ARRAY_SEND_FRONT_OF_QUEUE;
-                        }
-                        else
-                        {
-                            syslog(LOG_DEBUG, "%s:%hu going into monitoring state.", this_array->cmc_address, this_array->monitor_port);
-                            message_destroy(this_array->current_monitor_message);
-                            this_array->current_monitor_message = NULL; //doesn't do this in the above function. C problem.
-                            this_array->monitor_state = ARRAY_MONITOR;
-                        }
+                        //Don't actually need to do anything here, the inform processing code should handle.
+                        //syslog(LOG_DEBUG, "Waiting message was: %s", composed_message);
                     }
-                }
-                else
-                {
-                    syslog(LOG_WARNING, "Received a katcp response %s %s %s - unexpectedly.", arg_string_katcl(this_array->monitor_katcl_line, 0) + 1, arg_string_katcl(this_array->monitor_katcl_line, 1), arg_string_katcl(this_array->monitor_katcl_line, 2));
+                    else
+                    {
+                        //If sensor value requests are failing, it could be that we are looking for xhosts that don't exist.
+                        char *r;
+                        if ((r = strstr(composed_message, "xhost")))
+                        {
+                            char *xhost_n_chr = strndup(r + strlen("xhost"), 2);
+                            int xhost_n = atoi(xhost_n_chr);
+                            //syslog(LOG_WARNING, "Noticed that an xhost message failed. We have %zd xhosts in this array, this message was for xhost%02d (%s).",
+                            //        this_array->n_xhosts, xhost_n, xhost_n_chr);
+                            free(xhost_n_chr);
+                            if (xhost_n < this_array->n_xhosts)
+                            {
+                                syslog(LOG_WARNING, "(%s:%s) Fail response to [%s] received. Re-requesting.", this_array->cmc_address, this_array->name, composed_message);
+                                queue_push(this_array->outgoing_monitor_msg_queue, this_array->current_monitor_message);
+                            }
+                            else
+                            {
+                                syslog(LOG_INFO, "(%s:%s) Fail response to [%s] received. Probably unused x-engine, NOT re-requesting.", this_array->cmc_address, this_array->name, composed_message);
+                                message_destroy(this_array->current_monitor_message);
+                            }
+                        }
+                        else
+                        {
+                            syslog(LOG_WARNING, "(%s:%s) Fail response to '%s' received. Re-requesting.", this_array->cmc_address, this_array->name, composed_message);
+                            queue_push(this_array->outgoing_monitor_msg_queue, this_array->current_monitor_message);
+                        }
+                        this_array->current_monitor_message = NULL;
+                    }
+                    free(composed_message);
+
+                    if (queue_sizeof(this_array->outgoing_monitor_msg_queue))
+                    {
+                        array_monitor_queue_pop(this_array);
+                        this_array->monitor_state = ARRAY_SEND_FRONT_OF_QUEUE;
+                    }
+                    else
+                    {
+                        syslog(LOG_DEBUG, "%s:%s monitor connection going into monitoring state.", this_array->cmc_address, this_array->name);
+                        message_destroy(this_array->current_monitor_message);
+                        this_array->current_monitor_message = NULL; //doesn't do this in the above function. C problem.
+                        this_array->monitor_state = ARRAY_MONITOR;
+                    }
                 }
                 break;
             case '#': // it's a katcp inform
                 if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 0) + 1, "sensor-status") || !strcmp(arg_string_katcl(this_array->monitor_katcl_line, 0) + 1, "sensor-value"))
                 {
-                    if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 3), "hostname-functional-mapping") )
+                    if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 3), "hostname-functional-mapping") && !this_array->hostname_functional_mapping_received)
                     {
                         if (arg_string_katcl(this_array->monitor_katcl_line, 5) != NULL)
                         {
@@ -1040,13 +1085,13 @@ void array_handle_received_katcl_lines(struct array *this_array)
                                 if (i*30 + 21 > strlen(sensor_value))
                                         break;
                                 char host_type = sensor_value[i*30 + 21];
-                                syslog(LOG_DEBUG, "host type: %c", host_type);
+                                //syslog(LOG_DEBUG, "host type: %c", host_type);
 
                                 char *host_number_str = strndup(sensor_value + (i*30 + 26), 2);
                                 size_t host_number = (size_t) atoi(host_number_str);
-                                syslog(LOG_DEBUG, "host number: %lu", host_number);
+                                //syslog(LOG_DEBUG, "host number: %lu", host_number);
                                 char *host_serial = strndup(sensor_value + (i*30 + 8), 6);
-                                syslog(LOG_DEBUG, "host serial: %s", host_serial);
+                                //syslog(LOG_DEBUG, "host serial: %s", host_serial);
                                 switch (host_type)
                                 {
                                     //TODO: this should probably check more rigorously against team types.
@@ -1067,8 +1112,9 @@ void array_handle_received_katcl_lines(struct array *this_array)
                         }
                         else
                         {
-                            syslog(LOG_WARNING, "(%s:%s) Received NULL hostname-functional-mapping!", this_array->cmc_address, this_array->name);
+                            syslog(LOG_DEBUG, "(%s:%s) Received NULL hostname-functional-mapping!", this_array->cmc_address, this_array->name);
                         }
+                        this_array->hostname_functional_mapping_received = 1;
                     }
                     else
                     {
@@ -1098,7 +1144,7 @@ void array_handle_received_katcl_lines(struct array *this_array)
                         }
                         else
                         {
-                            syslog(LOG_DEBUG, "KATCP message from %s:%s for sensor-status %s - null value received.", this_array->cmc_address, this_array->name, arg_string_katcl(this_array->monitor_katcl_line, 3));
+                            //syslog(LOG_DEBUG, "KATCP message from %s:%s for sensor-status %s - null value received.", this_array->cmc_address, this_array->name, arg_string_katcl(this_array->monitor_katcl_line, 3));
                             new_value = strdup("none");
                         }
 
@@ -1109,13 +1155,17 @@ void array_handle_received_katcl_lines(struct array *this_array)
                         }
                         else
                         {
-                            syslog(LOG_DEBUG, "KATCP message from %s:%s for sensor-status %chost%02ld.%s.%s - null status received.", this_array->cmc_address, this_array->name, team, host_no, tokens[1], tokens[2]);
+                            //syslog(LOG_DEBUG, "KATCP message from %s:%s for sensor-status %chost%02ld.%s.%s - null status received.", this_array->cmc_address, this_array->name, team, host_no, tokens[1], tokens[2]);
                             new_status = strdup("none");
                         }
 
                         switch (n_tokens) {
                             case 1:
                                 array_update_top_level_sensor(this_array, tokens[0], new_value, new_status);
+                                break;
+                            case 2: 
+                                ; //Nothing to do here. It's probably a fhost01.device-status or something like that.
+                                // will get these when requesting sensor-value for all the sensorz. Just ignore.
                                 break;
                             case 3:
                                 team_update_sensor(this_array->team_list[team_no], host_no, tokens[1], tokens[2], new_value, new_status);
@@ -1125,7 +1175,7 @@ void array_handle_received_katcl_lines(struct array *this_array)
                                 break;
                             default:
                                 //TODO make this error message a bit more reasonable so that I'd be able to find it if I needed to.
-                                syslog(LOG_ERR, "There was an unexpected number of tokens (%ld) in the message: %s", n_tokens, arg_string_katcl(this_array->monitor_katcl_line, 3)); 
+                                syslog(LOG_ERR, "Unexpected number of tokens (%ld) in received KATCP message: %s", n_tokens, arg_string_katcl(this_array->monitor_katcl_line, 3)); 
                         }
 
                         //Update the time
@@ -1349,7 +1399,7 @@ struct message *array_monitor_queue_pop(struct array *this_array)
  * \param   number_of_sensors A pointer to an integer so that the function can return the number of sensors in the list.
  * \return  A pointer to an array of strings containing the names of the array's stagnant sensors.
  */
-char** array_get_stagnant_sensor_names(struct array *this_array, time_t stagnant_time, size_t *number_of_sensors)
+/*char** array_get_stagnant_sensor_names(struct array *this_array, time_t stagnant_time, size_t *number_of_sensors)
 {
     *number_of_sensors = 0;
     char **sensor_names = NULL;
@@ -1382,6 +1432,6 @@ char** array_get_stagnant_sensor_names(struct array *this_array, time_t stagnant
         syslog(LOG_DEBUG, "Array %s reported %ld stagnant sensor%s.", this_array->name, *number_of_sensors, *number_of_sensors == 1 ? "" : "s");
     return sensor_names;
 
-} 
+} */
 
 

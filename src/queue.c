@@ -78,11 +78,29 @@ int queue_push(struct queue *this_queue, struct message *new_message)
         syslog(LOG_ERR, "Attempted to push NULL message onto a queue.");
         return -2; /// \retval -2 Operation failed: the message was NULL.
     }
+
+    // First we're going to check whether the message already exists on the queue. No need to be sending duplicates.
+    size_t i;
+    for (i = 0; i < this_queue->queue_length; i++)
+    {
+        char *already_queued = message_compose(this_queue->message_queue[i]);
+        char *composed_new_message = message_compose(new_message);
+        if (!strcmp(already_queued, composed_new_message))
+        {
+            syslog(LOG_DEBUG, "Message [%s] already on the queue, not pushing.", already_queued);
+            free(already_queued);
+            free(composed_new_message);
+            return 0; // Pretend that we've added the message to the queue because it's already there.
+        }
+        free(already_queued);
+        free(composed_new_message);
+    }
+
     struct message **temp = realloc(this_queue->message_queue, sizeof(*(this_queue->message_queue))*(this_queue->queue_length + 1));
     if (temp != NULL)
     {
         char *composed_message = message_compose(new_message);
-        syslog(LOG_DEBUG, "Pushing message %s onto queue.", composed_message);
+        //syslog(LOG_DEBUG, "Pushing message %s onto queue, now %zd messages long.", composed_message, queue_sizeof(this_queue));
         free(composed_message);
         composed_message = NULL;
         temp[this_queue->queue_length] = new_message;
@@ -119,7 +137,7 @@ struct message *queue_pop(struct queue *this_queue)
     }
 
     char *composed_message = message_compose(this_queue->message_queue[0]);
-    syslog(LOG_DEBUG, "Popping message %s from queue.", composed_message);
+    //syslog(LOG_DEBUG, "Popping message %s from queue, now %zd messages long.", composed_message, queue_sizeof(this_queue));
     free(composed_message);
     composed_message = NULL;
 

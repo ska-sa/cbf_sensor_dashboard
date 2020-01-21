@@ -19,10 +19,7 @@ int engine_add_device(struct engine *this_engine, char *new_device_name);
 int engine_add_sensor_to_device(struct engine *this_engine, char *device_name, char *new_sensor_name);
 char *engine_get_sensor_value(struct engine *this_engine, char *device_name, char *sensor_name);
 char *engine_get_sensor_status(struct engine *this_engine, char *device_name, char *sensor_name);
-time_t engine_get_sensor_time(struct engine *this_engine, char *device_name, char *sensor_name);
 int engine_update_sensor(struct engine *this_engine, char *device_name, char *sensor_name, char *new_sensor_value, char *new_sensor_status);
-
-char** engine_get_stagnant_sensor_names(struct engine *this_engine, time_t stagnant_time, size_t *number_of_sensors);
 
 /*debug functions*/
 //void engine_print(struct engine *this_engine);

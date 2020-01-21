@@ -98,38 +98,6 @@ int device_add_sensor(struct device *this_device, char *new_sensor_name)
 
 
 /**
- * \fn      char **device_get_stagnant_sensor_names(struct device *this_device, time_t stagnant_time, size_t *number_of_sensors)
- * \details Get a list of names of the device's sensor members which haven't been updated for a specified amount of time.
- * \param   this_device A pointer to the device.
- * \param   stagnant_time The time in seconds above which sensors should be reported stagnant.
- * \param   number_of_sensors A pointer to an integer so that the function can return the number
- *          of sensors in the list.
- * \return  A pointer to an array of strings containing the names of the device's stagnant sensors.
- */
-char **device_get_stagnant_sensor_names(struct device *this_device, time_t stagnant_time, size_t *number_of_sensors)
-{
-    *number_of_sensors = 0; /*need to return this to the caller*/
-    if (this_device->number_of_sensors == 0)
-        return NULL; /*Not useful to return a pointer to zero memory space.*/
-    char **sensor_names = NULL;
-    int i;
-    for (i = 0; i < this_device->number_of_sensors; i++)
-    {
-        if ((time(0) - stagnant_time) >= sensor_get_last_updated(this_device->sensor_list[i]))
-        {
-            sensor_names = realloc(sensor_names, sizeof(*sensor_names)*(*number_of_sensors + 1));
-            ssize_t needed = snprintf(NULL, 0, "%s.%s", this_device->name, sensor_get_name(this_device->sensor_list[i])) + 1;
-            sensor_names[*number_of_sensors] = malloc((size_t) needed);
-            sprintf(sensor_names[(*number_of_sensors)++], "%s.%s", this_device->name, sensor_get_name(this_device->sensor_list[i]));
-        }
-    }
-    if (*number_of_sensors)
-        syslog(LOG_DEBUG, "Device %s reported %ld stagnant sensor%s.", this_device->name, *number_of_sensors, *number_of_sensors == 1 ? "" : "s");
-    return sensor_names;
-}
-
-
-/**
  * \fn      char *device_get_sensor_value(struct sensor *this_device, char *sensor_name)
  * \details Query the device for the value of one of its sensors.
  * \param   this_device A pointer to the device to be queried.
@@ -174,27 +142,6 @@ char *device_get_sensor_status(struct device *this_device, char *sensor_name)
 
 
 /**
- * \fn      char *device_get_sensor_time(struct device *this_device, char *sensor_name)
- * \details Query the device for the last updated time of one of its sensors.
- * \param   this_device A pointer to the device to be queried.
- * \param   sensor_name A char* contianing the name of the sensor to be queried.
- * \return  The time in seconds of the sensor's last update.
- */
-time_t device_get_sensor_time(struct device *this_device, char *sensor_name)
-{
-    unsigned int i;
-    for (i = 0; i < this_device->number_of_sensors; i++)
-    {
-        if (!strcmp(sensor_name, sensor_get_name(this_device->sensor_list[i])))
-        {
-            return sensor_get_last_updated(this_device->sensor_list[i]);
-        }
-    }
-    return 0;
-}
-
-
-/**
  * \fn      int device_update_sensor(struct device *this_device, char *sensor_name, char *new_sensor_value, char *new_sensor_status)
  * \details Update the value and status of the named sensor underneath the given device.
  * \param   this_device A pointer to the device.
@@ -227,15 +174,10 @@ int device_update_sensor(struct device *this_device, char *sensor_name, char *ne
  */
 char *device_html_summary(struct device *this_device)
 {
-    //leaving these lines in, in case I want to bring this feature back.
-    //char format[] = "<td class=\"%s\">%s (%u)</td>";
     char format[] = "<td class=\"%s\">%s</td>";
     // TODO some kind of check in case the device doens't have a "device-status" sensor.
-    //time_t last_updated = time(0) - device_get_sensor_time(this_device, "device-status");
-    //ssize_t needed = snprintf(NULL, 0, format, device_get_sensor_status(this_device, "device-status"), this_device->name, last_updated) + 1;
     ssize_t needed = snprintf(NULL, 0, format, device_get_sensor_status(this_device, "device-status"), this_device->name) + 1;
     char *html_summary = malloc((size_t) needed);
-    //sprintf(html_summary, format, device_get_sensor_status(this_device, "device-status"), this_device->name, last_updated);
     sprintf(html_summary, format, device_get_sensor_status(this_device, "device-status"), this_device->name);
     return html_summary;
 }

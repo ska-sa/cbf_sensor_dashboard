@@ -165,29 +165,6 @@ char *engine_get_sensor_status(struct engine *this_engine, char *device_name, ch
 
 
 /**
- * \fn      time_t engine_get_sensor_time(struct engine *this_engine, char *device_name, char *sensor_name)
- * \details Retrieve the last updated time from a sensor on one of the engine's devices.
- * \param   this_engine A pointer to the engine in question.
- * \param   device_name A string containing the name of the device to be queried.
- * \param   sensor_name A string containing the name of the sensor to be queried.
- * \return  The time in seconds of the sensor's last update.
- *          Returns NULL if the operation was unsuccessful.
- */
-time_t engine_get_sensor_time(struct engine *this_engine, char *device_name, char *sensor_name)
-{
-    unsigned int i;
-    for (i = 0; i < this_engine->number_of_devices; i++)
-    {
-        if (!strcmp(device_name, device_get_name(this_engine->device_list[i])))
-        {
-            return device_get_sensor_time(this_engine->device_list[i], sensor_name);
-        }
-    }
-    return 0;
-}
-
-
-/**
  * \fn      int engine_update_sensor(struct engine *this_engine, char *device_name, char *sensor_name, char *new_sensor_value, char *new_sensor_status)
  * \details Write a new value and status to a sensor on one of the engine's devices.
  * \param   this_engine A pointer to the engine in question.
@@ -209,41 +186,3 @@ int engine_update_sensor(struct engine *this_engine, char *device_name, char *se
     }
     return -1;
 }
-
-
-/**
- * \fn      char** engine_get_stagnant_sensor_names(struct engine *this_engine, time_t stagnant_time, size_t *number_of_sensors)
- * \details Get a list of names of the engine's sensors (via its child devices) which haven't been updated for a specified amount of time.
- * \param   this_engine A pointer to the engine.
- * \param   stagnant_time The time in seconds above which sensors should be reported stagnant.
- * \param   number_of_sensors A pointer to an integer so that the function can return the number of sensors in the list.
- * \return  A pointer to an array of strings containing the names of the engine's stagnant sensors.
- */
-char** engine_get_stagnant_sensor_names(struct engine *this_engine, time_t stagnant_time, size_t *number_of_sensors)
-{
-    *number_of_sensors = 0;
-
-    char **sensor_names = NULL;
-    int i;
-    for (i = 0; i < this_engine->number_of_devices; i++)
-    {
-        size_t batch_n_sensors = 0;
-        char **batch_sensor_names = device_get_stagnant_sensor_names(this_engine->device_list[i], stagnant_time, &batch_n_sensors);
-        sensor_names = realloc(sensor_names, sizeof(*sensor_names)*(*number_of_sensors + batch_n_sensors));
-        int j;
-        for (j = 0; j < batch_n_sensors; j++)
-        {
-            ssize_t needed = snprintf(NULL, 0, "%s.%s", this_engine->name, batch_sensor_names[j]) + 1;
-            sensor_names[*number_of_sensors + (size_t) j] = malloc((size_t) needed);
-            sprintf(sensor_names[*number_of_sensors + (size_t) j], "%s.%s", this_engine->name, batch_sensor_names[j]);
-            free(batch_sensor_names[j]);
-        }
-        free(batch_sensor_names);
-        *number_of_sensors += batch_n_sensors;
-    }
-    if (*number_of_sensors)
-        syslog(LOG_DEBUG, "Engine %s reported %ld stagnant sensor%s.", this_engine->name, *number_of_sensors, *number_of_sensors == 1 ? "" : "s");
-    return sensor_names;
-}
-
-

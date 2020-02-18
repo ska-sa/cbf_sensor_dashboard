@@ -417,27 +417,25 @@ char *host_html_detail(struct host *this_host)
         sprintf(host_detail, format, this_host->host_input_stream_name);
     }
     {
-        char format[] = "%s<td>%c%d %s</td>";
-        ssize_t needed = snprintf(NULL, 0, format, host_detail, this_host->type, this_host->host_number, this_host->host_serial) + 1;
+        char format[] = "<td>%c%d %s</td>";
+        ssize_t needed = snprintf(NULL, 0, format, this_host->type, this_host->host_number, this_host->host_serial) + 1;
+        needed += (ssize_t) strlen(host_detail);
         host_detail = realloc(host_detail, (size_t) needed); //TODO checks for errors.
-        sprintf(host_detail, format, host_detail, this_host->type, this_host->host_number, this_host->host_serial);
+        sprintf(host_detail + strlen(host_detail), format, this_host->type, this_host->host_number, this_host->host_serial);
     }
     for (i = 0; i < this_host->number_of_devices; i++)
     {
-        char format[] = "%s%s";
         char *dev_html_summ = device_html_summary(this_host->device_list[i]);
-        ssize_t needed = snprintf(NULL, 0, format, host_detail, dev_html_summ) + 1;
-        host_detail = realloc(host_detail, (size_t) needed); //TODO checks for errors.
-        sprintf(host_detail, format, host_detail, dev_html_summ);
+        size_t needed = strlen(host_detail) + strlen(dev_html_summ) + 1;
+        host_detail = realloc(host_detail, needed);
+        strcat(host_detail, dev_html_summ);
         free(dev_html_summ);
     }
     for (i = 0; i < this_host->number_of_vdevices; i++)
     {
-        char format[] = "%s%s";
         char *vdev_html_summ = vdevice_html_summary(this_host->vdevice_list[i]);
-        ssize_t needed = snprintf(NULL, 0, format, host_detail, vdev_html_summ) + 1;
-        host_detail = realloc(host_detail, (size_t) needed); //TODO checks for errors.
-        sprintf(host_detail, format, host_detail, vdev_html_summ);
+        host_detail = realloc(host_detail, strlen(host_detail) + strlen(vdev_html_summ) + 1);
+        strcat(host_detail, vdev_html_summ);
         free(vdev_html_summ);
     }
     return host_detail;

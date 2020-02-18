@@ -154,7 +154,9 @@ char *message_compose(struct message *this_message)
     sprintf(composed_message, "%c%s", this_message->message_type, this_message->word_list[0]);
     for (i = 1; i < this_message->number_of_words; i++)
     {
-        sprintf(composed_message, "%s %s", composed_message, this_message->word_list[i]);
+        composed_message = realloc(composed_message, strlen(composed_message) + strlen(this_message->word_list[i]) + 1);
+        strcat(composed_message, " ");
+        strcat(composed_message, this_message->word_list[i]);
     }
     composed_message[message_length - 2] = '\0'; //to remove the trailiing space
 

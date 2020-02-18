@@ -1073,7 +1073,7 @@ void array_handle_received_katcl_lines(struct array *this_array)
             case '#': // it's a katcp inform
                 if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 0) + 1, "sensor-status") || !strcmp(arg_string_katcl(this_array->monitor_katcl_line, 0) + 1, "sensor-value"))
                 {
-                    if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 3), "hostname-functional-mapping") && !this_array->hostname_functional_mapping_received)
+                    if (!strcmp(arg_string_katcl(this_array->monitor_katcl_line, 3), "hostname-functional-mapping"))
                     {
                         if (arg_string_katcl(this_array->monitor_katcl_line, 5) != NULL)
                         {
@@ -1234,16 +1234,12 @@ char *array_html_detail(struct array *this_array)
         char *tl_sensors_rep = strdup("");
         for (i = 0; i < this_array->num_top_level_sensors; i++)
         {
-            //leaving these lines in, in case I want to bring this (debug) feature back
-            //char tl_sensors_format[] = "%s<button class=\"%s\" style=\"width:300px\">%s (%u)</button> ";
-            char tl_sensors_format[] = "%s<button class=\"%s\" style=\"width:300px\">%s</button> ";
-            //time_t last_updated = time(0) - sensor_get_last_updated(this_array->top_level_sensor_list[i]);
-            ssize_t needed = snprintf(NULL, 0, tl_sensors_format, tl_sensors_rep, sensor_get_status(this_array->top_level_sensor_list[i]), \
-                    //sensor_get_name(this_array->top_level_sensor_list[i]), last_updated) + 1;
+            char tl_sensors_format[] = "<button class=\"%s\" style=\"width:300px\">%s</button> ";
+            ssize_t needed = (ssize_t) snprintf(NULL, 0, tl_sensors_format, sensor_get_status(this_array->top_level_sensor_list[i]), \
                     sensor_get_name(this_array->top_level_sensor_list[i])) + 1;
+            needed += (ssize_t) strlen(tl_sensors_rep);
             tl_sensors_rep = realloc(tl_sensors_rep, (size_t) needed); //TODO check for -1
-            sprintf(tl_sensors_rep, tl_sensors_format, tl_sensors_rep, sensor_get_status(this_array->top_level_sensor_list[i]), \
-                    //sensor_get_name(this_array->top_level_sensor_list[i]), last_updated);
+            sprintf(tl_sensors_rep + strlen(tl_sensors_rep), tl_sensors_format, sensor_get_status(this_array->top_level_sensor_list[i]), \
                     sensor_get_name(this_array->top_level_sensor_list[i]));
         }
         char format[] = "<p align=\"right\">CMC: %s | Array name: %s | Config: %s | %s Last updated: %s (%d seconds ago). <button style=\"width:7%\"><a href=\"/%s/%s/missing-pkts\">missing-pkts</a></button></p>";
@@ -1263,17 +1259,18 @@ char *array_html_detail(struct array *this_array)
         char *row_detail = strdup("");
         for (j = 0; j < this_array->number_of_teams; j++)
         {
-            char format[] = "%s%s";
             char *host_html_det = team_get_host_html_detail(this_array->team_list[j], i);
-            ssize_t needed = snprintf(NULL, 0, format, row_detail, host_html_det) + 1;
-            row_detail = realloc(row_detail, (size_t) needed);
-            sprintf(row_detail, format, row_detail, host_html_det);
+            size_t needed =  strlen(row_detail) + strlen(host_html_det) + 1;
+            row_detail = realloc(row_detail, needed);
+            strcat(row_detail, host_html_det);
             free(host_html_det);
         }
-        char format[] = "%s<tr>%s</tr>\n";
-        ssize_t needed = snprintf(NULL, 0, format, array_detail, row_detail) + 1;
-        array_detail = realloc(array_detail, (size_t) needed); //TODO checks
-        sprintf(array_detail, format, array_detail, row_detail);
+        char format[] = "<tr>%s</tr>\n";
+        ssize_t needed = (ssize_t) snprintf(NULL, 0, format, row_detail) + 1;
+        needed += (ssize_t) strlen(array_detail);
+        //printf("Needed: %zd\n", needed);
+        array_detail = realloc(array_detail, (size_t) needed);
+        sprintf(array_detail + strlen(array_detail), format, row_detail);
         free(row_detail);
     }
 
@@ -1305,16 +1302,17 @@ char *array_html_missing_pkt_view(struct array *this_array)
     size_t i, j;
     for (i = 0; i < this_array->n_antennas; i++)
     {
-        char top_row_format[] = "%s<td>f%02d</td>";
-        char second_row_format[] = "%s<td>%s</td>";
-        ssize_t needed = snprintf(NULL, 0, top_row_format, top_row_html, i) + 1; //using vertical axis to build column headings,
-                                                                        //which should be okay because we assume a square array.
+        char top_row_format[] = "<td>f%02d</td>";
+        char second_row_format[] = "<td>%s</td>";
+        ssize_t needed = (ssize_t) snprintf(NULL, 0, top_row_format, i) + 1; //using vertical axis to build column headings,
+        needed += (ssize_t) strlen(top_row_html);                                                                //which should be okay because we assume a square array.
         top_row_html = realloc(top_row_html, (size_t) needed);
-        sprintf(top_row_html, top_row_format, top_row_html, i);
+        sprintf(top_row_html + strlen(top_row_html), top_row_format, i);
 
-        needed = snprintf(NULL, 0, second_row_format, second_row_html, team_get_fhost_input_stream(this_array->team_list[0], (size_t) i)) + 1;
+        needed = (ssize_t) snprintf(NULL, 0, second_row_format, team_get_fhost_input_stream(this_array->team_list[0], (size_t) i)) + 1;
+        needed += (ssize_t) strlen(second_row_html);
         second_row_html = realloc(second_row_html, (size_t) needed);
-        sprintf(second_row_html, second_row_format, second_row_html, team_get_fhost_input_stream(this_array->team_list[0], (size_t) i));
+        sprintf(second_row_html + strlen(second_row_html), second_row_format, team_get_fhost_input_stream(this_array->team_list[0], (size_t) i));
 
         char *host_html = strdup("");
         for (j = 0; j < this_array->n_antennas; j++)
@@ -1325,30 +1323,31 @@ char *array_html_missing_pkt_view(struct array *this_array)
             char *sensor_name = malloc((size_t) needed);
             sprintf(sensor_name, sensor_name_format, j);
 
-            char html_format[] = "%s<td class=\"%s\">%s</td>";
+            char html_format[] = "<td class=\"%s\">%s</td>";
             char *sensor_status = array_get_sensor_status(this_array, 'x', i, "missing-pkts", sensor_name);
             char *sensor_value = array_get_sensor_value(this_array, 'x', i, "missing-pkts", sensor_name);
-            needed = snprintf(NULL, 0, html_format, host_html, sensor_status, sensor_value) + 1;
+            needed = (ssize_t) snprintf(NULL, 0, html_format, sensor_status, sensor_value) + 1;
+            needed += (ssize_t) strlen(host_html);
             host_html = realloc(host_html, (size_t) needed);
-            sprintf(host_html, html_format, host_html, sensor_status, sensor_value);
+            sprintf(host_html + strlen(host_html), html_format, sensor_status, sensor_value);
             
             free(sensor_name);
         }
         //syslog(LOG_DEBUG, "Generated host html: %s", host_html);
-        char array_format[] = "%s<tr><td>x%02d</td>%s</tr>\n";
-        needed = snprintf(NULL, 0, array_format, array_html, i, host_html) + 1;
+        char array_format[] = "<tr><td>x%02d</td>%s</tr>\n";
+        needed = (ssize_t) snprintf(NULL, 0, array_format, i, host_html) + 1;
+        needed += (ssize_t) strlen(array_html);
         array_html = realloc(array_html, (size_t) needed);
-        sprintf(array_html, array_format, array_html, i, host_html);
+        sprintf(array_html + strlen(array_html), array_format, i, host_html);
         free(host_html);
     }
 
     char top_row_format[] = "%s</tr>\n";
-    ssize_t needed = snprintf(NULL, 0, top_row_format, top_row_html) + 1;
-    top_row_html = realloc(top_row_html, (size_t) needed);
-    sprintf(top_row_html, top_row_format, top_row_html);
+    top_row_html = realloc(top_row_html, strlen(top_row_html) + strlen(top_row_format) + 1);
+    strcat(top_row_html, top_row_format);
 
     char final_format[] = "<table>%s%s%s</table>";
-    needed = snprintf(NULL, 0, final_format, top_row_html, second_row_html, array_html) + 1;
+    ssize_t needed = snprintf(NULL, 0, final_format, top_row_html, second_row_html, array_html) + 1;
     char *final_html = malloc((size_t) needed);
     sprintf(final_html, final_format, top_row_html, second_row_html, array_html);
     free(array_html);

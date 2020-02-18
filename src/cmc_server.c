@@ -659,21 +659,23 @@ char *cmc_server_html_representation(struct cmc_server *this_cmc_server)
             size_t i;
             for (i = 0; i < this_cmc_server->no_of_arrays; i++)
             {
-                char format[] = "%s%s\n";
+                char format[] = "%s\n";
                 char *array_html_rep = array_html_summary(this_cmc_server->array_list[i], this_cmc_server->address);
-                ssize_t needed = snprintf(NULL, 0, format, cmc_html_rep, array_html_rep) + 1;
+                ssize_t needed = (ssize_t) snprintf(NULL, 0, format, array_html_rep) + 1;
+                needed += (ssize_t) strlen(cmc_html_rep);
                 //TODO checks
                 cmc_html_rep = realloc(cmc_html_rep, (size_t) needed); //naughty naughty, no temp variable.
-                sprintf(cmc_html_rep, format, cmc_html_rep, array_html_rep);
+                sprintf(cmc_html_rep + strlen(cmc_html_rep), format, array_html_rep);
                 free(array_html_rep);
             }
 
             {
-                char *format = "%s</table><p>Allocated SKARABS: %lu</p><p>Up SKARABS: %lu</p><p>Standby SKARABs: %lu</p>";
-                ssize_t needed = snprintf(NULL, 0, format, cmc_html_rep, this_cmc_server->allocated_skarabs, this_cmc_server->up_skarabs, this_cmc_server->standby_skarabs) + 1;
+                char *format = "</table><p>Allocated SKARABS: %lu</p><p>Up SKARABS: %lu</p><p>Standby SKARABs: %lu</p>";
+                ssize_t needed = (ssize_t) snprintf(NULL, 0, format, this_cmc_server->allocated_skarabs, this_cmc_server->up_skarabs, this_cmc_server->standby_skarabs) + 1;
+                needed += (ssize_t) strlen(cmc_html_rep);
                 //TODO checks
                 cmc_html_rep = realloc(cmc_html_rep, (size_t) needed);
-                sprintf(cmc_html_rep, format, cmc_html_rep, this_cmc_server->allocated_skarabs, this_cmc_server->up_skarabs, this_cmc_server->standby_skarabs);
+                sprintf(cmc_html_rep + strlen(cmc_html_rep), format, this_cmc_server->allocated_skarabs, this_cmc_server->up_skarabs, this_cmc_server->standby_skarabs);
             }
     }
     return cmc_html_rep;

@@ -1,10 +1,10 @@
 .nominal {
-  background-color: #4CAF50;
+  background-color: #1A7A1D;
   border: none;
   color: white;
   text-align: center;
   text-decoration: none;
-  opacity: 0.4;
+  opacity: 0.6;
   transition: 0.2s;
 }
 .nominal:hover {opacity: 1}

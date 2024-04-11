@@ -282,7 +282,7 @@ int main(int argc, char **argv)
         FD_SET(server_fd, &rd);
         nfds = max(nfds, server_fd);
 
-        if ((time(0) - last_array_list_poll) >= 10) //check for a change
+        if ((time(0) - last_array_list_poll) >= 60) //check for a change
         {
             for (i = 0; i < num_cmcs; i++)
                 cmc_server_poll_array_list(cmc_list[i]);

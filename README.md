@@ -5,6 +5,8 @@ It makes connections to every CMC listed in its config file, and hosts a simple
 HTTP server to which you can connect a browser and see the state of the correlators
 that are running.
 
+![Screenshot](screenshot.png)
+
 ### To install:
 
 1. Clone this repo.
